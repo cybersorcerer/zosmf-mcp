@@ -1,0 +1,27 @@
+# Binaries
+zosmf-mcp
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build output
+/bin/
+/dist/
+
+# Config with secrets
+.zosmf-mcp-config.yaml
+.env
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+*.test
+*.out
+coverage.html

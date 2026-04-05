@@ -1,0 +1,32 @@
+systems:
+  - name: "SYSA"
+    host: "https://sysa.example.com:443"
+    auth:
+      type: "basic"
+      username: "IBMUSER"
+      password: "${ZOSMF_SYSA_PASSWORD}"
+    # ca_file: "/path/to/ca.pem"       # Optional: custom CA for self-signed z/OSMF certs
+    skip_tls_verify: false
+    csi_datasets:                       # Optional: default CSI datasets for SMP/E queries
+      - "SMPE.GLOBAL.CSI"
+      # - "SMPE.OTHER.CSI"
+    target_zones:                       # Optional: default SMP/E target zones
+      - "TGTZONE"
+    dlib_zones:                         # Optional: default SMP/E distribution zones
+      - "DLIBZONE"
+
+  # Example: second system with client certificate auth
+  # - name: "SYSB"
+  #   host: "https://sysb.example.com:443"
+  #   auth:
+  #     type: "certificate"
+  #     cert_file: "/path/to/client.pem"
+  #     key_file: "/path/to/client.key"
+  #   ca_file: "/path/to/ca.pem"
+  #   skip_tls_verify: false
+
+transport:
+  stdio: true
+  http:
+    enabled: false
+    listen: ":8080"

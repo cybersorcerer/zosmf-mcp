@@ -1,0 +1,271 @@
+package zosmf
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"os"
+	"strings"
+
+	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+)
+
+// Client is an HTTP client for communicating with a z/OSMF instance.
+type Client struct {
+	httpClient *http.Client
+	baseURL    string
+	auth       config.AuthConfig
+	systemName string
+}
+
+// ClientRegistry manages clients for multiple z/OS systems.
+type ClientRegistry struct {
+	clients map[string]*Client
+}
+
+func NewClientRegistry() *ClientRegistry {
+	return &ClientRegistry{
+		clients: make(map[string]*Client),
+	}
+}
+
+func (r *ClientRegistry) Register(name string, client *Client) {
+	r.clients[strings.ToUpper(name)] = client
+}
+
+func (r *ClientRegistry) Get(name string) (*Client, error) {
+	c, ok := r.clients[strings.ToUpper(name)]
+	if !ok {
+		return nil, fmt.Errorf("unknown system: %s", name)
+	}
+	return c, nil
+}
+
+func (r *ClientRegistry) SystemNames() []string {
+	names := make([]string, 0, len(r.clients))
+	for name := range r.clients {
+		names = append(names, name)
+	}
+	return names
+}
+
+// NewClient creates a z/OSMF client from a system configuration.
+func NewClient(sys config.SystemConfig) (*Client, error) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: sys.SkipTLSVerify,
+	}
+
+	// Load custom CA if specified
+	if sys.CAFile != "" {
+		caCert, err := os.ReadFile(sys.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("reading CA file: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate")
+		}
+		tlsConfig.RootCAs = pool
+	}
+
+	// Load client certificate if auth type is certificate
+	if sys.Auth.Type == "certificate" {
+		cert, err := tls.LoadX509KeyPair(sys.Auth.CertFile, sys.Auth.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("loading client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating cookie jar: %w", err)
+	}
+
+	httpClient := &http.Client{
+		Jar: jar,
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	baseURL := strings.TrimRight(sys.Host, "/")
+
+	return &Client{
+		httpClient: httpClient,
+		baseURL:    baseURL,
+		auth:       sys.Auth,
+		systemName: sys.Name,
+	}, nil
+}
+
+// Do executes an HTTP request against the z/OSMF instance.
+func (c *Client) Do(req *http.Request) (*http.Response, error) {
+	// Set common z/OSMF headers
+	req.Header.Set("X-CSRF-ZOSMF-HEADER", "*")
+	req.Header.Set("Accept", "application/json")
+
+	if req.Body != nil && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	// Set basic auth if configured
+	if c.auth.Type == "basic" {
+		req.SetBasicAuth(c.auth.Username, c.auth.Password)
+	}
+
+	return c.httpClient.Do(req)
+}
+
+// Get performs a GET request to the given z/OSMF API path.
+func (c *Client) Get(path string) ([]byte, error) {
+	url := c.baseURL + path
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to %s failed: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}
+
+// Put performs a PUT request to the given z/OSMF API path with a JSON body.
+func (c *Client) Put(path string, body any) ([]byte, error) {
+	return c.doWithBody(http.MethodPut, path, body)
+}
+
+// Post performs a POST request to the given z/OSMF API path with a JSON body.
+func (c *Client) Post(path string, body any) ([]byte, error) {
+	return c.doWithBody(http.MethodPost, path, body)
+}
+
+// Delete performs a DELETE request to the given z/OSMF API path.
+func (c *Client) Delete(path string) ([]byte, error) {
+	url := c.baseURL + path
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to %s failed: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
+}
+
+// PostWithStatus performs a POST and returns the status code along with the body.
+func (c *Client) PostWithStatus(path string, body any) (int, []byte, error) {
+	return c.doWithBodyAndStatus(http.MethodPost, path, body)
+}
+
+// GetWithStatus performs a GET to a full URL and returns status code and body.
+// Used for polling async status URLs.
+func (c *Client) GetWithStatus(fullURL string) (int, []byte, error) {
+	req, err := http.NewRequest(http.MethodGet, fullURL, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("request to %s failed: %w", fullURL, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	return resp.StatusCode, respBody, nil
+}
+
+func (c *Client) doWithBodyAndStatus(method, path string, body any) (int, []byte, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("marshaling request body: %w", err)
+	}
+
+	url := c.baseURL + path
+	req, err := http.NewRequest(method, url, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("request to %s failed: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || (resp.StatusCode >= 300 && resp.StatusCode != 202) {
+		return resp.StatusCode, nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+	}
+
+	return resp.StatusCode, respBody, nil
+}
+
+func (c *Client) doWithBody(method, path string, body any) ([]byte, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request body: %w", err)
+	}
+
+	url := c.baseURL + path
+	req, err := http.NewRequest(method, url, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to %s failed: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
+}

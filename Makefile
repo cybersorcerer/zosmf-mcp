@@ -19,12 +19,13 @@ build-all:
 	GOARCH=amd64  GOOS=windows go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-windows.exe   ./cmd/zosmf-mcp
 
 build-local:
-	go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/zosmf-mcp
+	@mkdir -p $(BINARY_DIR)
+	go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY) ./cmd/zosmf-mcp
 
 build: build-local
 
 clean:
-	rm -f $(BINARY)
+	rm -rf $(BINARY_DIR)
 	go clean -cache -testcache
 
 test:
@@ -41,11 +42,11 @@ lint:
 	golangci-lint run ./...
 
 run: build
-	./$(BINARY) --config .zosmf-mcp-config.yaml
+	./$(BINARY_DIR)/$(BINARY) --config .zosmf-mcp-config.yaml
 
 install: build
 	install -d $(HOME)/.local/bin
-	install -m 755 $(BINARY) $(HOME)/.local/bin/$(BINARY)
+	install -m 755 $(BINARY_DIR)/$(BINARY) $(HOME)/.local/bin/$(BINARY)
 
 tidy:
 	go mod tidy

@@ -1,13 +1,12 @@
 # Binaries
-zosmf-mcp
 *.exe
 *.dll
 *.so
 *.dylib
 
 # Build output
-/bin/
-/dist/
+bin/
+dist/
 
 # Config with secrets
 .zosmf-mcp-config.yaml

@@ -23,6 +23,10 @@ type SystemConfig struct {
 	CSIDatasets   []string   `yaml:"csi_datasets"`
 	TargetZones   []string   `yaml:"target_zones"`
 	DlibZones     []string   `yaml:"dlib_zones"`
+	TSOAccount    string     `yaml:"tso_account"`
+	TSOProc       string     `yaml:"tso_proc"`
+	TSOCharset    string     `yaml:"tso_charset"`
+	TSOCodepage   string     `yaml:"tso_codepage"`
 }
 
 type AuthConfig struct {

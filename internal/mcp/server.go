@@ -18,7 +18,7 @@ const (
 
 const (
 	ServerName    = "zosmf-mcp"
-	ServerVersion = "0.1.0"
+	ServerVersion = "0.3.0"
 )
 
 // Transport defines how the server sends and receives messages.

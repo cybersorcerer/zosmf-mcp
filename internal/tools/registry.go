@@ -32,6 +32,22 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		NewUnmountFilesystemTool(clients),
 		NewCreateZFSTool(clients),
 		NewDeleteZFSTool(clients),
+		// Console tools
+		NewIssueCommandTool(clients, nil),
+		NewGetHardcopyLogTool(clients),
+		// USS Files tools
+		NewListUSSFilesTool(clients),
+		NewReadUSSFileTool(clients),
+		NewWriteUSSFileTool(clients),
+		NewCreateUSSFileTool(clients),
+		NewDeleteUSSFileTool(clients),
+		// Extended Dataset tools
+		NewCreateDatasetTool(clients),
+		NewDeleteDatasetTool(clients),
+		// TSO tool
+		NewTSOCommandTool(clients, cfg),
+		// Parmlib tools
+		NewParmlibValidateTool(clients),
 	}
 
 	for _, h := range handlers {

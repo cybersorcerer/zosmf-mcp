@@ -127,6 +127,47 @@ func (c *Client) WriteDataset(dsname, content string) error {
 	return nil
 }
 
+// CreateDatasetRequest contains parameters for creating a new dataset.
+type CreateDatasetRequest struct {
+	DSOrg     string `json:"dsorg"`               // "PS" (sequential) or "PO" (partitioned)
+	AlcUnit   string `json:"alcunit"`             // "TRK", "CYL"
+	Primary   int    `json:"primary"`             // Primary space
+	Secondary int    `json:"secondary"`           // Secondary space
+	RecFm     string `json:"recfm"`               // "FB", "VB", "F", "V", "U"
+	LRecL     int    `json:"lrecl"`               // Logical record length
+	BlkSize   int    `json:"blksize,omitempty"`   // Block size
+	DirBlk    int    `json:"dirblk,omitempty"`    // Directory blocks (PO only)
+	VolSer    string `json:"volser,omitempty"`    // Volume serial
+	Unit      string `json:"unit,omitempty"`      // Unit type
+	StorClass string `json:"storclass,omitempty"` // DFSMS storage class
+	MgmtClass string `json:"mgntclass,omitempty"` // DFSMS management class
+	DataClass string `json:"dataclass,omitempty"` // DFSMS data class
+	DSNType   string `json:"dsntype,omitempty"`   // e.g. "EXTREQ" for PDSE
+}
+
+// CreateDataset allocates a new z/OS dataset.
+func (c *Client) CreateDataset(dsname string, req CreateDatasetRequest) error {
+	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", url.PathEscape(dsname))
+
+	body, err := c.Post(path, req)
+	if err != nil {
+		return fmt.Errorf("create dataset failed: %w", err)
+	}
+	_ = body
+	return nil
+}
+
+// DeleteDataset deletes a sequential dataset, PDS, or a PDS member.
+// For a member, use "DATASET.NAME(MEMBER)" format.
+func (c *Client) DeleteDataset(dsname string) error {
+	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
+	_, err := c.Delete(path)
+	if err != nil {
+		return fmt.Errorf("delete dataset failed: %w", err)
+	}
+	return nil
+}
+
 // encodeDatasetPath encodes a dataset name for use in URL paths.
 // Handles PDS member notation: "DATASET.NAME(MEMBER)" -> "DATASET.NAME(MEMBER)"
 // The parentheses must NOT be percent-encoded for z/OSMF.

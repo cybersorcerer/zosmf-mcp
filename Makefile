@@ -1,15 +1,27 @@
 BINARY    := zosmf-mcp
 MODULE    := gitlab.com/ronaldfunk/zosmf-mcp
+BINARY_DIR := bin
 VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS   := -s -w -X main.version=$(VERSION)
+COMMIT    ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LDFLAGS   := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 GOFLAGS   := -trimpath
 
-.PHONY: all build clean test vet fmt lint run install
+.PHONY: all build build-all build-local clean test vet fmt lint run install
 
-all: fmt vet test build
+all: fmt vet test build-local
 
-build:
+build-all:
+	@mkdir -p $(BINARY_DIR)
+	GOARCH=amd64  GOOS=darwin  go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-darwin-amd64   ./cmd/zosmf-mcp
+	GOARCH=arm64  GOOS=darwin  go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-darwin-arm64   ./cmd/zosmf-mcp
+	GOARCH=amd64  GOOS=linux   go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-linux-amd64    ./cmd/zosmf-mcp
+	GOARCH=s390x  GOOS=linux   go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-linux-s390x    ./cmd/zosmf-mcp
+	GOARCH=amd64  GOOS=windows go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-windows.exe   ./cmd/zosmf-mcp
+
+build-local:
 	go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/zosmf-mcp
+
+build: build-local
 
 clean:
 	rm -f $(BINARY)

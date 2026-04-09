@@ -150,6 +150,11 @@ func (t *HTTPTransport) handleBatchPost(ctx context.Context, w http.ResponseWrit
 		if resp != nil {
 			responses = append(responses, resp)
 		}
+		// If this batch contains an initialize request, create a session
+		if batch[i].Method == "initialize" && resp != nil && resp.Error == nil {
+			sess := t.createSession()
+			w.Header().Set("Mcp-Session-Id", sess.id)
+		}
 	}
 
 	if len(responses) == 0 {
@@ -230,10 +235,8 @@ func (t *HTTPTransport) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	t.mu.Unlock()
 
-	if !exists {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	}
+	// Session already gone — treat as success (idempotent delete)
+	w.WriteHeader(http.StatusOK)
 
 	t.logger.Printf("session %s terminated", sessionID)
 	w.WriteHeader(http.StatusOK)

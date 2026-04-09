@@ -14,6 +14,8 @@ systems:
       - "TGTZONE"
     dlib_zones:                         # Optional: default SMP/E distribution zones
       - "DLIBZONE"
+    tso_account: "ACCT#"               # Optional: TSO account number for TSO commands
+    tso_proc: "IKJACCNT"               # Optional: TSO logon procedure
 
   # Example: second system with client certificate auth
   # - name: "SYSB"

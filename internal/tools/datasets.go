@@ -238,3 +238,144 @@ func (t *writeDatasetTool) Execute(ctx context.Context, arguments json.RawMessag
 
 	return mcp.TextResult(fmt.Sprintf("Successfully wrote to %s", args.Dataset)), nil
 }
+
+// --- Create Dataset ---
+
+type createDatasetTool struct {
+	clients *zosmf.ClientRegistry
+}
+
+type createDatasetArgs struct {
+	System    string `json:"system"`
+	Dataset   string `json:"dataset"`
+	DSOrg     string `json:"dsorg"`
+	AlcUnit   string `json:"alcunit"`
+	Primary   int    `json:"primary"`
+	Secondary int    `json:"secondary"`
+	RecFm     string `json:"recfm"`
+	LRecL     int    `json:"lrecl"`
+	BlkSize   int    `json:"blksize,omitempty"`
+	DirBlk    int    `json:"dirblk,omitempty"`
+	VolSer    string `json:"volser,omitempty"`
+	Unit      string `json:"unit,omitempty"`
+	StorClass string `json:"storclass,omitempty"`
+	MgmtClass string `json:"mgmtclass,omitempty"`
+	DataClass string `json:"dataclass,omitempty"`
+	DSNType   string `json:"dsntype,omitempty"`
+}
+
+func NewCreateDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
+	return &createDatasetTool{clients: clients}
+}
+
+func (t *createDatasetTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name:        "zosmf_create_dataset",
+		Description: "Allocate a new z/OS dataset (sequential PS or partitioned PDS/PDSE).",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":    map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"dataset":   map[string]any{"type": "string", "description": "Dataset name to create (e.g. 'USER.NEW.DATA')"},
+				"dsorg":     map[string]any{"type": "string", "description": "Dataset organization: 'PS' (sequential) or 'PO' (partitioned)", "enum": []string{"PS", "PO"}},
+				"alcunit":   map[string]any{"type": "string", "description": "Allocation unit: 'TRK' or 'CYL'", "enum": []string{"TRK", "CYL"}},
+				"primary":   map[string]any{"type": "integer", "description": "Primary space allocation"},
+				"secondary": map[string]any{"type": "integer", "description": "Secondary space allocation"},
+				"recfm":     map[string]any{"type": "string", "description": "Record format: 'FB', 'VB', 'F', 'V', 'U'"},
+				"lrecl":     map[string]any{"type": "integer", "description": "Logical record length (e.g. 80, 132, 0 for U)"},
+				"blksize":   map[string]any{"type": "integer", "description": "Block size (optional, system will calculate if omitted)"},
+				"dirblk":    map[string]any{"type": "integer", "description": "Number of directory blocks (required for PO datasets)"},
+				"volser":    map[string]any{"type": "string", "description": "Volume serial (optional)"},
+				"unit":      map[string]any{"type": "string", "description": "Unit type (optional)"},
+				"storclass": map[string]any{"type": "string", "description": "DFSMS storage class (optional)"},
+				"mgmtclass": map[string]any{"type": "string", "description": "DFSMS management class (optional)"},
+				"dataclass": map[string]any{"type": "string", "description": "DFSMS data class (optional)"},
+				"dsntype":   map[string]any{"type": "string", "description": "Dataset name type, e.g. 'EXTREQ' for PDSE (optional)"},
+			},
+			"required": []string{"system", "dataset", "dsorg", "alcunit", "primary", "secondary", "recfm", "lrecl"},
+		}),
+	}
+}
+
+func (t *createDatasetTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args createDatasetArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+
+	client, err := t.clients.Get(args.System)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	req := zosmf.CreateDatasetRequest{
+		DSOrg:     args.DSOrg,
+		AlcUnit:   args.AlcUnit,
+		Primary:   args.Primary,
+		Secondary: args.Secondary,
+		RecFm:     args.RecFm,
+		LRecL:     args.LRecL,
+		BlkSize:   args.BlkSize,
+		DirBlk:    args.DirBlk,
+		VolSer:    args.VolSer,
+		Unit:      args.Unit,
+		StorClass: args.StorClass,
+		MgmtClass: args.MgmtClass,
+		DataClass: args.DataClass,
+		DSNType:   args.DSNType,
+	}
+
+	if err := client.CreateDataset(args.Dataset, req); err != nil {
+		return mcp.ErrorResult("failed to create dataset: " + err.Error()), nil
+	}
+
+	return mcp.TextResult(fmt.Sprintf("Dataset %s created successfully", args.Dataset)), nil
+}
+
+// --- Delete Dataset ---
+
+type deleteDatasetTool struct {
+	clients *zosmf.ClientRegistry
+}
+
+type deleteDatasetArgs struct {
+	System  string `json:"system"`
+	Dataset string `json:"dataset"`
+}
+
+func NewDeleteDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
+	return &deleteDatasetTool{clients: clients}
+}
+
+func (t *deleteDatasetTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name:        "zosmf_delete_dataset",
+		Description: "Delete a z/OS dataset or PDS member. WARNING: Permanent deletion. For a PDS member use 'DATASET.NAME(MEMBER)' format.",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":  map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"dataset": map[string]any{"type": "string", "description": "Dataset name or PDS member (e.g. 'USER.DATA' or 'USER.PDS(MEMBER)')"},
+			},
+			"required": []string{"system", "dataset"},
+		}),
+	}
+}
+
+func (t *deleteDatasetTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args deleteDatasetArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+
+	client, err := t.clients.Get(args.System)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	if err := client.DeleteDataset(args.Dataset); err != nil {
+		return mcp.ErrorResult("failed to delete dataset: " + err.Error()), nil
+	}
+
+	return mcp.TextResult(fmt.Sprintf("Dataset %s deleted successfully", args.Dataset)), nil
+}

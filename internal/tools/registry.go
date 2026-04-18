@@ -26,6 +26,8 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		NewListMembersTool(clients),
 		NewReadDatasetTool(clients),
 		NewWriteDatasetTool(clients),
+		NewAcquireDatasetEnqTool(clients),
+		NewReleaseDatasetEnqTool(clients),
 		// Filesystem tools
 		NewListFilesystemsTool(clients),
 		NewMountFilesystemTool(clients),

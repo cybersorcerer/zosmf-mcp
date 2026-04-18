@@ -6,21 +6,25 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
 // Dataset represents a z/OS dataset as returned by the z/OSMF Datasets REST API.
+// z/OSMF returns numeric fields as strings when attributes=base is requested.
 type Dataset struct {
 	DSName string `json:"dsname"`
 	DSOrg  string `json:"dsorg,omitempty"`
 	VolSer string `json:"vol,omitempty"`
 	RecFmt string `json:"recfm,omitempty"`
-	LRecL  int    `json:"lrecl,omitempty"`
-	BlkSz  int    `json:"blksz,omitempty"`
+	LRecL  string `json:"lrecl,omitempty"`
+	BlkSz  string `json:"blksz,omitempty"`
 	CDate  string `json:"cdate,omitempty"`
 	RDate  string `json:"rdate,omitempty"`
 	EDate  string `json:"edate,omitempty"`
-	Used   int    `json:"used,omitempty"`
+	Used   string `json:"used,omitempty"`
+	Migr   string `json:"migr,omitempty"`
+	DSNType string `json:"dsntp,omitempty"`
 }
 
 // DatasetMember represents a member of a PDS/PDSE.
@@ -46,7 +50,7 @@ func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-IBM-Attrs", "base")
+	req.Header.Set("X-IBM-Attributes", "base")
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -61,6 +65,8 @@ func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("z/OSMF list datasets returned %d: %s", resp.StatusCode, string(body))
 	}
+
+	fmt.Fprintf(os.Stderr, "[DEBUG ListDatasets] raw: %s\n", string(body))
 
 	var result struct {
 		Items []Dataset `json:"items"`
@@ -79,7 +85,7 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-IBM-Attrs", "member")
+	req.Header.Set("X-IBM-Attributes", "member")
 
 	resp, err := c.Do(req)
 	if err != nil {

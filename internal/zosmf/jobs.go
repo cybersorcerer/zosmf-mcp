@@ -11,29 +11,34 @@ import (
 
 // Job represents a z/OS job as returned by the z/OSMF Jobs REST API.
 type Job struct {
-	JobID     string `json:"jobid"`
-	JobName   string `json:"jobname"`
-	Owner     string `json:"owner"`
-	Status    string `json:"status"`
-	Type      string `json:"type"`
-	Class     string `json:"class"`
-	RetCode   string `json:"retcode"`
-	SubSystem string `json:"subsystem"`
-	URL       string `json:"url"`
-	Phase     int    `json:"phase"`
-	PhaseName string `json:"phase-name"`
+	JobID       string `json:"jobid"`
+	JobName     string `json:"jobname"`
+	Owner       string `json:"owner"`
+	Status      string `json:"status"`
+	Type        string `json:"type"`
+	Class       string `json:"class"`
+	RetCode     string `json:"retcode"`
+	SubSystem   string `json:"subsystem,omitempty"`
+	URL         string `json:"url,omitempty"`
+	Phase       int    `json:"phase,omitempty"`
+	PhaseName   string `json:"phase-name,omitempty"`
+	ExecStarted string `json:"exec-started,omitempty"`
+	ExecEnded   string `json:"exec-ended,omitempty"`
+	ExecMember  string `json:"exec-member,omitempty"`
+	ExecSystem  string `json:"exec-system,omitempty"`
 }
 
 // JobFile represents a spool file (DD) of a job.
 type JobFile struct {
-	ID        int    `json:"id"`
-	DDName    string `json:"ddname"`
-	RecordFmt string `json:"record-format"`
-	ByteCount int64  `json:"byte-count"`
-	RecCount  int    `json:"record-count"`
-	StepName  string `json:"stepname"`
-	ProcStep  string `json:"procstep"`
-	Class     string `json:"class"`
+	ID         int    `json:"id"`
+	DDName     string `json:"ddname"`
+	RecordFmt  string `json:"record-format,omitempty"`
+	ByteCount  int64  `json:"byte-count,omitempty"`
+	RecCount   int    `json:"record-count,omitempty"`
+	StepName   string `json:"stepname,omitempty"`
+	ProcStep   string `json:"procstep,omitempty"`
+	Class      string `json:"class,omitempty"`
+	RecordsURL string `json:"records-url,omitempty"`
 }
 
 // ListJobsParams contains parameters for listing jobs.

@@ -25,7 +25,18 @@ type Dataset struct {
 
 // DatasetMember represents a member of a PDS/PDSE.
 type DatasetMember struct {
-	Member string `json:"member"`
+	Member  string `json:"member"`
+	Vers    int    `json:"vers,omitempty"`
+	Mod     int    `json:"mod,omitempty"`
+	C4Date  string `json:"c4date,omitempty"`
+	M4Date  string `json:"m4date,omitempty"`
+	CNoRC   int    `json:"cnorc,omitempty"`
+	INoRC   int    `json:"inorc,omitempty"`
+	MNoRC   int    `json:"mnorc,omitempty"`
+	MTime   string `json:"mtime,omitempty"`
+	MSec    string `json:"msec,omitempty"`
+	User    string `json:"user,omitempty"`
+	SCLM    string `json:"sclm,omitempty"`
 }
 
 // ListDatasets lists datasets matching a given level pattern (e.g. "SYS1.PARM*").

@@ -379,3 +379,114 @@ func (t *deleteDatasetTool) Execute(ctx context.Context, arguments json.RawMessa
 
 	return mcp.TextResult(fmt.Sprintf("Dataset %s deleted successfully", args.Dataset)), nil
 }
+
+// --- Acquire Dataset ENQ ---
+
+type acquireDatasetEnqTool struct {
+	clients *zosmf.ClientRegistry
+}
+
+type acquireDatasetEnqArgs struct {
+	System  string `json:"system"`
+	Dataset string `json:"dataset"`
+	EnqType string `json:"enq_type"`
+}
+
+func NewAcquireDatasetEnqTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
+	return &acquireDatasetEnqTool{clients: clients}
+}
+
+func (t *acquireDatasetEnqTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name: "zosmf_acquire_dataset_enq",
+		Description: "Acquire an ENQ lock on a z/OS dataset or PDS member without reading its content. " +
+			"Use enq_type 'exclusive' (SHRW) to prevent other readers and writers, or 'shared' (SHRE) to allow concurrent readers. " +
+			"Returns a session_ref that must be passed to zosmf_release_dataset_enq when done, " +
+			"and to zosmf_read_dataset / zosmf_write_dataset to associate operations with this ENQ session. " +
+			"Returns an ENQ_NOT_AVAILABLE error if the dataset is already locked.",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":  map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"dataset": map[string]any{"type": "string", "description": "Dataset name, e.g. 'HLQ.PDS(MEMBER)' or 'HLQ.SEQ'"},
+				"enq_type": map[string]any{
+					"type":        "string",
+					"description": "Lock type: 'exclusive' (SHRW — no other readers or writers) or 'shared' (SHRE — concurrent readers allowed)",
+					"enum":        []string{"exclusive", "shared"},
+				},
+			},
+			"required": []string{"system", "dataset", "enq_type"},
+		}),
+	}
+}
+
+func (t *acquireDatasetEnqTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args acquireDatasetEnqArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+
+	client, err := t.clients.Get(args.System)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	sessionRef, err := client.AcquireDatasetEnq(args.Dataset, args.EnqType)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	data, _ := json.Marshal(map[string]string{"session_ref": sessionRef})
+	return mcp.TextResult(string(data)), nil
+}
+
+// --- Release Dataset ENQ ---
+
+type releaseDatasetEnqTool struct {
+	clients *zosmf.ClientRegistry
+}
+
+type releaseDatasetEnqArgs struct {
+	System     string `json:"system"`
+	Dataset    string `json:"dataset"`
+	SessionRef string `json:"session_ref"`
+}
+
+func NewReleaseDatasetEnqTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
+	return &releaseDatasetEnqTool{clients: clients}
+}
+
+func (t *releaseDatasetEnqTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name:        "zosmf_release_dataset_enq",
+		Description: "Release a previously acquired ENQ lock on a z/OS dataset. Pass the session_ref returned by zosmf_acquire_dataset_enq.",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":      map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"dataset":     map[string]any{"type": "string", "description": "Same dataset name used when acquiring the ENQ"},
+				"session_ref": map[string]any{"type": "string", "description": "Session reference returned by zosmf_acquire_dataset_enq"},
+			},
+			"required": []string{"system", "dataset", "session_ref"},
+		}),
+	}
+}
+
+func (t *releaseDatasetEnqTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args releaseDatasetEnqArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+
+	client, err := t.clients.Get(args.System)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	if err := client.ReleaseDatasetEnq(args.Dataset, args.SessionRef); err != nil {
+		// Non-fatal: log but don't error — ENQ will time out on z/OS
+		return mcp.TextResult(fmt.Sprintf(`{"warning": "release ENQ failed (non-fatal): %s"}`, err.Error())), nil
+	}
+
+	return mcp.TextResult(`{}`), nil
+}

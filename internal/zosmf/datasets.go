@@ -41,40 +41,68 @@ type DatasetMember struct {
 
 // ListDatasets lists datasets matching a given level pattern (e.g. "SYS1.PARM*").
 func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
-	path := fmt.Sprintf("/zosmf/restfiles/ds?dslevel=%s&attributes=base", url.QueryEscape(dslevel))
-
-	body, err := c.Get(path)
+	reqURL := c.baseURL + fmt.Sprintf("/zosmf/restfiles/ds?dslevel=%s", url.QueryEscape(dslevel))
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("X-IBM-Attrs", "base")
 
-	var resp struct {
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to list datasets failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading dataset list response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("z/OSMF list datasets returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
 		Items []Dataset `json:"items"`
 	}
-	if err := json.Unmarshal(body, &resp); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("parsing dataset list response: %w", err)
 	}
 
-	return resp.Items, nil
+	return result.Items, nil
 }
 
 // ListMembers lists members of a PDS/PDSE dataset.
 func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
-	path := fmt.Sprintf("/zosmf/restfiles/ds/%s/member?attributes=member", url.PathEscape(dataset))
-
-	body, err := c.Get(path)
+	reqURL := c.baseURL + fmt.Sprintf("/zosmf/restfiles/ds/%s/member", url.PathEscape(dataset))
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("X-IBM-Attrs", "member")
 
-	var resp struct {
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to list members failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading member list response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("z/OSMF list members returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
 		Items []DatasetMember `json:"items"`
 	}
-	if err := json.Unmarshal(body, &resp); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("parsing member list response: %w", err)
 	}
 
-	return resp.Items, nil
+	return result.Items, nil
 }
 
 // ReadDataset reads the content of a sequential dataset or PDS member.

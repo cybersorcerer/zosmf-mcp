@@ -41,7 +41,7 @@ type DatasetMember struct {
 
 // ListDatasets lists datasets matching a given level pattern (e.g. "SYS1.PARM*").
 func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
-	path := fmt.Sprintf("/zosmf/restfiles/ds?dslevel=%s", url.QueryEscape(dslevel))
+	path := fmt.Sprintf("/zosmf/restfiles/ds?dslevel=%s&attributes=base", url.QueryEscape(dslevel))
 
 	body, err := c.Get(path)
 	if err != nil {
@@ -60,7 +60,7 @@ func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
 
 // ListMembers lists members of a PDS/PDSE dataset.
 func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
-	path := fmt.Sprintf("/zosmf/restfiles/ds/%s/member", url.PathEscape(dataset))
+	path := fmt.Sprintf("/zosmf/restfiles/ds/%s/member?attributes=member", url.PathEscape(dataset))
 
 	body, err := c.Get(path)
 	if err != nil {

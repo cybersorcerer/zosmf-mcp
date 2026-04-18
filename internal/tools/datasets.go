@@ -485,7 +485,8 @@ func (t *releaseDatasetEnqTool) Execute(ctx context.Context, arguments json.RawM
 
 	if err := client.ReleaseDatasetEnq(args.Dataset, args.SessionRef); err != nil {
 		// Non-fatal: log but don't error — ENQ will time out on z/OS
-		return mcp.TextResult(fmt.Sprintf(`{"warning": "release ENQ failed (non-fatal): %s"}`, err.Error())), nil
+		w, _ := json.Marshal(map[string]string{"warning": "release ENQ failed (non-fatal): " + err.Error()})
+		return mcp.TextResult(string(w)), nil
 	}
 
 	return mcp.TextResult(`{}`), nil

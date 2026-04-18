@@ -647,7 +647,7 @@ Mcp-Session-Id: <uuid>
 
 ## 5. Tools Overview
 
-The server provides 30 tools across 8 categories:
+The server provides 32 tools across 8 categories:
 
 ### Jobs (9 tools)
 | Tool                      | Description                                  |
@@ -667,15 +667,18 @@ The server provides 30 tools across 8 categories:
 |------------------------|--------------------------------------------------|
 | `zosmf_smpe_query_csi` | Query the SMP/E CSI (SYSMODs, DDDEFs, products) |
 
-### Datasets (6 tools)
-| Tool                    | Description                                  |
-|-------------------------|----------------------------------------------|
-| `zosmf_list_datasets`   | Search datasets by pattern                   |
-| `zosmf_list_members`    | List members of a PDS or PDSE                |
-| `zosmf_read_dataset`    | Read a sequential dataset or PDS member      |
-| `zosmf_write_dataset`   | Write to a sequential dataset or PDS member  |
-| `zosmf_create_dataset`  | Allocate a new dataset                       |
-| `zosmf_delete_dataset`  | Delete a dataset or PDS member               |
+### Datasets (8 tools)
+
+| Tool                         | Description                                              |
+|------------------------------|----------------------------------------------------------|
+| `zosmf_list_datasets`        | Search datasets by pattern                               |
+| `zosmf_list_members`         | List members of a PDS or PDSE                            |
+| `zosmf_read_dataset`         | Read a sequential dataset or PDS member                  |
+| `zosmf_write_dataset`        | Write to a sequential dataset or PDS member              |
+| `zosmf_create_dataset`       | Allocate a new dataset                                   |
+| `zosmf_delete_dataset`       | Delete a dataset or PDS member                           |
+| `zosmf_acquire_dataset_enq`  | Acquire an exclusive or shared ENQ lock on a dataset or member |
+| `zosmf_release_dataset_enq`  | Release a previously acquired ENQ lock                   |
 
 ### Filesystems (5 tools)
 | Tool                       | Description                              |

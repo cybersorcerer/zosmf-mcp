@@ -209,7 +209,7 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType string) (string, error) {
 		return "", fmt.Errorf("acquire ENQ failed: %w", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body) // discard body — content is read separately
+	_, _ = io.ReadAll(resp.Body) // discard body — content is read separately
 
 	if resp.StatusCode == http.StatusConflict {
 		return "", fmt.Errorf("ENQ_NOT_AVAILABLE: %s is locked by another user or session", dsname)
@@ -219,6 +219,9 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType string) (string, error) {
 	}
 
 	sessionRef := resp.Header.Get("X-IBM-Session-Ref")
+	if sessionRef == "" {
+		return "", fmt.Errorf("z/OSMF did not return X-IBM-Session-Ref for %s", dsname)
+	}
 	return sessionRef, nil
 }
 
@@ -238,7 +241,7 @@ func (c *Client) ReleaseDatasetEnq(dsname, sessionRef string) error {
 		return fmt.Errorf("release ENQ failed: %w", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body) // discard body
+	_, _ = io.ReadAll(resp.Body) // discard body
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("z/OSMF returned %d releasing ENQ for %s", resp.StatusCode, dsname)

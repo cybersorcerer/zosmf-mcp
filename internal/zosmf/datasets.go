@@ -235,10 +235,10 @@ func encodeDatasetPath(dsname string) string {
 	return url.PathEscape(dsname)
 }
 
-// AcquireDatasetEnq acquires an ENQ lock on a dataset or PDS member without
-// returning content. enqType must be "exclusive" (SHRW) or "shared" (SHRE).
-// Returns the session reference string needed for subsequent operations and release.
-func (c *Client) AcquireDatasetEnq(dsname, enqType string) (string, error) {
+// AcquireDatasetEnq acquires an ENQ lock on a dataset or PDS member and returns
+// the content along with the session reference. enqType must be "exclusive" (SHRW)
+// or "shared" (SHRE).
+func (c *Client) AcquireDatasetEnq(dsname, enqType, encoding string) (content, sessionRef string, err error) {
 	var enqHeader string
 	switch enqType {
 	case "exclusive":
@@ -246,37 +246,45 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType string) (string, error) {
 	case "shared":
 		enqHeader = "SHRE"
 	default:
-		return "", fmt.Errorf("invalid enq_type: must be 'exclusive' or 'shared'")
+		return "", "", fmt.Errorf("invalid enq_type: must be 'exclusive' or 'shared'")
 	}
 
 	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
 	reqURL := c.baseURL + path
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	req.Header.Set("X-IBM-Data-Type", "text")
+	if encoding != "" {
+		req.Header.Set("X-IBM-Data-Type", "text;fileEncoding="+encoding)
+	} else {
+		req.Header.Set("X-IBM-Data-Type", "text")
+	}
 	req.Header.Set("X-IBM-Obtain-ENQ", enqHeader)
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("acquire ENQ failed: %w", err)
+		return "", "", fmt.Errorf("acquire ENQ failed: %w", err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.ReadAll(resp.Body) // discard body — content is read separately
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("reading ENQ response body: %w", err)
+	}
 
 	if resp.StatusCode == http.StatusConflict {
-		return "", fmt.Errorf("ENQ_NOT_AVAILABLE: %s is locked by another user or session", dsname)
+		return "", "", fmt.Errorf("ENQ_NOT_AVAILABLE: %s is locked by another user or session", dsname)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("z/OSMF returned %d acquiring ENQ for %s", resp.StatusCode, dsname)
+		return "", "", fmt.Errorf("z/OSMF returned %d acquiring ENQ for %s", resp.StatusCode, dsname)
 	}
 
-	sessionRef := resp.Header.Get("X-IBM-Session-Ref")
+	sessionRef = resp.Header.Get("X-IBM-Session-Ref")
 	if sessionRef == "" {
-		return "", fmt.Errorf("z/OSMF did not return X-IBM-Session-Ref for %s", dsname)
+		return "", "", fmt.Errorf("z/OSMF did not return X-IBM-Session-Ref for %s", dsname)
 	}
-	return sessionRef, nil
+	return string(body), sessionRef, nil
 }
 
 // ReleaseDatasetEnq releases a previously acquired ENQ lock identified by sessionRef.

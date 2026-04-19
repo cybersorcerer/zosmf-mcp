@@ -402,9 +402,10 @@ type acquireDatasetEnqTool struct {
 }
 
 type acquireDatasetEnqArgs struct {
-	System  string `json:"system"`
-	Dataset string `json:"dataset"`
-	EnqType string `json:"enq_type"`
+	System   string `json:"system"`
+	Dataset  string `json:"dataset"`
+	EnqType  string `json:"enq_type"`
+	Encoding string `json:"encoding,omitempty"`
 }
 
 func NewAcquireDatasetEnqTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -429,6 +430,10 @@ func (t *acquireDatasetEnqTool) Definition() mcp.Tool {
 					"description": "Lock type: 'exclusive' (SHRW — no other readers or writers) or 'shared' (SHRE — concurrent readers allowed)",
 					"enum":        []string{"exclusive", "shared"},
 				},
+				"encoding": map[string]any{
+					"type":        "string",
+					"description": "Optional EBCDIC code page for z/OSMF conversion, e.g. 'IBM-1141'. Omit to use z/OSMF default (IBM-1047).",
+				},
 			},
 			"required": []string{"system", "dataset", "enq_type"},
 		}),
@@ -446,12 +451,12 @@ func (t *acquireDatasetEnqTool) Execute(ctx context.Context, arguments json.RawM
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	sessionRef, err := client.AcquireDatasetEnq(args.Dataset, args.EnqType)
+	content, sessionRef, err := client.AcquireDatasetEnq(args.Dataset, args.EnqType, args.Encoding)
 	if err != nil {
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	data, _ := json.Marshal(map[string]string{"session_ref": sessionRef})
+	data, _ := json.Marshal(map[string]string{"session_ref": sessionRef, "content": content})
 	return mcp.TextResult(string(data)), nil
 }
 

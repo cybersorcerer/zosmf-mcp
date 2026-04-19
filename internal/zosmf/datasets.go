@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
@@ -66,8 +65,6 @@ func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
 		return nil, fmt.Errorf("z/OSMF list datasets returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	fmt.Fprintf(os.Stderr, "[DEBUG ListDatasets] raw: %s\n", string(body))
-
 	var result struct {
 		Items []Dataset `json:"items"`
 	}
@@ -85,7 +82,7 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-IBM-Attributes", "member")
+	req.Header.Set("X-IBM-Attributes", "base")
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -143,7 +140,7 @@ func (c *Client) ReadDataset(dsname string) (string, error) {
 
 // WriteDataset writes content to a sequential dataset or PDS member.
 // For a PDS member, use "DATASET.NAME(MEMBER)" format.
-func (c *Client) WriteDataset(dsname, content string) error {
+func (c *Client) WriteDataset(dsname, content, sessionRef string) error {
 	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
 
 	reqURL := c.baseURL + path
@@ -153,6 +150,9 @@ func (c *Client) WriteDataset(dsname, content string) error {
 	}
 	req.Header.Set("Content-Type", "text/plain")
 	req.Header.Set("X-IBM-Data-Type", "text")
+	if sessionRef != "" {
+		req.Header.Set("X-IBM-Session-Ref", sessionRef)
+	}
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -271,22 +271,23 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType string) (string, error) {
 }
 
 // ReleaseDatasetEnq releases a previously acquired ENQ lock identified by sessionRef.
-// Errors are non-fatal — z/OS will time out the ENQ automatically if release fails.
+// Per z/OSMF documentation: send GET /zosmf/restfiles/ping with X-IBM-Session-Ref
+// and X-IBM-Release-ENQ: true to release the ENQ held by the TSO address space.
 func (c *Client) ReleaseDatasetEnq(dsname, sessionRef string) error {
-	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
-	reqURL := c.baseURL + path
-	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
+	reqURL := c.baseURL + "/zosmf/restfiles/ping"
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("X-IBM-Session-Ref", sessionRef)
+	req.Header.Set("X-IBM-Release-ENQ", "true")
 
 	resp, err := c.Do(req)
 	if err != nil {
 		return fmt.Errorf("release ENQ failed: %w", err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.ReadAll(resp.Body) // discard body
+	_, _ = io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("z/OSMF returned %d releasing ENQ for %s", resp.StatusCode, dsname)

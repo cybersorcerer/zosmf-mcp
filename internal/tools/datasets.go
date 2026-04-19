@@ -185,9 +185,10 @@ type writeDatasetTool struct {
 }
 
 type writeDatasetArgs struct {
-	System  string `json:"system"`
-	Dataset string `json:"dataset"`
-	Content string `json:"content"`
+	System     string `json:"system"`
+	Dataset    string `json:"dataset"`
+	Content    string `json:"content"`
+	SessionRef string `json:"session_ref"`
 }
 
 func NewWriteDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -215,6 +216,10 @@ func (t *writeDatasetTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Content to write to the dataset",
 				},
+				"session_ref": map[string]any{
+					"type":        "string",
+					"description": "Session reference from zosmf_acquire_dataset_enq (required when ENQ is held)",
+				},
 			},
 			"required": []string{"system", "dataset", "content"},
 		}),
@@ -232,7 +237,7 @@ func (t *writeDatasetTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	if err := client.WriteDataset(args.Dataset, args.Content); err != nil {
+	if err := client.WriteDataset(args.Dataset, args.Content, args.SessionRef); err != nil {
 		return mcp.ErrorResult("failed to write dataset: " + err.Error()), nil
 	}
 

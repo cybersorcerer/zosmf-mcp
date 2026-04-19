@@ -129,8 +129,9 @@ type readDatasetTool struct {
 }
 
 type readDatasetArgs struct {
-	System  string `json:"system"`
-	Dataset string `json:"dataset"`
+	System   string `json:"system"`
+	Dataset  string `json:"dataset"`
+	Encoding string `json:"encoding,omitempty"`
 }
 
 func NewReadDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -153,6 +154,10 @@ func (t *readDatasetTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Dataset name, e.g. 'SYS1.PARMLIB(IEASYS00)' or 'USER.DATA.SEQ'",
 				},
+				"encoding": map[string]any{
+					"type":        "string",
+					"description": "Optional EBCDIC code page for z/OSMF conversion, e.g. 'IBM-1141'. Omit to use z/OSMF default (IBM-1047).",
+				},
 			},
 			"required": []string{"system", "dataset"},
 		}),
@@ -170,7 +175,7 @@ func (t *readDatasetTool) Execute(ctx context.Context, arguments json.RawMessage
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	content, err := client.ReadDataset(args.Dataset)
+	content, err := client.ReadDataset(args.Dataset, args.Encoding)
 	if err != nil {
 		return mcp.ErrorResult("failed to read dataset: " + err.Error()), nil
 	}
@@ -189,6 +194,7 @@ type writeDatasetArgs struct {
 	Dataset    string `json:"dataset"`
 	Content    string `json:"content"`
 	SessionRef string `json:"session_ref"`
+	Encoding   string `json:"encoding,omitempty"`
 }
 
 func NewWriteDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -220,6 +226,10 @@ func (t *writeDatasetTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Session reference from zosmf_acquire_dataset_enq (required when ENQ is held)",
 				},
+				"encoding": map[string]any{
+					"type":        "string",
+					"description": "Optional EBCDIC code page for z/OSMF conversion, e.g. 'IBM-1141'. Omit to use z/OSMF default (IBM-1047).",
+				},
 			},
 			"required": []string{"system", "dataset", "content"},
 		}),
@@ -237,7 +247,7 @@ func (t *writeDatasetTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	if err := client.WriteDataset(args.Dataset, args.Content, args.SessionRef); err != nil {
+	if err := client.WriteDataset(args.Dataset, args.Content, args.SessionRef, args.Encoding); err != nil {
 		return mcp.ErrorResult("failed to write dataset: " + err.Error()), nil
 	}
 

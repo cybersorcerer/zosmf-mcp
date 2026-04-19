@@ -20,7 +20,9 @@ type queryCSIArgs struct {
 	System      string   `json:"system"`
 	CSIDataset  string   `json:"csi_dataset"`
 	Zone        string   `json:"zone"`
+	Zones       []string `json:"zones,omitempty"`
 	EntryType   string   `json:"entry_type"`
+	Entries     []string `json:"entries,omitempty"`
 	Filter      string   `json:"filter,omitempty"`
 	Subentries  []string `json:"subentries,omitempty"`
 }
@@ -122,12 +124,25 @@ func (t *queryCSITool) Execute(ctx context.Context, arguments json.RawMessage) (
 		csiDataset = sysCfg.CSIDatasets[0]
 	}
 
-	zone := args.Zone
-	if zone == "" {
+	// Resolve zones: prefer zones array, fall back to zone string, then config default
+	var zones []string
+	if len(args.Zones) > 0 {
+		zones = args.Zones
+	} else if args.Zone != "" {
+		zones = []string{args.Zone}
+	} else {
 		if len(sysCfg.TargetZones) == 0 {
 			return mcp.ErrorResult(fmt.Sprintf("no zone provided and system %s has no target_zones configured", args.System)), nil
 		}
-		zone = sysCfg.TargetZones[0]
+		zones = sysCfg.TargetZones
+	}
+
+	// Resolve entries: prefer entries array, fall back to entry_type
+	var entries []string
+	if len(args.Entries) > 0 {
+		entries = args.Entries
+	} else {
+		entries = []string{entryType}
 	}
 
 	// Build filter expression: if user provided a simple name/wildcard, wrap it as ENAME filter
@@ -152,8 +167,8 @@ func (t *queryCSITool) Execute(ctx context.Context, arguments json.RawMessage) (
 
 	resp, err := client.QueryCSI(zosmf.CSIQueryRequest{
 		CSIDataset: csiDataset,
-		Zones:      []string{zone},
-		Entries:    []string{entryType},
+		Zones:      zones,
+		Entries:    entries,
 		Filter:     filter,
 		Subentries: subentries,
 	})

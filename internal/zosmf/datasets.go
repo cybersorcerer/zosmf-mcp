@@ -110,7 +110,7 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 
 // ReadDataset reads the content of a sequential dataset or PDS member.
 // For a PDS member, use "DATASET.NAME(MEMBER)" format.
-func (c *Client) ReadDataset(dsname string) (string, error) {
+func (c *Client) ReadDataset(dsname, encoding string) (string, error) {
 	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
 
 	reqURL := c.baseURL + path
@@ -118,7 +118,11 @@ func (c *Client) ReadDataset(dsname string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("X-IBM-Data-Type", "text")
+	if encoding != "" {
+		req.Header.Set("X-IBM-Data-Type", "text;fileEncoding="+encoding)
+	} else {
+		req.Header.Set("X-IBM-Data-Type", "text")
+	}
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -140,7 +144,7 @@ func (c *Client) ReadDataset(dsname string) (string, error) {
 
 // WriteDataset writes content to a sequential dataset or PDS member.
 // For a PDS member, use "DATASET.NAME(MEMBER)" format.
-func (c *Client) WriteDataset(dsname, content, sessionRef string) error {
+func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string) error {
 	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
 
 	reqURL := c.baseURL + path
@@ -149,7 +153,11 @@ func (c *Client) WriteDataset(dsname, content, sessionRef string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "text/plain")
-	req.Header.Set("X-IBM-Data-Type", "text")
+	if encoding != "" {
+		req.Header.Set("X-IBM-Data-Type", "text;fileEncoding="+encoding)
+	} else {
+		req.Header.Set("X-IBM-Data-Type", "text")
+	}
 	if sessionRef != "" {
 		req.Header.Set("X-IBM-Session-Ref", sessionRef)
 	}

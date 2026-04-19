@@ -160,6 +160,7 @@ func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string) erro
 	}
 	if sessionRef != "" {
 		req.Header.Set("X-IBM-Session-Ref", sessionRef)
+		req.Header.Set("X-IBM-Release-ENQ", "true")
 	}
 
 	resp, err := c.Do(req)

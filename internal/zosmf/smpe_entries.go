@@ -5,7 +5,7 @@ import "fmt"
 // ValidEntryTypes maps each SMP/E CSI entry type to its valid subentry names.
 // Source: IBM z/OS 3.1 SMP/E Reference.
 var ValidEntryTypes = map[string][]string{
-	"SYSMOD":     {"ACCEPT", "APPLY", "ASSEM", "BYPASS", "CIFREQ", "DELBY", "DELETE2", "DELLMOD", "DESCRIPTION", "DLMOD", "ELEMENT", "ELEMMOV", "EMOVE", "ENAME", "ERROR", "FEATURE", "FESN", "FMID", "IFREQ", "INSTALLDATE", "INSTALLTIME", "JAR", "JARUPD", "JCLIN", "LASTSUP", "LASTUPD", "LASTUPDTYPE", "MAC", "MACUPD", "MOD", "NPRE2", "PRE2", "PROGRAM", "RECDATE", "RECTIME", "REGEN", "RENLMOD", "REQ2", "RESDATE", "RESTIME", "RESTORE", "REWORK", "RLMOD", "SMODTYPE", "SOURCEID", "SRC", "SRCUPD", "SUPBY", "SUPING", "SZAP", "UCLDATE", "UCLTIME", "VERSION", "XZAP"},
+	"SYSMOD":     {"ACCEPT", "ACCID", "APPID", "APPLY", "ASSEM", "BYPASS", "CIFREQ", "DELBY", "DELETE", "DELLMOD", "DESCRIPTION", "DLMOD", "ELEMENT", "ELEMMOV", "EMOVE", "ENAME", "ERROR", "FEATURE", "FESN", "FMID", "HOLDDATA", "IFREQ", "INSTALLDATE", "INSTALLTIME", "JAR", "JARUPD", "JCLIN", "LASTSUP", "LASTUPD", "LASTUPDTYPE", "MAC", "MACUPD", "MOD", "NPRE", "PRE", "PROGRAM", "RECDATE", "RECTIME", "REGEN", "RENLMOD", "REQ", "RESDATE", "RESTIME", "RESTORE", "REWORK", "RLMOD", "SMODTYPE", "SOURCEID", "SRC", "SRCUPD", "SREL", "SUPBY", "SUPING", "SZAP", "TLIBPREFIX", "UCLDATE", "UCLTIME", "VERSION", "XZAP"},
 	"DDDEF":      {"CONCAT", "DATACLAS", "DATASET", "DIR", "DISP", "DSNTYPE", "DSPREFIX", "ENAME", "INITDISP", "MGMTCLAS", "PATH", "PROTECT", "SPACE", "STORCLAS", "SYSOUT", "UNIT", "UNITS", "VOLUME", "WAITFORDSN"},
 	"TARGETZONE": {"ENAME", "OPTIONS", "RELATED", "SREL", "TIEDTO", "UPGLEVEL", "XZLINK", "ZDESC"},
 	"DLIB":       {"ENAME", "LASTUPD", "LASTUPDTYPE", "SYSLIB"},
@@ -33,11 +33,12 @@ var ValidEntryTypes = map[string][]string{
 // DefaultSubentries defines the subentries returned by default when no explicit subentries are requested.
 // These are chosen to provide the most useful information for each entry type.
 var DefaultSubentries = map[string][]string{
-	"SYSMOD":     {"FMID", "SMODTYPE", "REWORK", "RECDATE", "RECTIME", "APPLY", "INSTALLDATE", "INSTALLTIME", "LASTSUP", "DELBY", "ERROR", "VERSION"},
-	"DDDEF":      {"DATASET", "PATH", "DATACLAS", "MGMTCLAS", "STORCLAS", "VOLUME"},
-	"TARGETZONE": {"RELATED", "SREL", "UPGLEVEL"},
-	"DLIB":       {"SYSLIB", "LASTUPD"},
-	"GLOBALZONE": {"FMID", "SREL", "UPGLEVEL", "ZONEINDEX"},
+	"SYSMOD":     {"APPID", "APPLY", "ERROR", "HOLDDATA", "IFREQ", "INSTALLDATE", "INSTALLTIME", "LASTUPD", "PRE", "RECDATE", "RECTIME", "REQ", "REWORK", "SUPBY", "SUPING"},
+	"DDDEF":      {"CONCAT", "DATACLAS", "DATASET", "DISP", "DSNTYPE", "INITDISP", "MGMTCLAS", "PATH", "STORCLAS"},
+	"TARGETZONE": {"ENAME", "OPTIONS", "RELATED", "SREL", "TIEDTO", "UPGLEVEL", "XZLINK", "ZDESC"},
+	"DLIB":       {"ENAME", "LASTUPD", "LASTUPDTYPE", "SYSLIB"},
+	"GLOBALZONE": {"ENAME", "FMID", "OPTIONS", "UPGLEVEL", "ZDESC", "ZONEINDEX"},
+	"DLIBZONE":   {"ACCJCLIN", "ENAME", "OPTIONS", "RELATED", "SREL", "UPGLEVEL", "ZDESC"},
 	"ASSEM":      {"ASMIN", "LASTUPD"},
 	"DATA":       {"DISTLIB", "FMID", "SYSLIB"},
 	"LMOD":       {"SYSLIB", "LEPARM", "LMODALIAS"},
@@ -47,7 +48,6 @@ var DefaultSubentries = map[string][]string{
 	"JAR":        {"DISTLIB", "FMID", "SYSLIB", "VERSION"},
 	"JARUPD":     {"JARPARM", "LASTUPD"},
 	"PROGRAM":    {"DISTLIB", "FMID", "SYSLIB", "VERSION"},
-	"DLIBZONE":   {"RELATED", "SREL", "UPGLEVEL"},
 	"FEATURE":    {"FMID", "PRODUCT", "DESCRIPTION"},
 	"FMIDSET":    {"FMID"},
 	"HOLDDATA":   {"HOLDCLASS", "HOLDREASON", "HOLDDATE", "HOLDFIXCAT", "HOLDRESOLVER"},

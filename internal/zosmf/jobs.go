@@ -22,10 +22,22 @@ type Job struct {
 	URL         string `json:"url,omitempty"`
 	Phase       int    `json:"phase,omitempty"`
 	PhaseName   string `json:"phase-name,omitempty"`
-	ExecStarted string `json:"exec-started,omitempty"`
-	ExecEnded   string `json:"exec-ended,omitempty"`
-	ExecMember  string `json:"exec-member,omitempty"`
-	ExecSystem  string `json:"exec-system,omitempty"`
+	ExecSystem    string    `json:"exec-system,omitempty"`
+	ExecMember    string    `json:"exec-member,omitempty"`
+	ExecSubmitted string    `json:"exec-submitted,omitempty"`
+	ExecStarted   string    `json:"exec-started,omitempty"`
+	ExecEnded     string    `json:"exec-ended,omitempty"`
+	StepData      []JobStep `json:"step-data,omitempty"`
+}
+
+// JobStep represents a single completed step returned when step-data=Y is requested.
+type JobStep struct {
+	StepNumber   int    `json:"step-number,omitempty"`
+	StepName     string `json:"step-name,omitempty"`
+	ProcStepName string `json:"proc-step-name,omitempty"`
+	ProgramName  string `json:"program-name,omitempty"`
+	CompletionCode string `json:"completion-code,omitempty"`
+	ActiveInd    bool   `json:"active-ind,omitempty"`
 }
 
 // JobFile represents a spool file (DD) of a job.
@@ -43,10 +55,12 @@ type JobFile struct {
 
 // ListJobsParams contains parameters for listing jobs.
 type ListJobsParams struct {
-	Owner   string
-	Prefix  string
-	Status  string // ACTIVE, OUTPUT, INPUT, or empty for all
-	MaxJobs int
+	Owner    string
+	Prefix   string
+	JobID    string // mutually exclusive with UserCorrelator
+	Status   string // ACTIVE, OUTPUT, INPUT, or empty for all
+	MaxJobs  int
+	ExecData bool // request exec-started/exec-ended/exec-member/exec-system fields
 }
 
 // ListJobs retrieves a list of jobs matching the given criteria.
@@ -58,11 +72,17 @@ func (c *Client) ListJobs(params ListJobsParams) ([]Job, error) {
 	if params.Prefix != "" {
 		query.Set("prefix", params.Prefix)
 	}
+	if params.JobID != "" {
+		query.Set("jobid", params.JobID)
+	}
 	if params.Status != "" {
 		query.Set("status", params.Status)
 	}
 	if params.MaxJobs > 0 {
 		query.Set("max-jobs", fmt.Sprintf("%d", params.MaxJobs))
+	}
+	if params.ExecData {
+		query.Set("exec-data", "Y")
 	}
 
 	path := "/zosmf/restjobs/jobs"
@@ -83,9 +103,10 @@ func (c *Client) ListJobs(params ListJobsParams) ([]Job, error) {
 	return jobs, nil
 }
 
-// GetJob retrieves details for a specific job.
+// GetJob retrieves details for a specific job, including exec-data and step-data.
 func (c *Client) GetJob(jobName, jobID string) (*Job, error) {
-	path := fmt.Sprintf("/zosmf/restjobs/jobs/%s/%s", url.PathEscape(jobName), url.PathEscape(jobID))
+	path := fmt.Sprintf("/zosmf/restjobs/jobs/%s/%s?exec-data=Y&step-data=Y",
+		url.PathEscape(jobName), url.PathEscape(jobID))
 
 	body, err := c.Get(path)
 	if err != nil {

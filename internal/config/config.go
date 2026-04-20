@@ -11,12 +11,14 @@ import (
 
 type Config struct {
 	Systems   []SystemConfig  `yaml:"systems"`
+	Servers   []SystemConfig  `yaml:"servers"`
 	Transport TransportConfig `yaml:"transport"`
 }
 
 type SystemConfig struct {
 	Name          string     `yaml:"name"`
 	Host          string     `yaml:"host"`
+	Port          int        `yaml:"port"`
 	Auth          AuthConfig `yaml:"auth"`
 	CAFile        string     `yaml:"ca_file"`
 	SkipTLSVerify bool       `yaml:"skip_tls_verify"`
@@ -27,6 +29,13 @@ type SystemConfig struct {
 	TSOProc       string     `yaml:"tso_proc"`
 	TSOCharset    string     `yaml:"tso_charset"`
 	TSOCodepage   string     `yaml:"tso_codepage"`
+
+	// smpe_ls-compatible aliases
+	User                string   `yaml:"user"`
+	RejectUnauthorized  *bool    `yaml:"rejectUnauthorized"`
+	CSI                 any      `yaml:"csi"`
+	Zones               []string `yaml:"zones"`
+	DefaultZones        []string `yaml:"defaultZones"`
 }
 
 type AuthConfig struct {
@@ -62,6 +71,12 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
+	if len(cfg.Systems) == 0 && len(cfg.Servers) > 0 {
+		cfg.Systems = cfg.Servers
+	}
+
+	cfg.normalize()
+
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("validating config: %w", err)
 	}
@@ -77,6 +92,56 @@ func expandEnvVars(s string) string {
 		}
 		return match
 	})
+}
+
+func (c *Config) normalize() {
+	envPassword := os.Getenv("ZOSMF_PASSWORD")
+
+	for i := range c.Systems {
+		s := &c.Systems[i]
+
+		// user: → auth.username
+		if s.User != "" && s.Auth.Username == "" {
+			s.Auth.Username = s.User
+		}
+
+		// password from env if not in config
+		if s.Auth.Password == "" && envPassword != "" {
+			s.Auth.Password = envPassword
+		}
+
+		// default auth type to basic if username+password are set
+		if s.Auth.Type == "" && s.Auth.Username != "" {
+			s.Auth.Type = "basic"
+		}
+
+		// rejectUnauthorized: false → skip_tls_verify: true
+		if s.RejectUnauthorized != nil && !*s.RejectUnauthorized {
+			s.SkipTLSVerify = true
+		}
+
+		// port: → append to host URL if not already present
+		if s.Port != 0 {
+			host := s.Host
+			if !strings.Contains(host[strings.LastIndex(host, "/")+1:], ":") {
+				s.Host = fmt.Sprintf("%s:%d", strings.TrimRight(host, "/"), s.Port)
+			}
+		}
+
+		// csi: (string or list) → csi_datasets
+		if len(s.CSIDatasets) == 0 && s.CSI != nil {
+			switch v := s.CSI.(type) {
+			case string:
+				s.CSIDatasets = []string{v}
+			case []any:
+				for _, item := range v {
+					if str, ok := item.(string); ok {
+						s.CSIDatasets = append(s.CSIDatasets, str)
+					}
+				}
+			}
+		}
+	}
 }
 
 func (c *Config) validate() error {
@@ -111,10 +176,6 @@ func (c *Config) validate() error {
 		default:
 			return fmt.Errorf("system %s: auth type must be 'basic' or 'certificate', got '%s'", sys.Name, sys.Auth.Type)
 		}
-	}
-
-	if !c.Transport.Stdio && !c.Transport.HTTP.Enabled {
-		return fmt.Errorf("at least one transport (stdio or http) must be enabled")
 	}
 
 	return nil

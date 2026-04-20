@@ -21,7 +21,7 @@ var (
 )
 
 func main() {
-	configPath := flag.String("config", ".zosmf-mcp-config.yaml", "Path to configuration file")
+	configPath := flag.String("config", ".smpe-zosmf.yaml", "Path to configuration file")
 	transport := flag.String("transport", "auto", "Transport type: stdio, http, or auto (uses config)")
 	listen := flag.String("listen", "", "HTTP listen address (overrides config)")
 	showVersion := flag.Bool("version", false, "Print version information and exit")

@@ -28,7 +28,8 @@ func (t *listDatasetsTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name: "zosmf_list_datasets",
 		Description: "List z/OS datasets matching a pattern. Use standard z/OS dataset level patterns " +
-			"(e.g. 'SYS1.PARM*', 'USER.**.JCL'). Returns dataset names with attributes like DSORG, RECFM, LRECL.",
+			"(e.g. 'SYS1.PARM*', 'USER.**.JCL'). Returns dataset attributes: DSORG, RECFM, LRECL, BLKSIZE, " +
+			"volume serial, creation/reference/expiry dates, used space, migration status, and dataset type (PDS, PDSE, etc.).",
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -84,7 +85,9 @@ func NewListMembersTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 func (t *listMembersTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_list_members",
-		Description: "List members of a PDS or PDSE dataset on z/OS.",
+		Description: "List members of a PDS or PDSE dataset on z/OS. Returns member statistics: " +
+			"name, version, modification count, creation/modification date and time, " +
+			"current/initial/modified line counts, last modifying user, and SCLM indicator.",
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{

@@ -16,10 +16,12 @@ type listJobsTool struct {
 }
 
 type listJobsArgs struct {
-	System string `json:"system"`
-	Owner  string `json:"owner,omitempty"`
-	Prefix string `json:"prefix,omitempty"`
-	Status string `json:"status,omitempty"`
+	System   string `json:"system"`
+	Owner    string `json:"owner,omitempty"`
+	Prefix   string `json:"prefix,omitempty"`
+	JobID    string `json:"jobid,omitempty"`
+	Status   string `json:"status,omitempty"`
+	ExecData bool   `json:"exec_data,omitempty"`
 }
 
 func NewListJobsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -29,9 +31,9 @@ func NewListJobsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 func (t *listJobsTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_list_jobs",
-		Description: "List z/OS jobs on a system. To list ALL jobs (not just your own), set owner and prefix to '*'. " +
-			"Filter by owner, job name prefix, and/or status (ACTIVE, OUTPUT, INPUT). " +
-			"When listing all active jobs, set owner='*', prefix='*', and status='ACTIVE'.",
+		Description: "List z/OS jobs on a system. Filter by owner, job name prefix, job ID, and/or status (ACTIVE, OUTPUT, INPUT). " +
+			"To list ALL jobs (not just your own), set owner and prefix to '*'. " +
+			"Set exec_data=true to include execution timestamps (exec-started, exec-ended, exec-submitted, exec-system, exec-member).",
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -47,10 +49,18 @@ func (t *listJobsTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Job name prefix filter. Use '*' for all job names. Supports wildcards (e.g. 'IEF*'). Defaults to the authenticated user's prefix if omitted.",
 				},
+				"jobid": map[string]any{
+					"type":        "string",
+					"description": "Job ID filter (e.g. JOB12345). Mutually exclusive with user-correlator. Folded to uppercase.",
+				},
 				"status": map[string]any{
 					"type":        "string",
 					"description": "Job status filter: ACTIVE, OUTPUT, or INPUT. If omitted, all statuses are returned.",
 					"enum":        []string{"ACTIVE", "OUTPUT", "INPUT"},
+				},
+				"exec_data": map[string]any{
+					"type":        "boolean",
+					"description": "If true, include exec-started, exec-ended, exec-member, exec-system fields in the response (adds exec-data=Y query parameter).",
 				},
 			},
 			"required": []string{"system"},
@@ -70,9 +80,11 @@ func (t *listJobsTool) Execute(ctx context.Context, arguments json.RawMessage) (
 	}
 
 	jobs, err := client.ListJobs(zosmf.ListJobsParams{
-		Owner:  args.Owner,
-		Prefix: args.Prefix,
-		Status: args.Status,
+		Owner:    args.Owner,
+		Prefix:   args.Prefix,
+		JobID:    args.JobID,
+		Status:   args.Status,
+		ExecData: args.ExecData,
 	})
 	if err != nil {
 		return mcp.ErrorResult("failed to list jobs: " + err.Error()), nil
@@ -101,7 +113,7 @@ func NewGetJobTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 func (t *getJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_job",
-		Description: "Get details of a specific z/OS job including status, return code, and timestamps.",
+		Description: "Get details of a specific z/OS job including status, return code, execution data (exec-system, exec-member, exec-submitted, exec-started, exec-ended) and step data (step name, number, completion code) for all completed steps.",
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{

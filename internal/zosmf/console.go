@@ -127,11 +127,19 @@ func (c *Client) GetHardcopyLog(source string, ago string, since time.Time, time
 
 	// Timestamp: ago takes priority over since
 	if ago != "" {
+		// ago means "start from (now - ago) going forward"
+		// e.g. ago=10m → timestamp=now-10m, direction=forward, timeRange=ago
 		ts, err := parseAgo(ago)
 		if err != nil {
 			return nil, err
 		}
 		params = append(params, "timestamp="+strconv.FormatInt(ts, 10))
+		if timeRange == "" {
+			timeRange = ago
+		}
+		if direction == "" {
+			direction = "forward"
+		}
 	} else if !since.IsZero() {
 		params = append(params, "timestamp="+strconv.FormatInt(since.UnixMilli(), 10))
 	}

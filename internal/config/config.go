@@ -10,9 +10,10 @@ import (
 )
 
 type Config struct {
-	Systems   []SystemConfig  `yaml:"systems"`
-	Servers   []SystemConfig  `yaml:"servers"`
-	Transport TransportConfig `yaml:"transport"`
+	Systems    []SystemConfig    `yaml:"systems"`
+	Servers    []SystemConfig    `yaml:"servers"`
+	SSHSystems []SSHSystemConfig `yaml:"ssh_systems"`
+	Transport  TransportConfig   `yaml:"transport"`
 }
 
 type SystemConfig struct {
@@ -54,6 +55,14 @@ type TransportConfig struct {
 type HTTPConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Listen  string `yaml:"listen"`
+}
+
+type SSHSystemConfig struct {
+	Name     string `yaml:"name"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 var envVarPattern = regexp.MustCompile(`\$\{([^}]+)\}`)
@@ -142,6 +151,12 @@ func (c *Config) normalize() {
 			}
 		}
 	}
+
+	for i := range c.SSHSystems {
+		if c.SSHSystems[i].Port == 0 {
+			c.SSHSystems[i].Port = 22
+		}
+	}
 }
 
 func (c *Config) validate() error {
@@ -175,6 +190,24 @@ func (c *Config) validate() error {
 			}
 		default:
 			return fmt.Errorf("system %s: auth type must be 'basic' or 'certificate', got '%s'", sys.Name, sys.Auth.Type)
+		}
+	}
+
+	sshNames := make(map[string]bool)
+	for i, ssh := range c.SSHSystems {
+		if ssh.Name == "" {
+			return fmt.Errorf("ssh_systems entry %d: name is required", i)
+		}
+		normalized := strings.ToUpper(ssh.Name)
+		if sshNames[normalized] {
+			return fmt.Errorf("duplicate ssh_systems name: %s", ssh.Name)
+		}
+		sshNames[normalized] = true
+		if ssh.Host == "" {
+			return fmt.Errorf("ssh_systems %s: host is required", ssh.Name)
+		}
+		if ssh.Username == "" {
+			return fmt.Errorf("ssh_systems %s: username is required", ssh.Name)
 		}
 	}
 

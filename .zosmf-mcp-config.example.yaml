@@ -7,8 +7,8 @@
 # One entry per z/OSMF endpoint. A single endpoint can serve an entire sysplex.
 # ---------------------------------------------------------------------------
 systems:
-  - name: "MAINT"
-    host: "https://203.0.113.11:443"
+  - name: "MYZOSMF"
+    host: "https://192.168.1.100:443"
     auth:
       type: "basic"
       username: "IBMUSER"
@@ -17,12 +17,19 @@ systems:
     # ca_file: "/path/to/ca.pem"      # PEM file with the z/OSMF CA certificate
 
     # SMP/E defaults (used when not specified in the tool call)
-    csi_datasets:
+    csi:
       - "SMPE.GLOBAL.CSI"
-    target_zones:
-      - "TGTZONE"
-    dlib_zones:
-      - "DLIBZONE"
+    zones:
+      - "TGT1ZONE"
+      - "TGT2ZONE"
+      - "TGT3ZONE"
+      - "DLB1ZONE"
+      - "DLB2ZONE"
+      - "DLB3ZONE"
+    defaultZones:
+      - "GLOBAL"
+      - "TGT?ZONE"
+      - "DLB?ZONE"
 
     # TSO settings (required for zosmf_tso_command)
     tso_account:  "ACCT#"
@@ -47,14 +54,14 @@ systems:
 # ZOAU tools are only registered when at least one ssh_systems entry is present.
 # ---------------------------------------------------------------------------
 # ssh_systems:
-#   - name: "MVSA"
-#     host: "mvsa.example.com"
+#   - name: "SYSA"
+#     host: "my.ssh.server"
 #     port: 22                    # optional, default: 22
 #     username: "ibmuser"
-#     key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key (~/.ssh)
-#   - name: "MVSB"
-#     host: "mvsb.example.com"
-#     username: "ibmuser"
+#    key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key (~/.ssh)
+#  - name: "MVSB"
+#    host: "mvsb.example.com"
+#    username: "ibmuser"
 
 # ---------------------------------------------------------------------------
 # Transport

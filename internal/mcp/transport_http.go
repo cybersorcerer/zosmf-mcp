@@ -23,10 +23,20 @@ type HTTPTransport struct {
 	sessions map[string]*session
 }
 
+type sessionState int
+
+const (
+	sessUninitialized sessionState = iota
+	sessInitializing
+	sessReady
+)
+
 type session struct {
 	id        string
 	createdAt time.Time
 	sseCh     chan *JSONRPCMessage // channel for server-initiated messages
+	mu        sync.Mutex
+	state     sessionState
 }
 
 func NewHTTPTransport(addr string, logger *log.Logger) *HTTPTransport {
@@ -106,27 +116,56 @@ func (t *HTTPTransport) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle session validation for non-initialize requests
-	if msg.Method != "initialize" {
-		sessionID := r.Header.Get("Mcp-Session-Id")
-		if sessionID != "" {
-			t.mu.RLock()
-			_, exists := t.sessions[sessionID]
-			t.mu.RUnlock()
-			if !exists {
-				http.Error(w, "Session not found", http.StatusNotFound)
-				return
-			}
+	if msg.Method == "initialize" {
+		// Each initialize creates a fresh session with its own state
+		sess := t.createSession()
+		sess.mu.Lock()
+		sess.state = sessInitializing
+		sess.mu.Unlock()
+		resp := t.handler(ctx, &msg)
+		if resp != nil && resp.Error == nil {
+			w.Header().Set("Mcp-Session-Id", sess.id)
+		} else {
+			// initialization failed — remove the session
+			t.mu.Lock()
+			delete(t.sessions, sess.id)
+			t.mu.Unlock()
 		}
+		if resp != nil {
+			writeJSON(w, resp)
+		} else {
+			w.WriteHeader(http.StatusAccepted)
+		}
+		return
+	}
+
+	// Non-initialize: require a valid session
+	sessionID := r.Header.Get("Mcp-Session-Id")
+	if sessionID == "" {
+		http.Error(w, "Missing Mcp-Session-Id header", http.StatusBadRequest)
+		return
+	}
+	t.mu.RLock()
+	sess, exists := t.sessions[sessionID]
+	t.mu.RUnlock()
+	if !exists {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Handle notifications/initialized per session
+	if msg.IsNotification() && msg.Method == "notifications/initialized" {
+		sess.mu.Lock()
+		if sess.state == sessInitializing {
+			sess.state = sessReady
+		}
+		sess.mu.Unlock()
+		t.handler(ctx, &msg)
+		w.WriteHeader(http.StatusAccepted)
+		return
 	}
 
 	resp := t.handler(ctx, &msg)
-
-	// If this was an initialize request, create a session
-	if msg.Method == "initialize" && resp != nil && resp.Error == nil {
-		sess := t.createSession()
-		w.Header().Set("Mcp-Session-Id", sess.id)
-	}
 
 	if resp == nil {
 		w.WriteHeader(http.StatusAccepted)

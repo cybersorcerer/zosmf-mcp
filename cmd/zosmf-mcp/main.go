@@ -65,9 +65,6 @@ func main() {
 	}
 	logger.Printf("registered %d tools", len(registry.List()))
 
-	// Create MCP server
-	server := mcp.NewServer(registry, logger)
-
 	// Setup context with signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -107,6 +104,7 @@ func main() {
 	errCh := make(chan error, 2)
 
 	if useStdio {
+		server := mcp.NewServer(registry, logger)
 		t := mcp.NewStdioTransport(logger)
 		logger.Println("starting stdio transport")
 		go func() {
@@ -119,6 +117,7 @@ func main() {
 	}
 
 	if useHTTP {
+		server := mcp.NewHTTPServer(registry, logger)
 		addr := cfg.Transport.HTTP.Listen
 		if *listen != "" {
 			addr = *listen

@@ -38,6 +38,7 @@ type Server struct {
 	state    serverState
 	registry *ToolRegistry
 	logger   *log.Logger
+	httpMode bool // when true, initialize resets state per-call (HTTP transport is session-aware)
 }
 
 func NewServer(registry *ToolRegistry, logger *log.Logger) *Server {
@@ -45,6 +46,15 @@ func NewServer(registry *ToolRegistry, logger *log.Logger) *Server {
 		state:    stateUninitialized,
 		registry: registry,
 		logger:   logger,
+	}
+}
+
+func NewHTTPServer(registry *ToolRegistry, logger *log.Logger) *Server {
+	return &Server{
+		state:    stateReady, // HTTP transport manages session state itself
+		registry: registry,
+		logger:   logger,
+		httpMode: true,
 	}
 }
 
@@ -86,6 +96,21 @@ func (s *Server) handleRequest(ctx context.Context, msg *JSONRPCMessage) *JSONRP
 			return NewErrorResponse(msg.ID, ErrCodeInternal, err.Error())
 		}
 		return resp
+	}
+
+	// In HTTP mode the transport manages session state — initialize is always valid
+	if s.httpMode {
+		switch msg.Method {
+		case "initialize":
+			return s.handleInitialize(msg)
+		case "tools/list":
+			return s.handleToolsList(msg)
+		case "tools/call":
+			return s.handleToolsCall(ctx, msg)
+		default:
+			return NewErrorResponse(msg.ID, ErrCodeMethodNotFound,
+				fmt.Sprintf("unknown method: %s", msg.Method))
+		}
 	}
 
 	// Before initialization, only initialize is allowed

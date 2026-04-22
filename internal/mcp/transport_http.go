@@ -235,9 +235,6 @@ func (t *HTTPTransport) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	t.mu.Unlock()
 
-	// Session already gone — treat as success (idempotent delete)
-	w.WriteHeader(http.StatusOK)
-
 	t.logger.Printf("session %s terminated", sessionID)
 	w.WriteHeader(http.StatusOK)
 }

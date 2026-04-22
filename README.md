@@ -40,7 +40,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for z/
 ### Build from Source
 
 ```bash
-git clone https://gitlab.com/ronaldfunk/zosmf-mcp.git
+git clone https://github.com/ronaldfunk/zosmf-mcp.git
 cd zosmf-mcp
 make install
 ```
@@ -88,9 +88,9 @@ systems:
       - "TGTZONE"
     dlib_zones:                            # Default SMP/E distribution zones
       - "DLIBZONE"
-    tso_account: "ACCT#"                  # TSO account number
-    tso_proc:    "IZUFPROC"               # TSO logon procedure
-    tso_charset: "697"                    # TSO character set (default: 697)
+    tso_account:  "ACCT#"                 # TSO account number
+    tso_proc:     "IZUFPROC"              # TSO logon procedure
+    tso_charset:  "697"                   # TSO character set (default: 697)
     tso_codepage: "1047"                  # TSO code page (default: 1047)
 
   # Second system using certificate authentication
@@ -111,22 +111,36 @@ transport:
 
 ### Configuration Reference
 
-| Field            | Required | Description                                                        |
-|------------------|----------|--------------------------------------------------------------------|
-| `name`           | Yes      | System name used in prompts (e.g. "PROD", "MAINT")                |
-| `host`           | Yes      | z/OSMF base URL including port                                     |
-| `auth.type`      | Yes      | `basic` or `certificate`                                           |
-| `auth.username`  | Yes*     | TSO user ID (*required for `basic`)                                |
-| `auth.password`  | Yes*     | Password — reference via `${ENV_VAR}` to avoid hardcoding         |
-| `ca_file`        | No       | PEM file with the CA certificate for self-signed z/OSMF certs     |
-| `skip_tls_verify`| No       | Skip TLS validation (not recommended for production)              |
-| `csi_datasets`   | No       | Default CSI datasets for SMP/E queries                             |
-| `target_zones`   | No       | Default target zones for SMP/E                                     |
-| `dlib_zones`     | No       | Default distribution zones for SMP/E                              |
-| `tso_account`    | No       | TSO account number (required for `zosmf_tso_command`)             |
-| `tso_proc`       | No       | TSO logon procedure (required for `zosmf_tso_command`)            |
-| `tso_charset`    | No       | TSO character set, default: `697`                                  |
-| `tso_codepage`   | No       | TSO code page, default: `1047`                                     |
+| Field             | Required | Description                                                       |
+|-------------------|----------|-------------------------------------------------------------------|
+| `name`            | Yes      | System name used in prompts (e.g. "PROD", "MAINT")               |
+| `host`            | Yes      | z/OSMF base URL including port                                    |
+| `port`            | No       | Port number — appended to `host` if not already present          |
+| `auth.type`       | Yes      | `basic` or `certificate`                                          |
+| `auth.username`   | Yes*     | TSO user ID (*required for `basic`)                               |
+| `auth.password`   | Yes*     | Password — reference via `${ENV_VAR}` to avoid hardcoding        |
+| `auth.cert_file`  | Yes**    | PEM certificate file (**required for `certificate`)               |
+| `auth.key_file`   | Yes**    | PEM private key file (**required for `certificate`)               |
+| `ca_file`         | No       | PEM file with the CA certificate for self-signed z/OSMF certs    |
+| `skip_tls_verify` | No       | Skip TLS validation — not recommended for production             |
+| `csi_datasets`    | No       | Default CSI datasets for SMP/E queries (list of dataset names)   |
+| `target_zones`    | No       | Default SMP/E target zones                                        |
+| `dlib_zones`      | No       | Default SMP/E distribution zones                                  |
+| `tso_account`     | No       | TSO account number (required for `zosmf_tso_command`)            |
+| `tso_proc`        | No       | TSO logon procedure (required for `zosmf_tso_command`)           |
+| `tso_charset`     | No       | TSO character set, default: `697`                                 |
+| `tso_codepage`    | No       | TSO code page, default: `1047`                                    |
+
+### Compatibility Aliases
+
+The following fields are accepted as aliases for compatibility with other z/OSMF tools:
+
+| Alias                | Equivalent to                 |
+|----------------------|-------------------------------|
+| `servers`            | `systems`                     |
+| `user`               | `auth.username`               |
+| `csi`                | `csi_datasets`                |
+| `rejectUnauthorized` | `skip_tls_verify` (inverted)  |
 
 ### Passing Passwords Securely
 
@@ -144,6 +158,8 @@ In the config:
 ```yaml
 password: "${ZOSMF_SYSA_PASSWORD}"
 ```
+
+If `auth.password` is not set for a system and no `${ENV_VAR}` placeholder is present, the server falls back to the `ZOSMF_PASSWORD` environment variable as a global default.
 
 ---
 

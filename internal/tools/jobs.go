@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
 	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
@@ -199,10 +200,10 @@ type getSpoolContentTool struct {
 }
 
 type getSpoolContentArgs struct {
-	System  string `json:"system"`
-	JobName string `json:"job_name"`
-	JobID   string `json:"job_id"`
-	FileID  int    `json:"file_id"`
+	System  string          `json:"system"`
+	JobName string          `json:"job_name"`
+	JobID   string          `json:"job_id"`
+	FileID  json.RawMessage `json:"file_id"`
 }
 
 func NewGetSpoolContentTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -219,7 +220,7 @@ func (t *getSpoolContentTool) Definition() mcp.Tool {
 				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
-				"file_id":  map[string]any{"type": "integer", "description": "Spool file ID (from zosmf_get_job_output)"},
+				"file_id":  map[string]any{"type": "string", "description": "Spool file ID (from zosmf_get_job_output)"},
 			},
 			"required": []string{"system", "job_name", "job_id", "file_id"},
 		}),
@@ -237,7 +238,14 @@ func (t *getSpoolContentTool) Execute(ctx context.Context, arguments json.RawMes
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	content, err := client.GetJobFileContent(args.JobName, args.JobID, args.FileID)
+	var fileID int
+	// file_id may arrive as integer or quoted string — handle both
+	raw := string(args.FileID)
+	raw = strings.Trim(raw, `"`)
+	if _, err := fmt.Sscanf(raw, "%d", &fileID); err != nil {
+		return mcp.ErrorResult("invalid file_id: " + err.Error()), nil
+	}
+	content, err := client.GetJobFileContent(args.JobName, args.JobID, fileID)
 	if err != nil {
 		return mcp.ErrorResult("failed to get spool content: " + err.Error()), nil
 	}

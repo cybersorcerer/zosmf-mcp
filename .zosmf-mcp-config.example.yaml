@@ -1,32 +1,67 @@
+# zosmf-mcp configuration example
+# Copy this file to .zosmf-mcp-config.yaml and adapt it to your environment.
+# Passwords should never be stored in plain text — use environment variables: ${VAR_NAME}
+
+# ---------------------------------------------------------------------------
+# z/OSMF Systems
+# One entry per z/OSMF endpoint. A single endpoint can serve an entire sysplex.
+# ---------------------------------------------------------------------------
 systems:
-  - name: "SYSA"
-    host: "https://sysa.example.com:443"
+  - name: "MAINT"
+    host: "https://203.0.113.11:443"
     auth:
       type: "basic"
       username: "IBMUSER"
-      password: "${ZOSMF_SYSA_PASSWORD}"
-    # ca_file: "/path/to/ca.pem"       # Optional: custom CA for self-signed z/OSMF certs
-    skip_tls_verify: false
-    csi_datasets:                       # Optional: default CSI datasets for SMP/E queries
-      - "SMPE.GLOBAL.CSI"
-      # - "SMPE.OTHER.CSI"
-    target_zones:                       # Optional: default SMP/E target zones
-      - "TGTZONE"
-    dlib_zones:                         # Optional: default SMP/E distribution zones
-      - "DLIBZONE"
-    tso_account: "ACCT#"               # Optional: TSO account number for TSO commands
-    tso_proc: "IKJACCNT"               # Optional: TSO logon procedure
+      password: "${ZOSMF_MAINT_PASSWORD}"
+    skip_tls_verify: true             # set to false and configure ca_file for production
+    # ca_file: "/path/to/ca.pem"      # PEM file with the z/OSMF CA certificate
 
-  # Example: second system with client certificate auth
-  # - name: "SYSB"
-  #   host: "https://sysb.example.com:443"
+    # SMP/E defaults (used when not specified in the tool call)
+    csi_datasets:
+      - "SMPE.GLOBAL.CSI"
+    target_zones:
+      - "TGTZONE"
+    dlib_zones:
+      - "DLIBZONE"
+
+    # TSO settings (required for zosmf_tso_command)
+    tso_account:  "ACCT#"
+    tso_proc:     "IZUFPROC"
+    tso_charset:  "697"
+    tso_codepage: "1047"
+
+  # Second system — certificate authentication
+  # - name: "PROD"
+  #   host: "https://prod.example.com:443"
   #   auth:
   #     type: "certificate"
   #     cert_file: "/path/to/client.pem"
-  #     key_file: "/path/to/client.key"
+  #     key_file:  "/path/to/client.key"
   #   ca_file: "/path/to/ca.pem"
-  #   skip_tls_verify: false
 
+# ---------------------------------------------------------------------------
+# SSH Systems (optional — required for ZOAU tools)
+# One entry per LPAR. SSH and z/OSMF are independent: a single z/OSMF endpoint
+# can see all LPARs in a sysplex, but SSH requires a separate entry per LPAR.
+# Only SSH key authentication is supported (no passwords).
+# ZOAU tools are only registered when at least one ssh_systems entry is present.
+# ---------------------------------------------------------------------------
+# ssh_systems:
+#   - name: "MVSA"
+#     host: "mvsa.example.com"
+#     port: 22                    # optional, default: 22
+#     username: "ibmuser"
+#     key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key (~/.ssh)
+#   - name: "MVSB"
+#     host: "mvsb.example.com"
+#     username: "ibmuser"
+
+# ---------------------------------------------------------------------------
+# Transport
+# stdio:        used by Claude Desktop, Claude Code, VS Code, Cursor, etc.
+# http.enabled: used by n8n, curl, and custom HTTP clients.
+# Both transports can run simultaneously.
+# ---------------------------------------------------------------------------
 transport:
   stdio: true
   http:

@@ -51,9 +51,16 @@ func main() {
 		logger.Printf("registered system: %s (%s)", sys.Name, sys.Host)
 	}
 
+	// Build SSH client registry if ssh_systems are configured
+	var sshReg *zosmf.SSHClientRegistry
+	if len(cfg.SSHSystems) > 0 {
+		sshReg = zosmf.NewSSHClientRegistry(cfg.SSHSystems)
+		logger.Printf("registered %d SSH systems", len(cfg.SSHSystems))
+	}
+
 	// Create tool registry and register all tools
 	registry := mcp.NewToolRegistry()
-	if err := tools.RegisterAll(registry, clients, cfg); err != nil {
+	if err := tools.RegisterAll(registry, clients, cfg, sshReg); err != nil {
 		logger.Fatalf("failed to register tools: %v", err)
 	}
 	logger.Printf("registered %d tools", len(registry.List()))

@@ -7,7 +7,8 @@ import (
 )
 
 // RegisterAll registers all available MCP tools with the given registry.
-func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg *config.Config) error {
+// ZOAU tools are only registered if sshReg is non-nil (i.e. ssh_systems is configured).
+func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg *config.Config, sshReg *zosmf.SSHClientRegistry) error {
 	handlers := []mcp.ToolHandler{
 		// Jobs tools
 		NewListJobsTool(clients),
@@ -50,6 +51,20 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		NewTSOCommandTool(clients, cfg),
 		// Parmlib tools
 		NewParmlibValidateTool(clients),
+	}
+
+	if sshReg != nil {
+		handlers = append(handlers,
+			NewZOAUPllTool(sshReg),
+			NewZOAUZinfoTool(sshReg),
+			NewZOAULlwhenceTool(sshReg),
+			NewZOAUParmgrepTool(sshReg),
+			NewZOAUParmwhenceTool(sshReg),
+			NewZOAUPprocTool(sshReg),
+			NewZOAUProcgrepTool(sshReg),
+			NewZOAUProcwhenceTool(sshReg),
+			NewZOAUVersionTool(sshReg),
+		)
 	}
 
 	for _, h := range handlers {

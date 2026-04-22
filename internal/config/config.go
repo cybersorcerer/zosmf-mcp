@@ -150,6 +150,11 @@ func (c *Config) normalize() {
 				}
 			}
 		}
+
+		// zones: → target_zones
+		if len(s.TargetZones) == 0 && len(s.Zones) > 0 {
+			s.TargetZones = s.Zones
+		}
 	}
 
 	for i := range c.SSHSystems {

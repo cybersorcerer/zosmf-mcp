@@ -23,25 +23,14 @@ type zoauPatternArgs struct {
 	Pattern string `json:"pattern"`
 }
 
-func runZOAU(sshReg *zosmf.SSHClientRegistry, system, command string, jsonFlag bool) (mcp.ToolCallResult, error) {
+func runZOAU(sshReg *zosmf.SSHClientRegistry, system, command string) (mcp.ToolCallResult, error) {
 	cfg, err := sshReg.Get(system)
 	if err != nil {
 		return mcp.ErrorResult(err.Error()), nil
 	}
-	cmd := command
-	if jsonFlag {
-		cmd = command + " -j"
-	}
-	out, err := zosmf.RunSSH(cfg, cmd)
+	out, err := zosmf.RunSSH(cfg, command)
 	if err != nil {
 		return mcp.ErrorResult(err.Error()), nil
-	}
-	if jsonFlag {
-		var parsed any
-		if jsonErr := json.Unmarshal([]byte(out), &parsed); jsonErr == nil {
-			pretty, _ := json.MarshalIndent(parsed, "", "  ")
-			return mcp.TextResult(string(pretty)), nil
-		}
 	}
 	return mcp.TextResult(out), nil
 }
@@ -73,7 +62,7 @@ func (t *zoauPllTool) Execute(ctx context.Context, arguments json.RawMessage) (m
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, "pll -v", false)
+	return runZOAU(t.sshReg, args.System, "pll -v")
 }
 
 // --- zosmf_zoau_zinfo ---
@@ -103,7 +92,7 @@ func (t *zoauZinfoTool) Execute(ctx context.Context, arguments json.RawMessage) 
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, "zinfo -a", false)
+	return runZOAU(t.sshReg, args.System, "zinfo -a")
 }
 
 // --- zosmf_zoau_llwhence ---
@@ -134,7 +123,7 @@ func (t *zoauLlwhenceTool) Execute(ctx context.Context, arguments json.RawMessag
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, fmt.Sprintf("llwhence -v %s", zosmf.ShellQuote(args.Member)), false)
+	return runZOAU(t.sshReg, args.System, fmt.Sprintf("llwhence -v %s", zosmf.ShellQuote(args.Member)))
 }
 
 // --- zosmf_zoau_parmgrep ---
@@ -165,7 +154,7 @@ func (t *zoauParmgrepTool) Execute(ctx context.Context, arguments json.RawMessag
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, fmt.Sprintf("parmgrep -n -v %s", zosmf.ShellQuote(args.Pattern)), false)
+	return runZOAU(t.sshReg, args.System, fmt.Sprintf("parmgrep -n -v %s", zosmf.ShellQuote(args.Pattern)))
 }
 
 // --- zosmf_zoau_parmwhence ---
@@ -196,7 +185,7 @@ func (t *zoauParmwhenceTool) Execute(ctx context.Context, arguments json.RawMess
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, fmt.Sprintf("parmwhence -v %s", zosmf.ShellQuote(args.Member)), false)
+	return runZOAU(t.sshReg, args.System, fmt.Sprintf("parmwhence -v %s", zosmf.ShellQuote(args.Member)))
 }
 
 // --- zosmf_zoau_pproc ---
@@ -226,7 +215,7 @@ func (t *zoauPprocTool) Execute(ctx context.Context, arguments json.RawMessage) 
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, "pproc -v", false)
+	return runZOAU(t.sshReg, args.System, "pproc -v")
 }
 
 // --- zosmf_zoau_procgrep ---
@@ -257,7 +246,7 @@ func (t *zoauProcgrepTool) Execute(ctx context.Context, arguments json.RawMessag
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, fmt.Sprintf("procgrep -n -v %s", zosmf.ShellQuote(args.Pattern)), false)
+	return runZOAU(t.sshReg, args.System, fmt.Sprintf("procgrep -n -v %s", zosmf.ShellQuote(args.Pattern)))
 }
 
 // --- zosmf_zoau_procwhence ---
@@ -288,7 +277,7 @@ func (t *zoauProcwhenceTool) Execute(ctx context.Context, arguments json.RawMess
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, fmt.Sprintf("procwhence -v %s", zosmf.ShellQuote(args.Member)), false)
+	return runZOAU(t.sshReg, args.System, fmt.Sprintf("procwhence -v %s", zosmf.ShellQuote(args.Member)))
 }
 
 // --- zosmf_zoau_version ---
@@ -318,5 +307,5 @@ func (t *zoauVersionTool) Execute(ctx context.Context, arguments json.RawMessage
 	if err := json.Unmarshal(arguments, &args); err != nil {
 		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
 	}
-	return runZOAU(t.sshReg, args.System, "zoaversion -v", false)
+	return runZOAU(t.sshReg, args.System, "zoaversion -v")
 }

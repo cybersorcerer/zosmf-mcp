@@ -74,38 +74,45 @@ Configuration is done via a YAML file. By default the server looks for `.zosmf-m
 
 ```yaml
 systems:
-  - name: "SYSA"
-    host: "https://sysa.example.com:443"
+  - name: "MAINT"
+    host: "https://203.0.113.11:443"
     auth:
       type: "basic"
       username: "IBMUSER"
-      password: "${ZOSMF_SYSA_PASSWORD}"   # From environment variable
+      password: "${ZOSMF_MAINT_PASSWORD}"  # From environment variable
+    skip_tls_verify: true                  # Set to false and configure ca_file for production
     # ca_file: "/path/to/ca.pem"           # Optional: custom CA for self-signed z/OSMF certs
-    skip_tls_verify: false
-    csi_datasets:                          # Default CSI datasets for SMP/E queries
+    csi:                                   # Default CSI datasets for SMP/E queries
       - "SMPE.GLOBAL.CSI"
-    target_zones:                          # Default SMP/E target zones
-      - "TGTZONE"
-    dlib_zones:                            # Default SMP/E distribution zones
-      - "DLIBZONE"
+    zones:                                 # Default SMP/E zones (used when not specified in tool call)
+      - "MVST100"
+      - "MVSD100"
     tso_account:  "ACCT#"                 # TSO account number
     tso_proc:     "IZUFPROC"              # TSO logon procedure
     tso_charset:  "697"                   # TSO character set (default: 697)
     tso_codepage: "1047"                  # TSO code page (default: 1047)
 
   # Second system using certificate authentication
-  - name: "SYSB"
-    host: "https://sysb.example.com:443"
-    auth:
-      type: "certificate"
-      cert_file: "/path/to/client.pem"
-      key_file:  "/path/to/client.key"
-    ca_file: "/path/to/ca.pem"
+  # - name: "PROD"
+  #   host: "https://prod.example.com:443"
+  #   auth:
+  #     type: "certificate"
+  #     cert_file: "/path/to/client.pem"
+  #     key_file:  "/path/to/client.key"
+  #   ca_file: "/path/to/ca.pem"
+
+# SSH systems for ZOAU tools (optional — omit if ZOAU is not needed)
+# ssh_systems:
+#   - name: "MVSA"
+#     host: "mvsa.example.com"
+#     port: 22                    # optional, default: 22
+#     username: "ibmuser"
+#     key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key
 
 transport:
   stdio: true        # For MCP integration (VS Code, Claude Code, etc.)
   http:
-    enabled: true    # Optional: HTTP transport for other clients (n8n, curl, etc.)
+    enabled: false   # Optional: HTTP transport for other clients (n8n, curl, etc.)
     listen: ":8080"
 ```
 
@@ -123,9 +130,8 @@ transport:
 | `auth.key_file`   | Yes**    | PEM private key file (**required for `certificate`)               |
 | `ca_file`         | No       | PEM file with the CA certificate for self-signed z/OSMF certs    |
 | `skip_tls_verify` | No       | Skip TLS validation — not recommended for production             |
-| `csi_datasets`    | No       | Default CSI datasets for SMP/E queries (list of dataset names)   |
-| `target_zones`    | No       | Default SMP/E target zones                                        |
-| `dlib_zones`      | No       | Default SMP/E distribution zones                                  |
+| `csi`             | No       | Default CSI datasets for SMP/E queries (list of dataset names)   |
+| `zones`           | No       | Default SMP/E zones (used when no zone is specified in tool call) |
 | `tso_account`     | No       | TSO account number (required for `zosmf_tso_command`)            |
 | `tso_proc`        | No       | TSO logon procedure (required for `zosmf_tso_command`)           |
 | `tso_charset`     | No       | TSO character set, default: `697`                                 |
@@ -139,7 +145,6 @@ The following fields are accepted as aliases for compatibility with other z/OSMF
 |----------------------|-------------------------------|
 | `servers`            | `systems`                     |
 | `user`               | `auth.username`               |
-| `csi`                | `csi_datasets`                |
 | `rejectUnauthorized` | `skip_tls_verify` (inverted)  |
 
 ### Passing Passwords Securely

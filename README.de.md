@@ -74,38 +74,45 @@ Die Konfiguration erfolgt über eine YAML-Datei. Standardmäßig sucht der Serve
 
 ```yaml
 systems:
-  - name: "SYSA"
-    host: "https://sysa.example.com:443"
+  - name: "MAINT"
+    host: "https://203.0.113.11:443"
     auth:
       type: "basic"
       username: "IBMUSER"
-      password: "${ZOSMF_SYSA_PASSWORD}"   # Aus Umgebungsvariable
+      password: "${ZOSMF_MAINT_PASSWORD}"  # Aus Umgebungsvariable
+    skip_tls_verify: true                  # Für Produktion: false setzen und ca_file konfigurieren
     # ca_file: "/path/to/ca.pem"           # Custom CA für selbstsignierte Zertifikate
-    skip_tls_verify: false
-    csi_datasets:                          # Standard-CSI-Datasets für SMP/E
+    csi:                                   # Standard-CSI-Datasets für SMP/E
       - "SMPE.GLOBAL.CSI"
-    target_zones:                          # Standard Target-Zonen
-      - "TGTZONE"
-    dlib_zones:                            # Standard Distribution-Zonen
-      - "DLIBZONE"
-    tso_account: "ACCT#"                  # TSO Account-Nummer
-    tso_proc:    "IKJACCNT"               # TSO Logon-Prozedur
-    tso_charset: "697"                    # TSO Character Set (Standard: 697)
+    zones:                                 # Standard SMP/E Zonen
+      - "MVST100"
+      - "MVSD100"
+    tso_account:  "ACCT#"                 # TSO Account-Nummer
+    tso_proc:     "IZUFPROC"              # TSO Logon-Prozedur
+    tso_charset:  "697"                   # TSO Character Set (Standard: 697)
     tso_codepage: "1047"                  # TSO Code Page (Standard: 1047)
 
   # Zweites System mit Zertifikats-Authentifizierung
-  - name: "SYSB"
-    host: "https://sysb.example.com:443"
-    auth:
-      type: "certificate"
-      cert_file: "/path/to/client.pem"
-      key_file:  "/path/to/client.key"
-    ca_file: "/path/to/ca.pem"
+  # - name: "PROD"
+  #   host: "https://prod.example.com:443"
+  #   auth:
+  #     type: "certificate"
+  #     cert_file: "/path/to/client.pem"
+  #     key_file:  "/path/to/client.key"
+  #   ca_file: "/path/to/ca.pem"
+
+# SSH-Systeme für ZOAU-Tools (optional — weglassen wenn ZOAU nicht benötigt wird)
+# ssh_systems:
+#   - name: "MVSA"
+#     host: "mvsa.example.com"
+#     port: 22                    # optional, Standard: 22
+#     username: "ibmuser"
+#     key_file: "~/.ssh/id_rsa"  # optional — weglassen für SSH-Standard-Key
 
 transport:
   stdio: true        # Für MCP-Integration (VS Code, Claude Code)
   http:
-    enabled: true    # Optional: HTTP-Transport für andere Clients (n8n, curl etc.)
+    enabled: false   # Optional: HTTP-Transport für andere Clients (n8n, curl etc.)
     listen: ":8080"
 ```
 
@@ -120,9 +127,8 @@ transport:
 | `auth.password`  | Ja*     | Passwort, kann als `${ENV_VAR}` referenziert werden            |
 | `ca_file`        | Nein    | PEM-Datei mit der CA für selbstsignierte z/OSMF-Zertifikate   |
 | `skip_tls_verify`| Nein    | TLS-Validierung überspringen (nicht für Produktion empfohlen) |
-| `csi_datasets`   | Nein    | Standard-CSI-Datasets für SMP/E-Abfragen                      |
-| `target_zones`   | Nein    | Standard-Target-Zonen für SMP/E                               |
-| `dlib_zones`     | Nein    | Standard-Distribution-Zonen für SMP/E                         |
+| `csi`            | Nein    | Standard-CSI-Datasets für SMP/E-Abfragen                      |
+| `zones`          | Nein    | Standard SMP/E Zonen (Fallback wenn keine Zone angegeben)     |
 | `tso_account`    | Nein    | TSO Account-Nummer (für `zosmf_tso_command`)                  |
 | `tso_proc`       | Nein    | TSO Logon-Prozedur (für `zosmf_tso_command`)                  |
 | `tso_charset`    | Nein    | TSO Character Set, Standard: `697`                             |
@@ -134,7 +140,7 @@ Passwörter sollten nie in Klartext in der Konfigurationsdatei stehen. Umgebungs
 
 ```bash
 # .env-Datei (nicht in Git committen!)
-export ZOSMF_SYSA_PASSWORD="mein_passwort"
+export ZOSMF_MAINT_PASSWORD="mein_passwort"
 
 # Vor dem Start laden:
 source .env
@@ -142,8 +148,38 @@ source .env
 
 In der Config dann:
 ```yaml
-password: "${ZOSMF_SYSA_PASSWORD}"
+password: "${ZOSMF_MAINT_PASSWORD}"
 ```
+
+Falls `auth.password` nicht gesetzt ist und kein `${ENV_VAR}`-Platzhalter vorhanden ist, greift der Server auf die Umgebungsvariable `ZOSMF_PASSWORD` als globalen Fallback zurück.
+
+### SSH-Systeme (für ZOAU-Tools)
+
+ZOAU-Tools benötigen SSH-Zugriff auf einzelne LPARs. SSH-Systeme werden unabhängig von z/OSMF-Systemen konfiguriert — ein z/OSMF-Endpoint kann den gesamten Sysplex sehen, SSH benötigt aber einen separaten Eintrag pro LPAR.
+
+```yaml
+ssh_systems:
+  - name: "MVSA"
+    host: "mvsa.example.com"
+    port: 22                    # optional, Standard: 22
+    username: "ibmuser"
+    key_file: "~/.ssh/id_rsa"  # optional — weglassen für SSH-Standard-Key (~/.ssh)
+  - name: "MVSB"
+    host: "mvsb.example.com"
+    username: "ibmuser"
+```
+
+ZOAU-Tools werden nur registriert wenn mindestens ein `ssh_systems`-Eintrag vorhanden ist. Passwort-basiertes SSH wird nicht unterstützt — nur SSH-Key-Authentifizierung.
+
+#### SSH-Systemkonfiguration
+
+| Feld       | Pflicht | Standard | Beschreibung                                              |
+|------------|---------|----------|-----------------------------------------------------------|
+| `name`     | Ja      | —        | LPAR-Name — wird als `system` in Tool-Aufrufen verwendet  |
+| `host`     | Ja      | —        | SSH-Hostname oder IP-Adresse                              |
+| `port`     | Nein    | 22       | SSH-Port                                                  |
+| `username` | Ja      | —        | USS-Benutzername für SSH-Login                            |
+| `key_file` | Nein    | —        | Pfad zum SSH-Private-Key; weglassen für SSH-Standard-Key  |
 
 ---
 
@@ -647,7 +683,7 @@ Mcp-Session-Id: <uuid>
 
 ## 5. Tools Übersicht
 
-Der Server stellt 30 Tools in 8 Kategorien bereit:
+Der Server stellt 32 Tools in 8 Kategorien bereit (plus 9 optionale ZOAU-Tools wenn `ssh_systems` konfiguriert ist):
 
 ### Jobs (9 Tools)
 | Tool                    | Beschreibung                              |
@@ -712,6 +748,20 @@ Der Server stellt 30 Tools in 8 Kategorien bereit:
 | Tool                     | Beschreibung                                        |
 |--------------------------|-----------------------------------------------------|
 | `zosmf_parmlib_validate` | Syntax von z/OS Parmlib-Members validieren          |
+
+### ZOAU (9 Tools) — erfordert `ssh_systems` Konfiguration
+
+| Tool                      | Beschreibung                                              |
+|---------------------------|-----------------------------------------------------------|
+| `zosmf_zoau_pll`          | z/OS Linklist (LLA) Verkettung anzeigen                   |
+| `zosmf_zoau_zinfo`        | z/OS Systeminformationen anzeigen                         |
+| `zosmf_zoau_llwhence`     | In welchem Linklist-Dataset ein Member enthalten ist      |
+| `zosmf_zoau_parmgrep`     | Parmlib-Members nach einem Muster durchsuchen             |
+| `zosmf_zoau_parmwhence`   | In welchem Parmlib-Dataset ein Member enthalten ist       |
+| `zosmf_zoau_pproc`        | z/OS Proclib Verkettung anzeigen                          |
+| `zosmf_zoau_procgrep`     | Proclib-Members nach einem Muster durchsuchen             |
+| `zosmf_zoau_procwhence`   | In welchem Proclib-Dataset ein Member enthalten ist       |
+| `zosmf_zoau_version`      | Installierte ZOAU-Version anzeigen                        |
 
 ---
 

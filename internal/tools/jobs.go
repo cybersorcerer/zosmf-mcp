@@ -253,6 +253,61 @@ func (t *getSpoolContentTool) Execute(ctx context.Context, arguments json.RawMes
 	return mcp.TextResult(content), nil
 }
 
+// --- Get All Spools ---
+
+type getAllSpoolsTool struct {
+	clients *zosmf.ClientRegistry
+}
+
+func NewGetAllSpoolsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
+	return &getAllSpoolsTool{clients: clients}
+}
+
+func (t *getAllSpoolsTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name:        "zosmf_get_all_spools",
+		Description: "Read all spool file contents of a z/OS job in a single call. Returns all DD names and their content concatenated.",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"job_name": map[string]any{"type": "string", "description": "Job name"},
+				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
+			},
+			"required": []string{"system", "job_name", "job_id"},
+		}),
+	}
+}
+
+func (t *getAllSpoolsTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args getJobArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+
+	client, err := t.clients.Get(args.System)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	files, err := client.GetJobFiles(args.JobName, args.JobID)
+	if err != nil {
+		return mcp.ErrorResult("failed to get job files: " + err.Error()), nil
+	}
+
+	var result strings.Builder
+	for _, f := range files {
+		content, err := client.GetJobFileContent(args.JobName, args.JobID, f.ID)
+		if err != nil {
+			result.WriteString(fmt.Sprintf("--- %s (step: %s) ---\n(error: %s)\n\n", f.DDName, f.StepName, err.Error()))
+			continue
+		}
+		result.WriteString(fmt.Sprintf("--- %s (step: %s) ---\n%s\n\n", f.DDName, f.StepName, content))
+	}
+
+	return mcp.TextResult(result.String()), nil
+}
+
 // --- Submit Job ---
 
 type submitJobTool struct {

@@ -161,6 +161,34 @@ password: "${ZOSMF_SYSA_PASSWORD}"
 
 If `auth.password` is not set for a system and no `${ENV_VAR}` placeholder is present, the server falls back to the `ZOSMF_PASSWORD` environment variable as a global default.
 
+### SSH Systems (for ZOAU tools)
+
+ZOAU tools require SSH access to individual LPARs. SSH systems are configured independently of z/OSMF systems — one z/OSMF endpoint can serve an entire sysplex, while SSH requires a separate entry per LPAR.
+
+```yaml
+ssh_systems:
+  - name: "MVSA"
+    host: "mvsa.example.com"
+    port: 22                    # optional, default: 22
+    username: "ibmuser"
+    key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key
+  - name: "MVSB"
+    host: "mvsb.example.com"
+    username: "ibmuser"
+```
+
+ZOAU tools are only registered when at least one `ssh_systems` entry is present. Password-based SSH is not supported — only key authentication.
+
+#### SSH Systems Configuration Reference
+
+| Field      | Required | Default | Description                                   |
+|------------|----------|---------|-----------------------------------------------|
+| `name`     | Yes      | —       | LPAR name — used as `system` in tool calls    |
+| `host`     | Yes      | —       | SSH hostname or IP address                    |
+| `port`     | No       | 22      | SSH port                                      |
+| `username` | Yes      | —       | USS username for SSH login                    |
+| `key_file` | No       | —       | Path to SSH private key; omit for SSH default |
+
 ---
 
 ## 4. Registering the MCP Server
@@ -663,7 +691,7 @@ Mcp-Session-Id: <uuid>
 
 ## 5. Tools Overview
 
-The server provides 32 tools across 8 categories:
+The server provides 32 tools across 8 categories (plus 9 optional ZOAU tools when ssh_systems is configured):
 
 ### Jobs (9 tools)
 | Tool                      | Description                                  |
@@ -730,6 +758,20 @@ The server provides 32 tools across 8 categories:
 | Tool                     | Description                                    |
 |--------------------------|------------------------------------------------|
 | `zosmf_parmlib_validate` | Validate z/OS parmlib member syntax via z/OSMF |
+
+### ZOAU (9 tools) — requires `ssh_systems` configuration
+
+| Tool                      | Description                                          |
+|---------------------------|------------------------------------------------------|
+| `zosmf_zoau_pll`          | Display the z/OS linklist (LLA) concatenation        |
+| `zosmf_zoau_zinfo`        | Display z/OS system information                      |
+| `zosmf_zoau_llwhence`     | Locate which linklist dataset a member comes from    |
+| `zosmf_zoau_parmgrep`     | Search parmlib members for a pattern                 |
+| `zosmf_zoau_parmwhence`   | Locate which parmlib dataset a member comes from     |
+| `zosmf_zoau_pproc`        | Display the z/OS proclib concatenation               |
+| `zosmf_zoau_procgrep`     | Search proclib members for a pattern                 |
+| `zosmf_zoau_procwhence`   | Locate which proclib dataset a member comes from     |
+| `zosmf_zoau_version`      | Display the installed ZOAU version                   |
 
 ---
 

@@ -58,11 +58,12 @@ type HTTPConfig struct {
 }
 
 type SSHSystemConfig struct {
-	Name     string `yaml:"name"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Username string `yaml:"username"`
-	KeyFile  string `yaml:"key_file"`
+	Name        string            `yaml:"name"`
+	Host        string            `yaml:"host"`
+	Port        int               `yaml:"port"`
+	Username    string            `yaml:"username"`
+	KeyFile     string            `yaml:"key_file"`
+	Environment map[string]string `yaml:"environment"`
 }
 
 var envVarPattern = regexp.MustCompile(`\$\{([^}]+)\}`)

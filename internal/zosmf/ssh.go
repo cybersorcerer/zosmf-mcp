@@ -42,7 +42,17 @@ func RunSSH(cfg config.SSHSystemConfig, command string) (string, error) {
 	if cfg.KeyFile != "" {
 		args = append(args, "-i", cfg.KeyFile)
 	}
-	args = append(args, fmt.Sprintf("%s@%s", cfg.Username, cfg.Host), command)
+
+	remoteCmd := command
+	if len(cfg.Environment) > 0 {
+		var exports []string
+		for k, v := range cfg.Environment {
+			exports = append(exports, fmt.Sprintf("export %s=%s", k, ShellQuote(v)))
+		}
+		remoteCmd = strings.Join(exports, " && ") + " && " + command
+	}
+
+	args = append(args, fmt.Sprintf("%s@%s", cfg.Username, cfg.Host), remoteCmd)
 
 	cmd := exec.CommandContext(ctx, "ssh", args...)
 	out, err := cmd.Output()

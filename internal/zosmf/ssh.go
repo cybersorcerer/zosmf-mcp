@@ -61,3 +61,9 @@ func RunSSH(cfg config.SSHSystemConfig, command string) (string, error) {
 	}
 	return strings.TrimRight(string(out), "\n"), nil
 }
+
+// ShellQuote wraps s in single quotes, escaping any existing single quotes.
+// Use this for user-provided values embedded in SSH commands.
+func ShellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}

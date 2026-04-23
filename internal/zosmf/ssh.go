@@ -72,6 +72,63 @@ func RunSSH(cfg config.SSHSystemConfig, command string) (string, error) {
 	return strings.TrimRight(string(out), "\n"), nil
 }
 
+// SSHResult holds the full output of an SSH command execution.
+type SSHResult struct {
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exit_code"`
+}
+
+// RunSSHDetailed executes a remote command and returns stdout, stderr and exit code.
+func RunSSHDetailed(cfg config.SSHSystemConfig, command string, timeoutSeconds int) (SSHResult, error) {
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 30
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	args := []string{
+		"-p", fmt.Sprintf("%d", cfg.Port),
+		"-o", "BatchMode=yes",
+		"-o", "StrictHostKeyChecking=accept-new",
+	}
+	if cfg.KeyFile != "" {
+		args = append(args, "-i", cfg.KeyFile)
+	}
+
+	remoteCmd := command
+	if len(cfg.Environment) > 0 {
+		var exports []string
+		for k, v := range cfg.Environment {
+			exports = append(exports, fmt.Sprintf("export %s=%s", k, ShellQuote(v)))
+		}
+		remoteCmd = strings.Join(exports, " && ") + " && " + command
+	}
+
+	args = append(args, fmt.Sprintf("%s@%s", cfg.Username, cfg.Host), remoteCmd)
+
+	cmd := exec.CommandContext(ctx, "ssh", args...)
+	var stdoutBuf, stderrBuf strings.Builder
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			return SSHResult{}, fmt.Errorf("SSH execution failed: %w", err)
+		}
+	}
+
+	return SSHResult{
+		Stdout:   strings.TrimRight(stdoutBuf.String(), "\n"),
+		Stderr:   strings.TrimRight(stderrBuf.String(), "\n"),
+		ExitCode: exitCode,
+	}, nil
+}
+
 // ShellQuote wraps s in single quotes, escaping any existing single quotes.
 // Use this for user-provided values embedded in SSH commands.
 func ShellQuote(s string) string {

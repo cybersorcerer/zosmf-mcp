@@ -53,17 +53,16 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### Verfügbare Make-Targets
 
-| Target    | Beschreibung                          |
-|-----------|---------------------------------------|
-| `build`   | Binary bauen                          |
-| `install` | Binary nach `~/.local/bin` installieren |
-| `test`    | Tests mit Race Detector ausführen     |
-| `vet`     | `go vet` ausführen                    |
-| `fmt`     | Quellcode formatieren                 |
-| `lint`    | `golangci-lint` ausführen             |
-| `clean`   | Binary und Caches löschen             |
-| `tidy`    | `go mod tidy` ausführen               |
-
+| Target      | Beschreibung                            |
+| ----------- | --------------------------------------- |
+| `build`     | Binary bauen                            |
+| `install`   | Binary nach `~/.local/bin` installieren |
+| `test`      | Tests mit Race Detector ausführen       |
+| `vet`       | `go vet` ausführen                      |
+| `fmt`       | Quellcode formatieren                   |
+| `lint`      | `golangci-lint` ausführen               |
+| `clean`     | Binary und Caches löschen               |
+| `tidy`      | `go mod tidy` ausführen                 |
 ---
 
 ## 3. Konfiguration
@@ -118,22 +117,21 @@ transport:
 
 ### Konfigurationsoptionen
 
-| Feld             | Pflicht | Beschreibung                                                   |
-|------------------|---------|----------------------------------------------------------------|
-| `name`           | Ja      | Systemname (wird in Prompts verwendet, z.B. "MAINT")          |
-| `host`           | Ja      | z/OSMF Base URL inkl. Port                                     |
-| `auth.type`      | Ja      | `basic` oder `certificate`                                     |
-| `auth.username`  | Ja*     | TSO-Benutzerkennung (*bei `basic`)                             |
-| `auth.password`  | Ja*     | Passwort, kann als `${ENV_VAR}` referenziert werden            |
-| `ca_file`        | Nein    | PEM-Datei mit der CA für selbstsignierte z/OSMF-Zertifikate   |
-| `skip_tls_verify`| Nein    | TLS-Validierung überspringen (nicht für Produktion empfohlen) |
-| `csi`            | Nein    | Standard-CSI-Datasets für SMP/E-Abfragen                      |
-| `zones`          | Nein    | Standard SMP/E Zonen (Fallback wenn keine Zone angegeben)     |
-| `tso_account`    | Nein    | TSO Account-Nummer (für `zosmf_tso_command`)                  |
-| `tso_proc`       | Nein    | TSO Logon-Prozedur (für `zosmf_tso_command`)                  |
-| `tso_charset`    | Nein    | TSO Character Set, Standard: `697`                             |
-| `tso_codepage`   | Nein    | TSO Code Page, Standard: `1047`                               |
-
+| Feld               | Pflicht   | Beschreibung                                                     |
+| ------------------ | --------- | ---------------------------------------------------------------- |
+| `name`             | Ja        | Systemname (wird in Prompts verwendet, z.B. "MAINT")             |
+| `host`             | Ja        | z/OSMF Base URL inkl. Port                                       |
+| `auth.type`        | Ja        | `basic` oder `certificate`                                       |
+| `auth.username`    | Ja*       | TSO-Benutzerkennung (*bei `basic`)                               |
+| `auth.password`    | Ja*       | Passwort, kann als `${ENV_VAR}` referenziert werden              |
+| `ca_file`          | Nein      | PEM-Datei mit der CA für selbstsignierte z/OSMF-Zertifikate      |
+| `skip_tls_verify`  | Nein      | TLS-Validierung überspringen (nicht für Produktion empfohlen)    |
+| `csi`              | Nein      | Standard-CSI-Datasets für SMP/E-Abfragen                         |
+| `zones`            | Nein      | Standard SMP/E Zonen (Fallback wenn keine Zone angegeben)        |
+| `tso_account`      | Nein      | TSO Account-Nummer (für `zosmf_tso_command`)                     |
+| `tso_proc`         | Nein      | TSO Logon-Prozedur (für `zosmf_tso_command`)                     |
+| `tso_charset`      | Nein      | TSO Character Set, Standard: `697`                               |
+| `tso_codepage`     | Nein      | TSO Code Page, Standard: `1047`                                  |
 ### Passwort sicher übergeben
 
 Passwörter sollten nie in Klartext in der Konfigurationsdatei stehen. Umgebungsvariablen verwenden:
@@ -173,14 +171,13 @@ ZOAU-Tools werden nur registriert wenn mindestens ein `ssh_systems`-Eintrag vorh
 
 #### SSH-Systemkonfiguration
 
-| Feld       | Pflicht | Standard | Beschreibung                                              |
-|------------|---------|----------|-----------------------------------------------------------|
-| `name`     | Ja      | —        | LPAR-Name — wird als `system` in Tool-Aufrufen verwendet  |
-| `host`     | Ja      | —        | SSH-Hostname oder IP-Adresse                              |
-| `port`     | Nein    | 22       | SSH-Port                                                  |
-| `username` | Ja      | —        | USS-Benutzername für SSH-Login                            |
-| `key_file` | Nein    | —        | Pfad zum SSH-Private-Key; weglassen für SSH-Standard-Key  |
-
+| Feld         | Pflicht   | Standard   | Beschreibung                                                |
+| ------------ | --------- | ---------- | ----------------------------------------------------------- |
+| `name`       | Ja        | —          | LPAR-Name — wird als `system` in Tool-Aufrufen verwendet    |
+| `host`       | Ja        | —          | SSH-Hostname oder IP-Adresse                                |
+| `port`       | Nein      | 22         | SSH-Port                                                    |
+| `username`   | Ja        | —          | USS-Benutzername für SSH-Login                              |
+| `key_file`   | Nein      | —          | Pfad zum SSH-Private-Key; weglassen für SSH-Standard-Key    |
 ---
 
 ## 4. MCP Server registrieren
@@ -317,13 +314,12 @@ JetBrains IDEs (IntelliJ, GoLand, etc.) unterstützen MCP über das **AI Assista
 
 Dort einen neuen Server hinzufügen:
 
-| Feld        | Wert                                              |
-|-------------|---------------------------------------------------|
-| Name        | `zosmf-mcp`                                       |
-| Command     | `/Users/<user>/.local/bin/zosmf-mcp`              |
-| Arguments   | `--config /Users/<user>/.zosmf-mcp-config.yaml`   |
-| Environment | `ZOSMF_SYSA_PASSWORD=geheim`                      |
-
+| Feld          | Wert                                                |
+| ------------- | --------------------------------------------------- |
+| Name          | `zosmf-mcp`                                         |
+| Command       | `/Users/<user>/.local/bin/zosmf-mcp`                |
+| Arguments     | `--config /Users/<user>/.zosmf-mcp-config.yaml`     |
+| Environment   | `ZOSMF_SYSA_PASSWORD=geheim`                        |
 Alternativ als JSON-Konfiguration unter `~/.config/JetBrains/mcp.json` (ab 2024.3):
 
 ```json
@@ -683,87 +679,79 @@ Mcp-Session-Id: <uuid>
 
 ## 5. Tools Übersicht
 
-Der Server stellt 33 Tools in 8 Kategorien bereit (plus 10 optionale ZOAU-Tools wenn `ssh_systems` konfiguriert ist):
+Der Server stellt 33 Tools in 8 Kategorien bereit (plus 11 optionale ZOAU-Tools wenn `ssh_systems` konfiguriert ist):
 
 ### Jobs (9 Tools)
-| Tool                    | Beschreibung                              |
-|-------------------------|-------------------------------------------|
-| `zosmf_list_jobs`       | Jobs auflisten (mit Filter)               |
-| `zosmf_get_job`         | Job-Details abrufen                       |
-| `zosmf_get_job_output`  | Spool-Dateien eines Jobs auflisten        |
-| `zosmf_get_spool_content` | Inhalt einer Spool-Datei lesen          |
-| `zosmf_submit_job`      | Job aus JCL oder Dataset submitten        |
-| `zosmf_cancel_job`      | Laufenden Job abbrechen                   |
-| `zosmf_purge_job`       | Job-Output aus dem Spool löschen          |
-| `zosmf_hold_job`        | Job in Hold setzen                        |
-| `zosmf_release_job`     | Job aus Hold freigeben                    |
-
+| Tool                      | Beschreibung                                |
+| ------------------------- | ------------------------------------------- |
+| `zosmf_list_jobs`         | Jobs auflisten (mit Filter)                 |
+| `zosmf_get_job`           | Job-Details abrufen                         |
+| `zosmf_get_job_output`    | Spool-Dateien eines Jobs auflisten          |
+| `zosmf_get_spool_content` | Inhalt einer Spool-Datei lesen              |
+| `zosmf_submit_job`        | Job aus JCL oder Dataset submitten          |
+| `zosmf_cancel_job`        | Laufenden Job abbrechen                     |
+| `zosmf_purge_job`         | Job-Output aus dem Spool löschen            |
+| `zosmf_hold_job`          | Job in Hold setzen                          |
+| `zosmf_release_job`       | Job aus Hold freigeben                      |
 ### SMP/E (1 Tool)
-| Tool                    | Beschreibung                              |
-|-------------------------|-------------------------------------------|
-| `zosmf_smpe_query_csi`  | SMP/E CSI abfragen (SYSMODs, DDDEFs, ...) |
-
+| Tool                      | Beschreibung                                |
+| ------------------------- | ------------------------------------------- |
+| `zosmf_smpe_query_csi`    | SMP/E CSI abfragen (SYSMODs, DDDEFs, ...)   |
 ### Datasets (6 Tools)
-| Tool                    | Beschreibung                              |
-|-------------------------|-------------------------------------------|
-| `zosmf_list_datasets`   | Datasets nach Muster suchen               |
-| `zosmf_list_members`    | Members eines PDS/PDSE auflisten          |
-| `zosmf_read_dataset`    | Dataset oder PDS-Member lesen             |
-| `zosmf_write_dataset`   | Dataset oder PDS-Member schreiben         |
-| `zosmf_create_dataset`  | Neues Dataset anlegen                     |
-| `zosmf_delete_dataset`  | Dataset oder PDS-Member löschen           |
-
+| Tool                      | Beschreibung                                |
+| ------------------------- | ------------------------------------------- |
+| `zosmf_list_datasets`     | Datasets nach Muster suchen                 |
+| `zosmf_list_members`      | Members eines PDS/PDSE auflisten            |
+| `zosmf_read_dataset`      | Dataset oder PDS-Member lesen               |
+| `zosmf_write_dataset`     | Dataset oder PDS-Member schreiben           |
+| `zosmf_create_dataset`    | Neues Dataset anlegen                       |
+| `zosmf_delete_dataset`    | Dataset oder PDS-Member löschen             |
 ### Filesystems (5 Tools)
-| Tool                      | Beschreibung                            |
-|---------------------------|-----------------------------------------|
-| `zosmf_list_filesystems`  | Gemountete Filesysteme auflisten        |
-| `zosmf_mount_filesystem`  | Filesystem mounten                      |
-| `zosmf_unmount_filesystem`| Filesystem unmounten                    |
-| `zosmf_create_zfs`        | Neues zFS Dataset anlegen              |
-| `zosmf_delete_zfs`        | zFS Dataset löschen                    |
-
+| Tool                        | Beschreibung                              |
+| --------------------------- | ----------------------------------------- |
+| `zosmf_list_filesystems`    | Gemountete Filesysteme auflisten          |
+| `zosmf_mount_filesystem`    | Filesystem mounten                        |
+| `zosmf_unmount_filesystem`  | Filesystem unmounten                      |
+| `zosmf_create_zfs`          | Neues zFS Dataset anlegen                 |
+| `zosmf_delete_zfs`          | zFS Dataset löschen                       |
 ### Operator Console (2 Tools)
-| Tool                      | Beschreibung                            |
-|---------------------------|-----------------------------------------|
-| `zosmf_issue_command`     | Operator-Kommando ausführen             |
-| `zosmf_get_hardcopy_log`  | OPERLOG oder SYSLOG lesen               |
-
+| Tool                        | Beschreibung                              |
+| --------------------------- | ----------------------------------------- |
+| `zosmf_issue_command`       | Operator-Kommando ausführen               |
+| `zosmf_get_hardcopy_log`    | OPERLOG oder SYSLOG lesen                 |
 ### USS Files (5 Tools)
-| Tool                      | Beschreibung                            |
-|---------------------------|-----------------------------------------|
-| `zosmf_list_uss_files`    | USS-Verzeichnis auflisten               |
-| `zosmf_read_uss_file`     | USS-Datei lesen                         |
-| `zosmf_write_uss_file`    | USS-Datei schreiben                     |
-| `zosmf_create_uss_file`   | USS-Datei oder -Verzeichnis anlegen     |
-| `zosmf_delete_uss_file`   | USS-Datei oder -Verzeichnis löschen     |
-
+| Tool                        | Beschreibung                              |
+| --------------------------- | ----------------------------------------- |
+| `zosmf_list_uss_files`      | USS-Verzeichnis auflisten                 |
+| `zosmf_read_uss_file`       | USS-Datei lesen                           |
+| `zosmf_write_uss_file`      | USS-Datei schreiben                       |
+| `zosmf_create_uss_file`     | USS-Datei oder -Verzeichnis anlegen       |
+| `zosmf_delete_uss_file`     | USS-Datei oder -Verzeichnis löschen       |
 ### TSO (1 Tool)
 
-| Tool                  | Beschreibung                                    |
-|-----------------------|-------------------------------------------------|
-| `zosmf_tso_command`   | TSO/E-Kommando ausführen und Output zurückgeben |
-
+| Tool                    | Beschreibung                                      |
+| ----------------------- | ------------------------------------------------- |
+| `zosmf_tso_command`     | TSO/E-Kommando ausführen und Output zurückgeben   |
 ### Parmlib (1 Tool)
 
-| Tool                     | Beschreibung                                        |
-|--------------------------|-----------------------------------------------------|
-| `zosmf_parmlib_validate` | Syntax von z/OS Parmlib-Members validieren          |
+| Tool                       | Beschreibung                                          |
+| -------------------------- | ----------------------------------------------------- |
+| `zosmf_parmlib_validate`   | Syntax von z/OS Parmlib-Members validieren            |
+### ZOAU (11 Tools) — erfordert `ssh_systems` Konfiguration
 
-### ZOAU (10 Tools) — erfordert `ssh_systems` Konfiguration
-
-| Tool                      | Beschreibung                                              |
-|---------------------------|-----------------------------------------------------------|
-| `zosmf_zoau_pll`          | z/OS Linklist (LLA) Verkettung anzeigen                   |
-| `zosmf_zoau_zinfo`        | z/OS Systeminformationen anzeigen                         |
-| `zosmf_zoau_llwhence`     | In welchem Linklist-Dataset ein Member enthalten ist      |
-| `zosmf_zoau_parmgrep`     | Parmlib-Members nach einem Muster durchsuchen             |
-| `zosmf_zoau_parmwhence`   | In welchem Parmlib-Dataset ein Member enthalten ist       |
-| `zosmf_zoau_pproc`        | z/OS Proclib Verkettung anzeigen                          |
-| `zosmf_zoau_procgrep`     | Proclib-Members nach einem Muster durchsuchen             |
-| `zosmf_zoau_procwhence`   | In welchem Proclib-Dataset ein Member enthalten ist       |
-| `zosmf_zoau_version`      | Installierte ZOAU-Version anzeigen                        |
-| `zosmf_zoau_vtocls`       | VTOC-Inhalt eines z/OS-Volumes auflisten                  |
-
+| Tool                        | Beschreibung                                                          |
+| --------------------------- | --------------------------------------------------------------------- |
+| `zosmf_zoau_pll`            | z/OS Linklist (LLA) Verkettung anzeigen                               |
+| `zosmf_zoau_zinfo`          | z/OS Systeminformationen anzeigen                                     |
+| `zosmf_zoau_llwhence`       | In welchem Linklist-Dataset ein Member enthalten ist                  |
+| `zosmf_zoau_parmgrep`       | Parmlib-Members nach einem Muster durchsuchen                         |
+| `zosmf_zoau_parmwhence`     | In welchem Parmlib-Dataset ein Member enthalten ist                   |
+| `zosmf_zoau_pproc`          | z/OS Proclib Verkettung anzeigen                                      |
+| `zosmf_zoau_procgrep`       | Proclib-Members nach einem Muster durchsuchen                         |
+| `zosmf_zoau_procwhence`     | In welchem Proclib-Dataset ein Member enthalten ist                   |
+| `zosmf_zoau_version`        | Installierte ZOAU-Version anzeigen                                    |
+| `zosmf_zoau_vtocls`         | VTOC-Inhalt eines z/OS-Volumes auflisten                              |
+| `zosmf_zoau_exec`           | USS-Befehl/Skript via SSH; stdout, stderr, Exit-Code als JSON         |
 ---
 
 ## 6. Tool-Referenz und Beispiel-Prompts

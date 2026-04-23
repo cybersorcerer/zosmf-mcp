@@ -66,6 +66,7 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 			NewZOAUProcwhenceTool(sshReg),
 			NewZOAUVersionTool(sshReg),
 			NewZOAUVtoclsTool(sshReg),
+			NewZOAUExecTool(sshReg),
 		)
 	}
 

@@ -696,7 +696,7 @@ Mcp-Session-Id: <uuid>
 
 ## 5. Tools Overview
 
-The server provides 33 tools across 8 categories (plus 10 optional ZOAU tools when ssh_systems is configured):
+The server provides 33 tools across 8 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
 
 ### Jobs (9 tools)
 | Tool                      | Description                                  |
@@ -764,7 +764,7 @@ The server provides 33 tools across 8 categories (plus 10 optional ZOAU tools wh
 |--------------------------|------------------------------------------------|
 | `zosmf_parmlib_validate` | Validate z/OS parmlib member syntax via z/OSMF |
 
-### ZOAU (10 tools) — requires `ssh_systems` configuration
+### ZOAU (11 tools) — requires `ssh_systems` configuration
 
 | Tool                      | Description                                          |
 |---------------------------|------------------------------------------------------|
@@ -778,6 +778,7 @@ The server provides 33 tools across 8 categories (plus 10 optional ZOAU tools wh
 | `zosmf_zoau_procwhence`   | Locate which proclib dataset a member comes from     |
 | `zosmf_zoau_version`      | Display the installed ZOAU version                   |
 | `zosmf_zoau_vtocls`       | List the VTOC contents of a z/OS volume              |
+| `zosmf_zoau_exec`         | Execute a USS command or script via SSH; returns stdout, stderr and exit code as JSON         |
 
 ---
 

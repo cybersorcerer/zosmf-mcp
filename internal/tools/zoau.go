@@ -328,6 +328,63 @@ func (t *zoauVtoclsTool) Execute(ctx context.Context, arguments json.RawMessage)
 	return runZOAU(t.sshReg, args.System, cmd)
 }
 
+// --- zosmf_zoau_exec ---
+
+type zoauExecArgs struct {
+	System  string   `json:"system"`
+	Command string   `json:"command"`
+	Args    []string `json:"args,omitempty"`
+	Timeout int      `json:"timeout,omitempty"`
+}
+
+type zoauExecTool struct{ sshReg *zosmf.SSHClientRegistry }
+
+func NewZOAUExecTool(sshReg *zosmf.SSHClientRegistry) mcp.ToolHandler {
+	return &zoauExecTool{sshReg: sshReg}
+}
+
+func (t *zoauExecTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name:        "zosmf_zoau_exec",
+		Description: "Execute an arbitrary command or script on a z/OS USS system via SSH. Returns stdout, stderr and exit code as JSON. Suitable for REXX scripts, shell scripts, Python scripts, and any USS command.",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":  map[string]any{"type": "string", "description": "LPAR name as defined in ssh_systems"},
+				"command": map[string]any{"type": "string", "description": "Command or script path to execute, e.g. '/u/user/myscript.sh' or 'python3 /u/user/script.py'"},
+				"args":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional list of arguments passed to the command"},
+				"timeout": map[string]any{"type": "integer", "description": "Timeout in seconds (default: 30)"},
+			},
+			"required": []string{"system", "command"},
+		}),
+	}
+}
+
+func (t *zoauExecTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args zoauExecArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+
+	cfg, err := t.sshReg.Get(args.System)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	cmd := zosmf.ShellQuote(args.Command)
+	for _, a := range args.Args {
+		cmd += " " + zosmf.ShellQuote(a)
+	}
+
+	result, err := zosmf.RunSSHDetailed(cfg, cmd, args.Timeout)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	data, _ := json.Marshal(result)
+	return mcp.TextResult(string(data)), nil
+}
+
 // --- zosmf_zoau_version ---
 
 type zoauVersionTool struct{ sshReg *zosmf.SSHClientRegistry }

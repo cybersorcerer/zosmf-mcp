@@ -280,6 +280,54 @@ func (t *zoauProcwhenceTool) Execute(ctx context.Context, arguments json.RawMess
 	return runZOAU(t.sshReg, args.System, fmt.Sprintf("procwhence -v %s", zosmf.ShellQuote(args.Member)))
 }
 
+// --- zosmf_zoau_vtocls ---
+
+type zoauVtoclsArgs struct {
+	System   string   `json:"system"`
+	Volume   string   `json:"volume"`
+	Datasets []string `json:"datasets,omitempty"`
+	Usage    bool     `json:"usage,omitempty"`
+}
+
+type zoauVtoclsTool struct{ sshReg *zosmf.SSHClientRegistry }
+
+func NewZOAUVtoclsTool(sshReg *zosmf.SSHClientRegistry) mcp.ToolHandler {
+	return &zoauVtoclsTool{sshReg: sshReg}
+}
+
+func (t *zoauVtoclsTool) Definition() mcp.Tool {
+	return mcp.Tool{
+		Name:        "zosmf_zoau_vtocls",
+		Description: "List the VTOC contents of a z/OS volume using ZOAU vtocls. Optionally filter by dataset names and include last reference time. Requires ZOAU >= 1.3.x and SSH access.",
+		InputSchema: mustJSON(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"system":   map[string]any{"type": "string", "description": "LPAR name as defined in ssh_systems"},
+				"volume":   map[string]any{"type": "string", "description": "Volume serial (VOLSER) to list, e.g. 'USER10'"},
+				"datasets": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional list of dataset name filters"},
+				"usage":    map[string]any{"type": "boolean", "description": "Include last reference time in output"},
+			},
+			"required": []string{"system", "volume"},
+		}),
+	}
+}
+
+func (t *zoauVtoclsTool) Execute(ctx context.Context, arguments json.RawMessage) (mcp.ToolCallResult, error) {
+	var args zoauVtoclsArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return mcp.ErrorResult("invalid arguments: " + err.Error()), nil
+	}
+	cmd := "vtocls"
+	if args.Usage {
+		cmd += " -u"
+	}
+	cmd += " " + zosmf.ShellQuote(args.Volume)
+	for _, ds := range args.Datasets {
+		cmd += " " + zosmf.ShellQuote(ds)
+	}
+	return runZOAU(t.sshReg, args.System, cmd)
+}
+
 // --- zosmf_zoau_version ---
 
 type zoauVersionTool struct{ sshReg *zosmf.SSHClientRegistry }

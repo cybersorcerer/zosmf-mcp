@@ -683,7 +683,7 @@ Mcp-Session-Id: <uuid>
 
 ## 5. Tools Übersicht
 
-Der Server stellt 32 Tools in 8 Kategorien bereit (plus 9 optionale ZOAU-Tools wenn `ssh_systems` konfiguriert ist):
+Der Server stellt 33 Tools in 8 Kategorien bereit (plus 10 optionale ZOAU-Tools wenn `ssh_systems` konfiguriert ist):
 
 ### Jobs (9 Tools)
 | Tool                    | Beschreibung                              |
@@ -749,7 +749,7 @@ Der Server stellt 32 Tools in 8 Kategorien bereit (plus 9 optionale ZOAU-Tools w
 |--------------------------|-----------------------------------------------------|
 | `zosmf_parmlib_validate` | Syntax von z/OS Parmlib-Members validieren          |
 
-### ZOAU (9 Tools) — erfordert `ssh_systems` Konfiguration
+### ZOAU (10 Tools) — erfordert `ssh_systems` Konfiguration
 
 | Tool                      | Beschreibung                                              |
 |---------------------------|-----------------------------------------------------------|
@@ -762,6 +762,7 @@ Der Server stellt 32 Tools in 8 Kategorien bereit (plus 9 optionale ZOAU-Tools w
 | `zosmf_zoau_procgrep`     | Proclib-Members nach einem Muster durchsuchen             |
 | `zosmf_zoau_procwhence`   | In welchem Proclib-Dataset ein Member enthalten ist       |
 | `zosmf_zoau_version`      | Installierte ZOAU-Version anzeigen                        |
+| `zosmf_zoau_vtocls`       | VTOC-Inhalt eines z/OS-Volumes auflisten                  |
 
 ---
 

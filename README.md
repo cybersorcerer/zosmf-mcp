@@ -74,8 +74,8 @@ Configuration is done via a YAML file. By default the server looks for `.zosmf-m
 
 ```yaml
 systems:
-  - name: "MAINT"
-    host: "https://203.0.113.11:443"
+  - name: "SYSA"
+    host: "<HOSTNAME/IP:<PORT>"
     auth:
       type: "basic"
       username: "IBMUSER"

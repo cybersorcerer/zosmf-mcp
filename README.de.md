@@ -74,8 +74,8 @@ Die Konfiguration erfolgt über eine YAML-Datei. Standardmäßig sucht der Serve
 
 ```yaml
 systems:
-  - name: "MAINT"
-    host: "https://203.0.113.11:443"
+  - name: "SYSA"
+    host: "<HOSTNAME>:<PORT>"
     auth:
       type: "basic"
       username: "IBMUSER"

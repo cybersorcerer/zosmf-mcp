@@ -65,12 +65,16 @@ systems:
 
 # ---------------------------------------------------------------------------
 # Transport
-# stdio:        used by Claude Desktop, Claude Code, VS Code, Cursor, etc.
-# http.enabled: used by n8n, curl, and custom HTTP clients.
-# Both transports can run simultaneously.
+# stdio:                  used by Claude Desktop, Claude Code, VS Code, Cursor, etc.
+# http.enabled:           used by n8n (HTTP Request nodes), curl, and custom HTTP clients.
+# streamable_http.enabled: used by n8n MCP Client Tool Node (v1.88+), supports SSE and Streamable HTTP.
+# All transports can run simultaneously.
 # ---------------------------------------------------------------------------
 transport:
   stdio: true
   http:
     enabled: false
     listen: ":8080"
+  streamable_http:
+    enabled: false
+    listen: ":8081"

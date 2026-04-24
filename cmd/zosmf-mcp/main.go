@@ -81,27 +81,34 @@ func main() {
 	// --transport flag overrides config; "auto" (default) uses config.
 	useStdio := cfg.Transport.Stdio
 	useHTTP := cfg.Transport.HTTP.Enabled
+	useStreamableHTTP := cfg.Transport.StreamableHTTP.Enabled
 
 	switch *transport {
 	case "stdio":
 		useStdio = true
 		useHTTP = false
+		useStreamableHTTP = false
 	case "http":
 		useStdio = false
 		useHTTP = true
+		useStreamableHTTP = false
+	case "streamable-http":
+		useStdio = false
+		useHTTP = false
+		useStreamableHTTP = true
 	case "auto":
 		// use config values (already set above)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown transport: %s (use 'stdio', 'http', or 'auto')\n", *transport)
+		fmt.Fprintf(os.Stderr, "unknown transport: %s (use 'stdio', 'http', 'streamable-http', or 'auto')\n", *transport)
 		os.Exit(1)
 	}
 
-	if !useStdio && !useHTTP {
-		fmt.Fprintf(os.Stderr, "no transport enabled — set stdio: true or http.enabled: true in config\n")
+	if !useStdio && !useHTTP && !useStreamableHTTP {
+		fmt.Fprintf(os.Stderr, "no transport enabled — set stdio: true, http.enabled: true, or streamable_http.enabled: true in config\n")
 		os.Exit(1)
 	}
 
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 
 	if useStdio {
 		server := mcp.NewServer(registry, logger)
@@ -130,6 +137,26 @@ func main() {
 		go func() {
 			if err := t.Run(ctx, server.HandleMessage); err != nil && ctx.Err() == nil {
 				errCh <- fmt.Errorf("http: %w", err)
+			} else {
+				errCh <- nil
+			}
+		}()
+	}
+
+	if useStreamableHTTP {
+		server := mcp.NewHTTPServer(registry, logger)
+		addr := cfg.Transport.StreamableHTTP.Listen
+		if *listen != "" {
+			addr = *listen
+		}
+		if addr == "" {
+			addr = ":8081"
+		}
+		t := mcp.NewHTTPTransport(addr, logger)
+		logger.Printf("starting Streamable HTTP transport on %s", addr)
+		go func() {
+			if err := t.Run(ctx, server.HandleMessage); err != nil && ctx.Err() == nil {
+				errCh <- fmt.Errorf("streamable-http: %w", err)
 			} else {
 				errCh <- nil
 			}

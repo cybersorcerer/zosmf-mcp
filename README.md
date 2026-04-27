@@ -20,6 +20,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for z/
    - [Anthropic API (custom applications)](#48-anthropic-api-custom-applications)
    - [Direct invocation / custom clients](#49-direct-invocation--custom-clients)
    - [n8n (HTTP transport)](#410-n8n-http-transport)
+   - [n8n (MCP Client Node)](#411-n8n-mcp-client-node)
 5. [Tools Overview](#5-tools-overview)
 6. [Tool Reference and Example Prompts](#6-tool-reference-and-example-prompts)
 7. [Building Automations](#7-building-automations)
@@ -110,10 +111,13 @@ systems:
 #     key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key
 
 transport:
-  stdio: true        # For MCP integration (VS Code, Claude Code, etc.)
+  stdio: true                   # For MCP integration (VS Code, Claude Code, etc.)
   http:
-    enabled: false   # Optional: HTTP transport for other clients (n8n, curl, etc.)
+    enabled: false              # Optional: HTTP transport for n8n HTTP Request nodes, curl, etc.
     listen: ":8080"
+  streamable_http:
+    enabled: false              # Optional: Streamable HTTP for n8n MCP Client Tool Node (v1.88+)
+    listen: ":8081"
 ```
 
 ### Configuration Reference
@@ -198,12 +202,13 @@ ZOAU tools are only registered when at least one `ssh_systems` entry is present.
 
 ## 4. Registering the MCP Server
 
-zosmf-mcp supports two transports that can run simultaneously:
+zosmf-mcp supports three transports that can run simultaneously:
 
 - **stdio** — the client starts the server process and communicates via stdin/stdout. Used by Claude Desktop, Claude Code, VS Code, etc.
-- **HTTP** — the server listens on a TCP port and accepts JSON-RPC 2.0 requests. Used by n8n, curl, and custom clients.
+- **HTTP** — the server listens on a TCP port and accepts JSON-RPC 2.0 requests. Used by n8n HTTP Request nodes, curl, and custom clients.
+- **Streamable HTTP** — MCP 2025-03-26 compliant transport with SSE support. Used by the n8n MCP Client Tool Node (v1.88+).
 
-Both transports are controlled via the config file. The `--transport` flag can override this (`stdio`, `http`, or `auto` which reads the config — default is `auto`).
+All transports are controlled via the config file. The `--transport` flag can override this (`stdio`, `http`, `streamable-http`, or `auto` which reads the config — default is `auto`).
 
 For the stdio clients the configuration is the same everywhere:
 
@@ -691,6 +696,43 @@ Mcp-Session-Id: <uuid>
 - No TLS is built into the HTTP transport — use nginx or Traefik as a reverse proxy for production.
 - The n8n host must be able to reach the MCP server on the configured port.
 - Credentials (z/OSMF passwords) stay on the MCP server — n8n never has direct mainframe access.
+
+---
+
+### 4.11 n8n (MCP Client Node)
+
+Since n8n **v1.88**, the native **MCP Client Tool Node** allows AI Agent workflows to use zosmf-mcp tools directly — without manually building HTTP Request nodes or managing session IDs.
+
+#### Enable Streamable HTTP transport
+
+In `.zosmf-mcp-config.yaml`:
+
+```yaml
+transport:
+  stdio: true                   # keep for Claude Code / VS Code
+  streamable_http:
+    enabled: true
+    listen: ":8081"
+```
+
+Restart the server after changing the config. The MCP endpoint is then available at `http://<host>:8081/mcp`.
+
+#### n8n workflow setup
+
+1. Add an **AI Agent** node to your workflow
+2. Add a **MCP Client Tool** node and connect it to the Agent's tools input
+3. Configure the MCP Client Tool node:
+   - **Transport**: `Streamable HTTP` (n8n v1.104+) or `SSE` (older versions)
+   - **URL**: `http://<host>:8081/mcp`
+4. The Agent can now use all zosmf-mcp tools natively
+
+The MCP Client Node automatically handles session initialization, tool discovery, and tool calls. No manual JSON-RPC plumbing required.
+
+#### Requirements and Notes
+
+- Use **Streamable HTTP** transport (n8n v1.104+) — it supersedes the older SSE transport.
+- The standalone **MCP Client node** (n8n v1.122+) allows configuring the transport directly in node parameters.
+- For production, use a reverse proxy (nginx, Traefik) for TLS termination in front of the Streamable HTTP port.
 
 ---
 

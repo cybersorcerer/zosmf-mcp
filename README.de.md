@@ -20,6 +20,7 @@ Ein [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) Server für
    - [Anthropic API (eigene Applikationen)](#48-anthropic-api-eigene-applikationen)
    - [Direkter Aufruf / eigene Clients](#49-direkter-aufruf--eigene-clients)
    - [n8n (HTTP-Transport)](#410-n8n-http-transport)
+   - [n8n (MCP Client Node)](#411-n8n-mcp-client-node)
 5. [Tools Übersicht](#5-tools-übersicht)
 6. [Tool-Referenz und Beispiel-Prompts](#6-tool-referenz-und-beispiel-prompts)
 7. [Automatisierungen erstellen](#7-automatisierungen-erstellen)
@@ -109,10 +110,13 @@ systems:
 #     key_file: "~/.ssh/id_rsa"  # optional — weglassen für SSH-Standard-Key
 
 transport:
-  stdio: true        # Für MCP-Integration (VS Code, Claude Code)
+  stdio: true                   # Für MCP-Integration (VS Code, Claude Code)
   http:
-    enabled: false   # Optional: HTTP-Transport für andere Clients (n8n, curl etc.)
+    enabled: false              # Optional: HTTP-Transport für n8n HTTP Request Nodes, curl etc.
     listen: ":8080"
+  streamable_http:
+    enabled: false              # Optional: Streamable HTTP für n8n MCP Client Tool Node (ab v1.88)
+    listen: ":8081"
 ```
 
 ### Konfigurationsoptionen
@@ -182,12 +186,13 @@ ZOAU-Tools werden nur registriert wenn mindestens ein `ssh_systems`-Eintrag vorh
 
 ## 4. MCP Server registrieren
 
-zosmf-mcp unterstützt zwei Transporte, die gleichzeitig laufen können:
+zosmf-mcp unterstützt drei Transporte, die gleichzeitig laufen können:
 
 - **stdio** — der Client startet den Server-Prozess selbst und kommuniziert über stdin/stdout. Verwendet von Claude Desktop, Claude Code, VS Code etc.
-- **HTTP** — der Server lauscht auf einem TCP-Port und nimmt JSON-RPC 2.0 Requests entgegen. Verwendet von n8n, curl und eigenen Clients.
+- **HTTP** — der Server lauscht auf einem TCP-Port und nimmt JSON-RPC 2.0 Requests entgegen. Verwendet von n8n HTTP Request Nodes, curl und eigenen Clients.
+- **Streamable HTTP** — MCP 2025-03-26 konformer Transport mit SSE-Unterstützung. Verwendet von der n8n MCP Client Tool Node (ab v1.88).
 
-Beide Transporte werden über die Config-Datei gesteuert. Der `--transport`-Flag kann das überschreiben (`stdio`, `http` oder `auto` liest die Config — Standard ist `auto`).
+Alle Transporte werden über die Config-Datei gesteuert. Der `--transport`-Flag kann das überschreiben (`stdio`, `http`, `streamable-http` oder `auto` liest die Config — Standard ist `auto`).
 
 Für die stdio-Clients gilt überall dasselbe Prinzip:
 
@@ -674,6 +679,43 @@ Mcp-Session-Id: <uuid>
 - Kein TLS im HTTP-Transport eingebaut — für Produktion nginx oder Traefik als Reverse Proxy vorschalten.
 - Der n8n-Host muss den MCP-Server auf dem konfigurierten Port erreichen können.
 - Credentials (z/OSMF-Passwörter) bleiben auf dem MCP-Server — n8n hat keinen direkten Mainframe-Zugriff.
+
+---
+
+### 4.11 n8n (MCP Client Node)
+
+Ab n8n **v1.88** ermöglicht die native **MCP Client Tool Node** es KI-Agent-Workflows, zosmf-mcp Tools direkt zu nutzen — ohne manuelle HTTP Request Nodes oder Session-ID-Verwaltung.
+
+#### Streamable HTTP Transport aktivieren
+
+In `.zosmf-mcp-config.yaml`:
+
+```yaml
+transport:
+  stdio: true                   # für Claude Code / VS Code beibehalten
+  streamable_http:
+    enabled: true
+    listen: ":8081"
+```
+
+Nach einer Konfigurationsänderung den Server neu starten. Der MCP-Endpoint ist dann erreichbar unter `http://<host>:8081/mcp`.
+
+#### n8n Workflow einrichten
+
+1. Einen **AI Agent** Node zum Workflow hinzufügen
+2. Einen **MCP Client Tool** Node hinzufügen und mit dem Tools-Eingang des Agents verbinden
+3. MCP Client Tool Node konfigurieren:
+   - **Transport**: `Streamable HTTP` (n8n v1.104+) oder `SSE` (ältere Versionen)
+   - **URL**: `http://<host>:8081/mcp`
+4. Der Agent kann jetzt alle zosmf-mcp Tools nativ verwenden
+
+Die MCP Client Node übernimmt automatisch Session-Initialisierung, Tool-Discovery und Tool-Aufrufe — kein manuelles JSON-RPC erforderlich.
+
+#### Voraussetzungen und Hinweise
+
+- **Streamable HTTP** Transport verwenden (n8n v1.104+) — löst den älteren SSE-Transport ab.
+- Der eigenständige **MCP Client Node** (n8n v1.122+) erlaubt die Transport-Konfiguration direkt in den Node-Parametern.
+- Für Produktion einen Reverse Proxy (nginx, Traefik) für TLS-Terminierung vor den Streamable HTTP Port schalten.
 
 ---
 

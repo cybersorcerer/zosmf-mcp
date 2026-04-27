@@ -48,8 +48,9 @@ type AuthConfig struct {
 }
 
 type TransportConfig struct {
-	Stdio bool             `yaml:"stdio"`
-	HTTP  HTTPConfig       `yaml:"http"`
+	Stdio          bool       `yaml:"stdio"`
+	HTTP           HTTPConfig `yaml:"http"`
+	StreamableHTTP HTTPConfig `yaml:"streamable_http"`
 }
 
 type HTTPConfig struct {

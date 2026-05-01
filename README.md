@@ -762,10 +762,10 @@ The server provides 33 tools across 8 categories (plus 11 optional ZOAU tools wh
 
 | Tool                         | Description                                              |
 |------------------------------|----------------------------------------------------------|
-| `zosmf_list_datasets`        | Search datasets by pattern                               |
+| `zosmf_list_datasets`        | Search datasets by pattern; optional `volser` and `start` parameters |
 | `zosmf_list_members`         | List members of a PDS or PDSE                            |
 | `zosmf_read_dataset`         | Read a sequential dataset or PDS member                  |
-| `zosmf_write_dataset`        | Write to a sequential dataset or PDS member              |
+| `zosmf_write_dataset`        | Write to a sequential dataset or PDS member; optional `release_enq` to release ENQ after write |
 | `zosmf_create_dataset`       | Allocate a new dataset                                   |
 | `zosmf_delete_dataset`       | Delete a dataset or PDS member                           |
 | `zosmf_acquire_dataset_enq`  | Acquire an exclusive or shared ENQ lock on a dataset or member |
@@ -789,11 +789,11 @@ The server provides 33 tools across 8 categories (plus 11 optional ZOAU tools wh
 ### USS Files (5 tools)
 | Tool                     | Description                              |
 |--------------------------|------------------------------------------|
-| `zosmf_list_uss_files`   | List a USS directory                     |
-| `zosmf_read_uss_file`    | Read a USS file                          |
-| `zosmf_write_uss_file`   | Write to a USS file                      |
-| `zosmf_create_uss_file`  | Create a USS file or directory           |
-| `zosmf_delete_uss_file`  | Delete a USS file or directory           |
+| `zosmf_list_uss_files`   | List a USS directory                                                        |
+| `zosmf_read_uss_file`    | Read a USS file; optional `tag` for encoding selection (`t IBM-1047`, `b`) |
+| `zosmf_write_uss_file`   | Write to a USS file; optional `tag` for encoding selection                 |
+| `zosmf_create_uss_file`  | Create a USS file or directory                                              |
+| `zosmf_delete_uss_file`  | Delete a USS file or directory                                              |
 
 ### TSO (1 tool)
 | Tool                  | Description                                      |

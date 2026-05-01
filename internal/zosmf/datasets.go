@@ -43,8 +43,17 @@ type DatasetMember struct {
 }
 
 // ListDatasets lists datasets matching a given level pattern (e.g. "SYS1.PARM*").
-func (c *Client) ListDatasets(dslevel string) ([]Dataset, error) {
-	reqURL := c.baseURL + fmt.Sprintf("/zosmf/restfiles/ds?dslevel=%s", url.QueryEscape(dslevel))
+// volser and start are optional; pass empty strings to omit them.
+func (c *Client) ListDatasets(dslevel, volser, start string) ([]Dataset, error) {
+	q := url.Values{}
+	q.Set("dslevel", dslevel)
+	if volser != "" {
+		q.Set("volser", volser)
+	}
+	if start != "" {
+		q.Set("start", start)
+	}
+	reqURL := c.baseURL + "/zosmf/restfiles/ds?" + q.Encode()
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
@@ -144,7 +153,9 @@ func (c *Client) ReadDataset(dsname, encoding string) (string, error) {
 
 // WriteDataset writes content to a sequential dataset or PDS member.
 // For a PDS member, use "DATASET.NAME(MEMBER)" format.
-func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string) error {
+// releaseEnq controls whether X-IBM-Release-ENQ: true is sent — set to false
+// when the editor tab remains open and the ENQ should be kept for subsequent saves.
+func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string, releaseEnq bool) error {
 	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
 
 	reqURL := c.baseURL + path
@@ -160,7 +171,9 @@ func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string) erro
 	}
 	if sessionRef != "" {
 		req.Header.Set("X-IBM-Session-Ref", sessionRef)
-		req.Header.Set("X-IBM-Release-ENQ", "true")
+		if releaseEnq {
+			req.Header.Set("X-IBM-Release-ENQ", "true")
+		}
 	}
 
 	resp, err := c.Do(req)

@@ -739,15 +739,17 @@ Der Server stellt 33 Tools in 8 Kategorien bereit (plus 11 optionale ZOAU-Tools 
 | Tool                      | Beschreibung                                |
 | ------------------------- | ------------------------------------------- |
 | `zosmf_smpe_query_csi`    | SMP/E CSI abfragen (SYSMODs, DDDEFs, ...)   |
-### Datasets (6 Tools)
-| Tool                      | Beschreibung                                |
-| ------------------------- | ------------------------------------------- |
-| `zosmf_list_datasets`     | Datasets nach Muster suchen                 |
-| `zosmf_list_members`      | Members eines PDS/PDSE auflisten            |
-| `zosmf_read_dataset`      | Dataset oder PDS-Member lesen               |
-| `zosmf_write_dataset`     | Dataset oder PDS-Member schreiben           |
-| `zosmf_create_dataset`    | Neues Dataset anlegen                       |
-| `zosmf_delete_dataset`    | Dataset oder PDS-Member löschen             |
+### Datasets (8 Tools)
+| Tool                         | Beschreibung                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `zosmf_list_datasets`        | Datasets nach Muster suchen; optional `volser` und `start` Parameter                      |
+| `zosmf_list_members`         | Members eines PDS/PDSE auflisten                                                           |
+| `zosmf_read_dataset`         | Dataset oder PDS-Member lesen                                                              |
+| `zosmf_write_dataset`        | Dataset oder PDS-Member schreiben; optional `release_enq` zum ENQ-Freigeben nach dem Save |
+| `zosmf_create_dataset`       | Neues Dataset anlegen                                                                      |
+| `zosmf_delete_dataset`       | Dataset oder PDS-Member löschen                                                            |
+| `zosmf_acquire_dataset_enq`  | Exklusiven oder geteilten ENQ-Lock auf Dataset oder Member setzen                         |
+| `zosmf_release_dataset_enq`  | Zuvor gesetzten ENQ-Lock freigeben                                                         |
 ### Filesystems (5 Tools)
 | Tool                        | Beschreibung                              |
 | --------------------------- | ----------------------------------------- |
@@ -764,11 +766,11 @@ Der Server stellt 33 Tools in 8 Kategorien bereit (plus 11 optionale ZOAU-Tools 
 ### USS Files (5 Tools)
 | Tool                        | Beschreibung                              |
 | --------------------------- | ----------------------------------------- |
-| `zosmf_list_uss_files`      | USS-Verzeichnis auflisten                 |
-| `zosmf_read_uss_file`       | USS-Datei lesen                           |
-| `zosmf_write_uss_file`      | USS-Datei schreiben                       |
-| `zosmf_create_uss_file`     | USS-Datei oder -Verzeichnis anlegen       |
-| `zosmf_delete_uss_file`     | USS-Datei oder -Verzeichnis löschen       |
+| `zosmf_list_uss_files`      | USS-Verzeichnis auflisten                                                              |
+| `zosmf_read_uss_file`       | USS-Datei lesen; optional `tag` zur Encoding-Auswahl (`t IBM-1047`, `b`)              |
+| `zosmf_write_uss_file`      | USS-Datei schreiben; optional `tag` zur Encoding-Auswahl                              |
+| `zosmf_create_uss_file`     | USS-Datei oder -Verzeichnis anlegen                                                    |
+| `zosmf_delete_uss_file`     | USS-Datei oder -Verzeichnis löschen                                                    |
 ### TSO (1 Tool)
 
 | Tool                    | Beschreibung                                      |

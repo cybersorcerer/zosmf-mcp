@@ -18,6 +18,8 @@ type listDatasetsTool struct {
 type listDatasetsArgs struct {
 	System  string `json:"system"`
 	DSLevel string `json:"dslevel"`
+	VolSer  string `json:"volser,omitempty"`
+	Start   string `json:"start,omitempty"`
 }
 
 func NewListDatasetsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -41,6 +43,14 @@ func (t *listDatasetsTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Dataset name pattern (e.g. 'SYS1.PARM*', 'USER.**'). Supports * and ** wildcards.",
 				},
+				"volser": map[string]any{
+					"type":        "string",
+					"description": "Optional volume serial (1-6 chars, no wildcards). If specified, searches uncatalogued datasets on that volume matching the dslevel pattern.",
+				},
+				"start": map[string]any{
+					"type":        "string",
+					"description": "Optional first dataset name to return (max 44 chars, no wildcards). Useful for pagination.",
+				},
 			},
 			"required": []string{"system", "dslevel"},
 		}),
@@ -58,7 +68,7 @@ func (t *listDatasetsTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	datasets, err := client.ListDatasets(args.DSLevel)
+	datasets, err := client.ListDatasets(args.DSLevel, args.VolSer, args.Start)
 	if err != nil {
 		return mcp.ErrorResult("failed to list datasets: " + err.Error()), nil
 	}
@@ -198,6 +208,7 @@ type writeDatasetArgs struct {
 	Content    string `json:"content"`
 	SessionRef string `json:"session_ref"`
 	Encoding   string `json:"encoding,omitempty"`
+	ReleaseEnq bool   `json:"release_enq,omitempty"`
 }
 
 func NewWriteDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -233,6 +244,10 @@ func (t *writeDatasetTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Optional EBCDIC code page for z/OSMF conversion, e.g. 'IBM-1141'. Omit to use z/OSMF default (IBM-1047).",
 				},
+				"release_enq": map[string]any{
+					"type":        "boolean",
+					"description": "If true, sends X-IBM-Release-ENQ: true to release the ENQ after writing. Default false — keep ENQ held for subsequent saves.",
+				},
 			},
 			"required": []string{"system", "dataset", "content"},
 		}),
@@ -250,7 +265,7 @@ func (t *writeDatasetTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	if err := client.WriteDataset(args.Dataset, args.Content, args.SessionRef, args.Encoding); err != nil {
+	if err := client.WriteDataset(args.Dataset, args.Content, args.SessionRef, args.Encoding, args.ReleaseEnq); err != nil {
 		return mcp.ErrorResult("failed to write dataset: " + err.Error()), nil
 	}
 

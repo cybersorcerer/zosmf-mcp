@@ -74,6 +74,7 @@ type readUSSFileTool struct {
 type readUSSFileArgs struct {
 	System string `json:"system"`
 	Path   string `json:"path"`
+	Tag    string `json:"tag,omitempty"`
 }
 
 func NewReadUSSFileTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -95,6 +96,10 @@ func (t *readUSSFileTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Absolute USS file path (e.g. '/u/ibmuser/.profile')",
 				},
+				"tag": map[string]any{
+					"type":        "string",
+					"description": "File tag from zosmf_list_uss_files (e.g. 't IBM-1047', 't UTF-8', 'b'). Used to select correct data conversion. Omit to use z/OSMF default (text).",
+				},
 			},
 			"required": []string{"system", "path"},
 		}),
@@ -112,7 +117,7 @@ func (t *readUSSFileTool) Execute(ctx context.Context, arguments json.RawMessage
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	content, err := client.ReadUSSFile(args.Path)
+	content, err := client.ReadUSSFile(args.Path, args.Tag)
 	if err != nil {
 		return mcp.ErrorResult("failed to read USS file: " + err.Error()), nil
 	}
@@ -130,6 +135,7 @@ type writeUSSFileArgs struct {
 	System  string `json:"system"`
 	Path    string `json:"path"`
 	Content string `json:"content"`
+	Tag     string `json:"tag,omitempty"`
 }
 
 func NewWriteUSSFileTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -155,6 +161,10 @@ func (t *writeUSSFileTool) Definition() mcp.Tool {
 					"type":        "string",
 					"description": "Text content to write to the file",
 				},
+				"tag": map[string]any{
+					"type":        "string",
+					"description": "File tag from zosmf_list_uss_files (e.g. 't IBM-1047', 't UTF-8', 'b'). Used to select correct data conversion. Omit to use z/OSMF default (text).",
+				},
 			},
 			"required": []string{"system", "path", "content"},
 		}),
@@ -172,7 +182,7 @@ func (t *writeUSSFileTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult(err.Error()), nil
 	}
 
-	if err := client.WriteUSSFile(args.Path, args.Content); err != nil {
+	if err := client.WriteUSSFile(args.Path, args.Content, args.Tag); err != nil {
 		return mcp.ErrorResult("failed to write USS file: " + err.Error()), nil
 	}
 

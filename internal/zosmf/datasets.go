@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -117,15 +118,58 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 	return result.Items, nil
 }
 
+// ReadDatasetResult is the structured result of a ReadDataset/ReadDatasetEx
+// call. NumRecords / FirstMatch are populated from the X-IBM-Record-Range
+// response header when a search was requested.
+type ReadDatasetResult struct {
+	Content    string `json:"content"`
+	Found      bool   `json:"found"`
+	FirstMatch int    `json:"first_match"`
+	NumRecords int    `json:"num_records"`
+}
+
 // ReadDataset reads the content of a sequential dataset or PDS member.
 // For a PDS member, use "DATASET.NAME(MEMBER)" format.
+// Kept for callers that don't need search support.
 func (c *Client) ReadDataset(dsname, encoding string) (string, error) {
+	res, err := c.ReadDatasetEx(dsname, encoding, "", true, 0)
+	if err != nil {
+		return "", err
+	}
+	return res.Content, nil
+}
+
+// ReadDatasetEx reads the content of a sequential dataset or PDS member, with
+// optional server-side search.
+//
+// search        - substring; z/OSMF returns the content starting at the first
+//                 matching record (max maxReturnSize records).
+// insensitive   - default true; pass false for case-sensitive match.
+// maxReturnSize - max number of records returned (z/OSMF default 100).
+//
+// When search is empty the function behaves like a plain read.
+// When search is set, the response also exposes the X-IBM-Record-Range
+// header parsed into FirstMatch (1-based start) and NumRecords. Found is
+// true iff NumRecords > 0.
+func (c *Client) ReadDatasetEx(dsname, encoding, search string, insensitive bool, maxReturnSize int) (*ReadDatasetResult, error) {
 	path := fmt.Sprintf("/zosmf/restfiles/ds/%s", encodeDatasetPath(dsname))
+
+	if search != "" {
+		q := url.Values{}
+		q.Set("search", search)
+		if !insensitive {
+			q.Set("insensitive", "false")
+		}
+		if maxReturnSize > 0 {
+			q.Set("maxreturnsize", strconv.Itoa(maxReturnSize))
+		}
+		path = path + "?" + q.Encode()
+	}
 
 	reqURL := c.baseURL + path
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if encoding != "" {
 		req.Header.Set("X-IBM-Data-Type", "text;fileEncoding="+encoding)
@@ -135,20 +179,32 @@ func (c *Client) ReadDataset(dsname, encoding string) (string, error) {
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("read dataset failed: %w", err)
+		return nil, fmt.Errorf("read dataset failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("reading response body: %w", err)
+		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(body))
 	}
 
-	return string(body), nil
+	res := &ReadDatasetResult{
+		Content: string(body),
+		Found:   true, // assume found unless we see X-IBM-Record-Range
+	}
+	if rr := resp.Header.Get("X-IBM-Record-Range"); rr != "" {
+		var p, q int
+		if _, err := fmt.Sscanf(rr, "%d,%d", &p, &q); err == nil {
+			res.FirstMatch = p
+			res.NumRecords = q
+			res.Found = q > 0
+		}
+	}
+	return res, nil
 }
 
 // WriteDataset writes content to a sequential dataset or PDS member.

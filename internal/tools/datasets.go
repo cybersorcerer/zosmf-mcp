@@ -142,9 +142,12 @@ type readDatasetTool struct {
 }
 
 type readDatasetArgs struct {
-	System   string `json:"system"`
-	Dataset  string `json:"dataset"`
-	Encoding string `json:"encoding,omitempty"`
+	System        string `json:"system"`
+	Dataset       string `json:"dataset"`
+	Encoding      string `json:"encoding,omitempty"`
+	Search        string `json:"search,omitempty"`
+	Insensitive   *bool  `json:"insensitive,omitempty"`
+	MaxReturnSize int    `json:"maxreturnsize,omitempty"`
 }
 
 func NewReadDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
@@ -155,7 +158,9 @@ func (t *readDatasetTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name: "zosmf_read_dataset",
 		Description: "Read the content of a z/OS sequential dataset or PDS/PDSE member. " +
-			"For a PDS member, use the format 'DATASET.NAME(MEMBER)'.",
+			"For a PDS member, use the format 'DATASET.NAME(MEMBER)'. " +
+			"Optionally performs a server-side search via the z/OSMF search= query parameter; " +
+			"when 'search' is supplied the response is a JSON object {content, found, first_match, num_records}.",
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -170,6 +175,18 @@ func (t *readDatasetTool) Definition() mcp.Tool {
 				"encoding": map[string]any{
 					"type":        "string",
 					"description": "Optional EBCDIC code page for z/OSMF conversion, e.g. 'IBM-1141'. Omit to use z/OSMF default (IBM-1047).",
+				},
+				"search": map[string]any{
+					"type":        "string",
+					"description": "Optional substring. z/OSMF returns the content starting at the first record that contains the string (case-insensitive by default). Response becomes a JSON object {content, found, first_match, num_records}.",
+				},
+				"insensitive": map[string]any{
+					"type":        "boolean",
+					"description": "Default true. Set to false for case-sensitive search.",
+				},
+				"maxreturnsize": map[string]any{
+					"type":        "integer",
+					"description": "Max number of records to return when 'search' is set (z/OSMF default 100).",
 				},
 			},
 			"required": []string{"system", "dataset"},
@@ -186,6 +203,19 @@ func (t *readDatasetTool) Execute(ctx context.Context, arguments json.RawMessage
 	client, err := t.clients.Get(args.System)
 	if err != nil {
 		return mcp.ErrorResult(err.Error()), nil
+	}
+
+	if args.Search != "" {
+		insensitive := true
+		if args.Insensitive != nil {
+			insensitive = *args.Insensitive
+		}
+		res, err := client.ReadDatasetEx(args.Dataset, args.Encoding, args.Search, insensitive, args.MaxReturnSize)
+		if err != nil {
+			return mcp.ErrorResult("failed to search dataset: " + err.Error()), nil
+		}
+		data, _ := json.Marshal(res)
+		return mcp.TextResult(string(data)), nil
 	}
 
 	content, err := client.ReadDataset(args.Dataset, args.Encoding)

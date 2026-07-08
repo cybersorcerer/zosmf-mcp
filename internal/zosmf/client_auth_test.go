@@ -68,3 +68,38 @@ func TestDo_EmptyAuthType_SkipsCredentialCheck(t *testing.T) {
 		t.Errorf("Get with empty auth: %v", err)
 	}
 }
+
+func TestGet_401_ReturnsAuthFailedMarker(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	c := newBasicAuthTestClient(srv, "falsch")
+
+	_, err := c.Get("/zosmf/info")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "AUTH_FAILED(SYSA):") {
+		t.Errorf("error %q does not contain AUTH_FAILED(SYSA):", err.Error())
+	}
+}
+
+func TestGet_500_KeepsGenericErrorFormat(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := newBasicAuthTestClient(srv, "pw")
+
+	_, err := c.Get("/zosmf/info")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), "AUTH_FAILED") {
+		t.Errorf("500 must not produce AUTH_FAILED marker: %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "returned 500") {
+		t.Errorf("error %q does not contain generic status message", err.Error())
+	}
+}

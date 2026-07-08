@@ -138,6 +138,15 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
+// httpError converts a non-2xx z/OSMF response into an error. 401 is marked
+// with the AUTH_FAILED marker so clients can react to wrong credentials.
+func (c *Client) httpError(path string, status int, body []byte) error {
+	if status == http.StatusUnauthorized {
+		return fmt.Errorf("AUTH_FAILED(%s): z/OSMF %s returned 401: %s", strings.ToUpper(c.systemName), path, string(body))
+	}
+	return fmt.Errorf("z/OSMF %s returned %d: %s", path, status, string(body))
+}
+
 // Get performs a GET request to the given z/OSMF API path.
 func (c *Client) Get(path string) ([]byte, error) {
 	url := c.baseURL + path
@@ -158,7 +167,7 @@ func (c *Client) Get(path string) ([]byte, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(body))
+		return nil, c.httpError(path, resp.StatusCode, body)
 	}
 
 	return body, nil
@@ -194,7 +203,7 @@ func (c *Client) Delete(path string) ([]byte, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+		return nil, c.httpError(path, resp.StatusCode, respBody)
 	}
 
 	return respBody, nil
@@ -251,7 +260,7 @@ func (c *Client) doWithBodyAndStatus(method, path string, body any) (int, []byte
 	}
 
 	if resp.StatusCode < 200 || (resp.StatusCode >= 300 && resp.StatusCode != 202) {
-		return resp.StatusCode, nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+		return resp.StatusCode, nil, c.httpError(path, resp.StatusCode, respBody)
 	}
 
 	return resp.StatusCode, respBody, nil
@@ -281,7 +290,7 @@ func (c *Client) doWithBody(method, path string, body any) ([]byte, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+		return nil, c.httpError(path, resp.StatusCode, respBody)
 	}
 
 	return respBody, nil

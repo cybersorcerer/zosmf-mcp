@@ -10,6 +10,8 @@ import (
 // ZOAU tools are only registered if sshReg is non-nil (i.e. ssh_systems is configured).
 func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg *config.Config, sshReg *zosmf.SSHClientRegistry) error {
 	handlers := []mcp.ToolHandler{
+		// Auth tools
+		NewSetPasswordTool(clients),
 		// Jobs tools
 		NewListJobsTool(clients),
 		NewGetJobTool(clients),

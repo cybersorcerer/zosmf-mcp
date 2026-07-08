@@ -738,7 +738,7 @@ The MCP Client Node automatically handles session initialization, tool discovery
 
 ## 5. Tools Overview
 
-The server provides 33 tools across 8 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
+The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
 
 ### Jobs (9 tools)
 | Tool                      | Description                                  |
@@ -779,6 +779,12 @@ The server provides 33 tools across 8 categories (plus 11 optional ZOAU tools wh
 | `zosmf_unmount_filesystem` | Unmount a filesystem                     |
 | `zosmf_create_zfs`         | Create a new zFS dataset                 |
 | `zosmf_delete_zfs`         | Delete a zFS dataset                     |
+
+### Authentication (1 tool)
+
+| Tool                 | Description                                                |
+|----------------------|------------------------------------------------------------|
+| `zosmf_set_password` | Set the password for a system at runtime (in-memory only)  |
 
 ### Operator Console (2 tools)
 | Tool                     | Description                              |

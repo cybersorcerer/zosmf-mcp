@@ -13,34 +13,34 @@ import (
 // Dataset represents a z/OS dataset as returned by the z/OSMF Datasets REST API.
 // z/OSMF returns numeric fields as strings when attributes=base is requested.
 type Dataset struct {
-	DSName string `json:"dsname"`
-	DSOrg  string `json:"dsorg,omitempty"`
-	VolSer string `json:"vol,omitempty"`
-	RecFmt string `json:"recfm,omitempty"`
-	LRecL  string `json:"lrecl,omitempty"`
-	BlkSz  string `json:"blksz,omitempty"`
-	CDate  string `json:"cdate,omitempty"`
-	RDate  string `json:"rdate,omitempty"`
-	EDate  string `json:"edate,omitempty"`
-	Used   string `json:"used,omitempty"`
-	Migr   string `json:"migr,omitempty"`
+	DSName  string `json:"dsname"`
+	DSOrg   string `json:"dsorg,omitempty"`
+	VolSer  string `json:"vol,omitempty"`
+	RecFmt  string `json:"recfm,omitempty"`
+	LRecL   string `json:"lrecl,omitempty"`
+	BlkSz   string `json:"blksz,omitempty"`
+	CDate   string `json:"cdate,omitempty"`
+	RDate   string `json:"rdate,omitempty"`
+	EDate   string `json:"edate,omitempty"`
+	Used    string `json:"used,omitempty"`
+	Migr    string `json:"migr,omitempty"`
 	DSNType string `json:"dsntp,omitempty"`
 }
 
 // DatasetMember represents a member of a PDS/PDSE.
 type DatasetMember struct {
-	Member  string `json:"member"`
-	Vers    int    `json:"vers,omitempty"`
-	Mod     int    `json:"mod,omitempty"`
-	C4Date  string `json:"c4date,omitempty"`
-	M4Date  string `json:"m4date,omitempty"`
-	CNoRC   int    `json:"cnorc,omitempty"`
-	INoRC   int    `json:"inorc,omitempty"`
-	MNoRC   int    `json:"mnorc,omitempty"`
-	MTime   string `json:"mtime,omitempty"`
-	MSec    string `json:"msec,omitempty"`
-	User    string `json:"user,omitempty"`
-	SCLM    string `json:"sclm,omitempty"`
+	Member string `json:"member"`
+	Vers   int    `json:"vers,omitempty"`
+	Mod    int    `json:"mod,omitempty"`
+	C4Date string `json:"c4date,omitempty"`
+	M4Date string `json:"m4date,omitempty"`
+	CNoRC  int    `json:"cnorc,omitempty"`
+	INoRC  int    `json:"inorc,omitempty"`
+	MNoRC  int    `json:"mnorc,omitempty"`
+	MTime  string `json:"mtime,omitempty"`
+	MSec   string `json:"msec,omitempty"`
+	User   string `json:"user,omitempty"`
+	SCLM   string `json:"sclm,omitempty"`
 }
 
 // ListDatasets lists datasets matching a given level pattern (e.g. "SYS1.PARM*").
@@ -143,7 +143,9 @@ func (c *Client) ReadDataset(dsname, encoding string) (string, error) {
 // optional server-side search.
 //
 // search        - substring; z/OSMF returns the content starting at the first
-//                 matching record (max maxReturnSize records).
+//
+//	matching record (max maxReturnSize records).
+//
 // insensitive   - default true; pass false for case-sensitive match.
 // maxReturnSize - max number of records returned (z/OSMF default 100).
 //

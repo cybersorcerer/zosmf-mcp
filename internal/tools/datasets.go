@@ -94,7 +94,7 @@ func NewListMembersTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *listMembersTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_list_members",
+		Name: "zosmf_list_members",
 		Description: "List members of a PDS or PDSE dataset on z/OS. Returns member statistics: " +
 			"name, version, modification count, creation/modification date and time, " +
 			"current/initial/modified line counts, last modifying user, and SCLM indicator.",

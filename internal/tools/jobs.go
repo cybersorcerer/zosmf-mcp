@@ -31,7 +31,7 @@ func NewListJobsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *listJobsTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_list_jobs",
+		Name: "zosmf_list_jobs",
 		Description: "List z/OS jobs on a system. Filter by owner, job name prefix, job ID, and/or status (ACTIVE, OUTPUT, INPUT). " +
 			"To list ALL jobs (not just your own), set owner and prefix to '*'. " +
 			"Set exec_data=true to include execution timestamps (exec-started, exec-ended, exec-submitted, exec-system, exec-member).",
@@ -557,4 +557,3 @@ func mustJSON(v any) json.RawMessage {
 	}
 	return data
 }
-

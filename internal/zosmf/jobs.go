@@ -11,17 +11,17 @@ import (
 
 // Job represents a z/OS job as returned by the z/OSMF Jobs REST API.
 type Job struct {
-	JobID       string `json:"jobid"`
-	JobName     string `json:"jobname"`
-	Owner       string `json:"owner"`
-	Status      string `json:"status"`
-	Type        string `json:"type"`
-	Class       string `json:"class"`
-	RetCode     string `json:"retcode"`
-	SubSystem   string `json:"subsystem,omitempty"`
-	URL         string `json:"url,omitempty"`
-	Phase       int    `json:"phase,omitempty"`
-	PhaseName   string `json:"phase-name,omitempty"`
+	JobID         string    `json:"jobid"`
+	JobName       string    `json:"jobname"`
+	Owner         string    `json:"owner"`
+	Status        string    `json:"status"`
+	Type          string    `json:"type"`
+	Class         string    `json:"class"`
+	RetCode       string    `json:"retcode"`
+	SubSystem     string    `json:"subsystem,omitempty"`
+	URL           string    `json:"url,omitempty"`
+	Phase         int       `json:"phase,omitempty"`
+	PhaseName     string    `json:"phase-name,omitempty"`
 	ExecSystem    string    `json:"exec-system,omitempty"`
 	ExecMember    string    `json:"exec-member,omitempty"`
 	ExecSubmitted string    `json:"exec-submitted,omitempty"`
@@ -32,12 +32,12 @@ type Job struct {
 
 // JobStep represents a single completed step returned when step-data=Y is requested.
 type JobStep struct {
-	StepNumber   int    `json:"step-number,omitempty"`
-	StepName     string `json:"step-name,omitempty"`
-	ProcStepName string `json:"proc-step-name,omitempty"`
-	ProgramName  string `json:"program-name,omitempty"`
+	StepNumber     int    `json:"step-number,omitempty"`
+	StepName       string `json:"step-name,omitempty"`
+	ProcStepName   string `json:"proc-step-name,omitempty"`
+	ProgramName    string `json:"program-name,omitempty"`
 	CompletionCode string `json:"completion-code,omitempty"`
-	ActiveInd    bool   `json:"active-ind,omitempty"`
+	ActiveInd      bool   `json:"active-ind,omitempty"`
 }
 
 // JobFile represents a spool file (DD) of a job.

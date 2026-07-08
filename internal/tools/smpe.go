@@ -17,14 +17,14 @@ type queryCSITool struct {
 }
 
 type queryCSIArgs struct {
-	System      string   `json:"system"`
-	CSIDataset  string   `json:"csi_dataset"`
-	Zone        string   `json:"zone"`
-	Zones       []string `json:"zones,omitempty"`
-	EntryType   string   `json:"entry_type"`
-	Entries     []string `json:"entries,omitempty"`
-	Filter      string   `json:"filter,omitempty"`
-	Subentries  []string `json:"subentries,omitempty"`
+	System     string   `json:"system"`
+	CSIDataset string   `json:"csi_dataset"`
+	Zone       string   `json:"zone"`
+	Zones      []string `json:"zones,omitempty"`
+	EntryType  string   `json:"entry_type"`
+	Entries    []string `json:"entries,omitempty"`
+	Filter     string   `json:"filter,omitempty"`
+	Subentries []string `json:"subentries,omitempty"`
 }
 
 func NewQueryCSITool(clients *zosmf.ClientRegistry, cfg *config.Config) mcp.ToolHandler {
@@ -33,7 +33,7 @@ func NewQueryCSITool(clients *zosmf.ClientRegistry, cfg *config.Config) mcp.Tool
 
 func (t *queryCSITool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_smpe_query_csi",
+		Name: "zosmf_smpe_query_csi",
 		Description: "Query the SMP/E Consolidated Software Inventory (CSI) on a z/OS system. " +
 			"Returns information about installed SYSMODs, DDDEFs, and other SMP/E entries.",
 		InputSchema: mustJSON(map[string]any{
@@ -60,8 +60,8 @@ func (t *queryCSITool) Definition() mcp.Tool {
 					"description": "Entry name filter pattern (supports * wildcard, e.g. ABC* or UI*)",
 				},
 				"subentries": map[string]any{
-					"type":        "array",
-					"items":       map[string]any{"type": "string"},
+					"type":  "array",
+					"items": map[string]any{"type": "string"},
 					"description": "List of subentry types to include in results. If omitted, useful defaults are used per entry type. " +
 						"SYSMOD defaults: FMID, SMODTYPE, REWORK, RECDATE, RECTIME, APPLY, INSTALLDATE, INSTALLTIME, LASTSUP, DELBY, ERROR, VERSION. " +
 						"DDDEF defaults: DATASET, PATH, DATACLAS, MGMTCLAS, STORCLAS, VOLUME. " +

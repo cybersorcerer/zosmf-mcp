@@ -32,11 +32,11 @@ type SystemConfig struct {
 	TSOCodepage   string     `yaml:"tso_codepage"`
 
 	// smpe_ls-compatible aliases
-	User                string   `yaml:"user"`
-	RejectUnauthorized  *bool    `yaml:"rejectUnauthorized"`
-	CSI                 any      `yaml:"csi"`
-	Zones               []string `yaml:"zones"`
-	DefaultZones        []string `yaml:"defaultZones"`
+	User               string   `yaml:"user"`
+	RejectUnauthorized *bool    `yaml:"rejectUnauthorized"`
+	CSI                any      `yaml:"csi"`
+	Zones              []string `yaml:"zones"`
+	DefaultZones       []string `yaml:"defaultZones"`
 }
 
 type AuthConfig struct {

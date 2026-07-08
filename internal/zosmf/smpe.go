@@ -9,7 +9,7 @@ import (
 
 // CSIQueryRequest represents a request to the SMP/E CSI Query API.
 type CSIQueryRequest struct {
-	CSIDataset string   `json:"-"`                  // used in URL path, not in body
+	CSIDataset string   `json:"-"` // used in URL path, not in body
 	Zones      []string `json:"zones"`
 	Entries    []string `json:"entries"`
 	Subentries []string `json:"subentries,omitempty"`
@@ -24,9 +24,9 @@ type CSIQueryResponse struct {
 
 // CSIEntry represents a single CSI entry returned by z/OSMF.
 type CSIEntry struct {
-	EntryName  string                      `json:"entryname"`
-	EntryType  string                      `json:"entrytype"`
-	ZoneName   string                      `json:"zonename"`
+	EntryName  string                       `json:"entryname"`
+	EntryType  string                       `json:"entrytype"`
+	ZoneName   string                       `json:"zonename"`
 	Subentries []map[string]json.RawMessage `json:"subentries,omitempty"`
 }
 

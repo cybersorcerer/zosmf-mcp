@@ -124,7 +124,7 @@ func (c *Client) putRaw(path string, body []byte, contentType string) ([]byte, e
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(respBody))
+		return nil, c.httpError(path, resp.StatusCode, respBody)
 	}
 	return respBody, nil
 }

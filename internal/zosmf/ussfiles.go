@@ -45,7 +45,7 @@ func (c *Client) ListUSSFiles(path string) ([]USSFile, error) {
 		return nil, fmt.Errorf("reading USS list response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", apiPath, resp.StatusCode, string(bodyBytes))
+		return nil, c.httpError(apiPath, resp.StatusCode, bodyBytes)
 	}
 
 	var result struct {
@@ -105,7 +105,7 @@ func (c *Client) ReadUSSFile(path, tag string) (string, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("z/OSMF %s returned %d: %s", apiPath, resp.StatusCode, string(bodyBytes))
+		return "", c.httpError(apiPath, resp.StatusCode, bodyBytes)
 	}
 
 	return string(bodyBytes), nil
@@ -136,7 +136,7 @@ func (c *Client) WriteUSSFile(path, content, tag string) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("z/OSMF %s returned %d: %s", apiPath, resp.StatusCode, string(bodyBytes))
+		return c.httpError(apiPath, resp.StatusCode, bodyBytes)
 	}
 
 	return nil
@@ -196,7 +196,7 @@ func (c *Client) DeleteUSSFile(path string, recursive bool) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("z/OSMF %s returned %d: %s", apiPath, resp.StatusCode, string(bodyBytes))
+		return c.httpError(apiPath, resp.StatusCode, bodyBytes)
 	}
 
 	return nil

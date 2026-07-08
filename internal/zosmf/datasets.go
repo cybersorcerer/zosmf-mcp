@@ -72,7 +72,7 @@ func (c *Client) ListDatasets(dslevel, volser, start string) ([]Dataset, error) 
 		return nil, fmt.Errorf("reading dataset list response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF list datasets returned %d: %s", resp.StatusCode, string(body))
+		return nil, c.httpError("list datasets", resp.StatusCode, body)
 	}
 
 	var result struct {
@@ -105,7 +105,7 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 		return nil, fmt.Errorf("reading member list response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF list members returned %d: %s", resp.StatusCode, string(body))
+		return nil, c.httpError("list members", resp.StatusCode, body)
 	}
 
 	var result struct {
@@ -191,7 +191,7 @@ func (c *Client) ReadDatasetEx(dsname, encoding, search string, insensitive bool
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(body))
+		return nil, c.httpError(path, resp.StatusCode, body)
 	}
 
 	res := &ReadDatasetResult{
@@ -246,7 +246,7 @@ func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string, rele
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("z/OSMF %s returned %d: %s", path, resp.StatusCode, string(body))
+		return c.httpError(path, resp.StatusCode, body)
 	}
 
 	return nil
@@ -348,7 +348,7 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType, encoding string) (content, s
 		return "", "", fmt.Errorf("ENQ_NOT_AVAILABLE: %s is locked by another user or session", dsname)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", fmt.Errorf("z/OSMF returned %d acquiring ENQ for %s", resp.StatusCode, dsname)
+		return "", "", c.httpError(path, resp.StatusCode, body)
 	}
 
 	sessionRef = resp.Header.Get("X-IBM-Session-Ref")
@@ -375,10 +375,10 @@ func (c *Client) ReleaseDatasetEnq(dsname, sessionRef string) error {
 		return fmt.Errorf("release ENQ failed: %w", err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("z/OSMF returned %d releasing ENQ for %s", resp.StatusCode, dsname)
+		return c.httpError("/zosmf/restfiles/ping", resp.StatusCode, body)
 	}
 	return nil
 }

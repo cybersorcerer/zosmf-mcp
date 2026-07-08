@@ -176,7 +176,7 @@ func (c *Client) SubmitJobJCL(jcl string) (*Job, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("z/OSMF submit returned %d: %s", resp.StatusCode, string(body))
+		return nil, c.httpError(path, resp.StatusCode, body)
 	}
 
 	var job Job

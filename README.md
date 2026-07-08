@@ -740,13 +740,14 @@ The MCP Client Node automatically handles session initialization, tool discovery
 
 The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
 
-### Jobs (9 tools)
+### Jobs (10 tools)
 | Tool                      | Description                                  |
 |---------------------------|----------------------------------------------|
 | `zosmf_list_jobs`         | List jobs with optional filters              |
 | `zosmf_get_job`           | Get details of a specific job                |
 | `zosmf_get_job_output`    | List spool files (DD names) of a job         |
 | `zosmf_get_spool_content` | Read the content of a spool file             |
+| `zosmf_get_all_spools`    | Read all spool file contents of a job in a single call |
 | `zosmf_submit_job`        | Submit a job from inline JCL or a dataset    |
 | `zosmf_cancel_job`        | Cancel a running job                         |
 | `zosmf_purge_job`         | Delete job output from the spool             |

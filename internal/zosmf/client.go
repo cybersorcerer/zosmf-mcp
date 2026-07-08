@@ -10,6 +10,7 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"strings"
+	"sync"
 
 	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
 )
@@ -18,6 +19,7 @@ import (
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
+	mu         sync.RWMutex
 	auth       config.AuthConfig
 	systemName string
 }
@@ -103,6 +105,14 @@ func NewClient(sys config.SystemConfig) (*Client, error) {
 	}, nil
 }
 
+// SetPassword replaces the password used for basic auth. It is safe to call
+// concurrently with in-flight requests. The password is kept in memory only.
+func (c *Client) SetPassword(password string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.auth.Password = password
+}
+
 // Do executes an HTTP request against the z/OSMF instance.
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	// Set common z/OSMF headers
@@ -113,9 +123,16 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	c.mu.RLock()
+	auth := c.auth
+	c.mu.RUnlock()
+
 	// Set basic auth if configured
-	if c.auth.Type == "basic" {
-		req.SetBasicAuth(c.auth.Username, c.auth.Password)
+	if auth.Type == "basic" {
+		if auth.Password == "" {
+			return nil, fmt.Errorf("NO_CREDENTIALS(%s): no password set for this system, set one with the zosmf_set_password tool", strings.ToUpper(c.systemName))
+		}
+		req.SetBasicAuth(auth.Username, auth.Password)
 	}
 
 	return c.httpClient.Do(req)

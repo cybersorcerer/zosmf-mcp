@@ -25,10 +25,10 @@ Systeme in der Config können unterschiedliche RACF-Datenbanken haben — eine U
 
 ## Fehlermarker
 
-Tool-Fehler propagieren als Strings. Für den Client müssen zwei Fälle maschinell unterscheidbar sein — stabile Präfixe:
+Tool-Fehler propagieren als Strings und werden auf dem Weg nach oben gewrappt (z.B. `command failed: request to /x failed: ...`). Für den Client müssen zwei Fälle maschinell unterscheidbar sein — stabile Marker, die irgendwo in der Fehlermeldung **enthalten** sind (Client matched per Regex, nicht per Präfix am Zeilenanfang):
 
-| Präfix | Wann |
-|---|---|
+| Marker | Wann |
+| --- | --- |
 | `NO_CREDENTIALS(<system>):` | Tool-Call auf ein System, dessen Client kein Passwort hat |
 | `AUTH_FAILED(<system>):` | z/OSMF antwortet HTTP 401 auf einen Request für dieses System |
 

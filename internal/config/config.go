@@ -188,8 +188,8 @@ func (c *Config) validate() error {
 
 		switch sys.Auth.Type {
 		case "basic":
-			if sys.Auth.Username == "" || sys.Auth.Password == "" {
-				return fmt.Errorf("system %s: basic auth requires username and password", sys.Name)
+			if sys.Auth.Username == "" {
+				return fmt.Errorf("system %s: basic auth requires username", sys.Name)
 			}
 		case "certificate":
 			if sys.Auth.CertFile == "" || sys.Auth.KeyFile == "" {

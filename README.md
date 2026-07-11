@@ -69,56 +69,59 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## 3. Configuration
 
-Configuration is done via a YAML file. By default the server looks for `.zosmf-mcp-config.yaml` in the working directory.
+Configuration is done via a YAML file. By default the server searches for configuration in the following order (first match wins):
 
-### Example Configuration
+1. Path specified via `--config` flag (or `MCP_CONFIG` environment variable)
+2. `.smpe-zosmf.yaml` in the current working directory
+3. `.smpe-zosmf.yaml` in `~/.config/smpe_ls/`
+4. `.zosmf-mcp-config.yaml` in the current working directory **(deprecated)**
+
+> **Note:** The `.zosmf-mcp-config.yaml` file is deprecated. For new installations, use `.smpe-zosmf.yaml`. This shared configuration file is used by zosmf-mcp, vscode-smpe, vscpdf, and nvpdf.nvim — all three tools ignore unknown fields in the config.
+
+### Canonical Configuration Example
+
+The following is the recommended shared configuration file `.smpe-zosmf.yaml`, which is read by zosmf-mcp, vscode-smpe, vscpdf, and nvpdf.nvim:
 
 ```yaml
-systems:
-  - name: "SYSA"
-    host: "<HOSTNAME/IP:<PORT>"
-    auth:
-      type: "basic"
-      username: "IBMUSER"
-      password: "${ZOSMF_MAINT_PASSWORD}"  # From environment variable
-    skip_tls_verify: true                  # Set to false and configure ca_file for production
-    # ca_file: "/path/to/ca.pem"           # Optional: custom CA for self-signed z/OSMF certs
-    csi:                                   # Default CSI datasets for SMP/E queries
-      - "SMPE.GLOBAL.CSI"
-    zones:                                 # Default SMP/E zones (used when not specified in tool call)
-      - "MVST100"
-      - "MVSD100"
-    tso_account:  "ACCT#"                 # TSO account number
-    tso_proc:     "IZUFPROC"              # TSO logon procedure
-    tso_charset:  "697"                   # TSO character set (default: 697)
-    tso_codepage: "1047"                  # TSO code page (default: 1047)
+# .smpe-zosmf.yaml — shared by zosmf-mcp, vscode-smpe, vscpdf and nvpdf.nvim
+servers:
+  - name: PROD
+    host: https://zosmf.example.com
+    port: 443
+    user: USER1                  # z/OSMF userid (basic auth)
+    rejectUnauthorized: true
+    # auth:                      # alternative to user:, with env expansion
+    #   username: USER1
+    #   password: ${PROD_PASSWORD}
+    # tso_account: ACCT1         # required for zosmf_tso_command
+    # tso_proc: IKJACCNT
+    # csi:                       # SMP/E (used by vscode-smpe and zosmf_smpe_query_csi)
+    #   - SMPE.GLOBAL.CSI
+    # zones: [GLOBAL, TGT1]
+    # defaultZones: [GLOBAL]
+    # home: /u/user1             # USS home (used by vscpdf/nvpdf)
 
-  # Second system using certificate authentication
-  # - name: "PROD"
-  #   host: "https://prod.example.com:443"
-  #   auth:
-  #     type: "certificate"
-  #     cert_file: "/path/to/client.pem"
-  #     key_file:  "/path/to/client.key"
-  #   ca_file: "/path/to/ca.pem"
+# ssh_systems:                   # optional, for ZOAU tools via SSH
+#   - name: PROD
+#     host: prod.example.com
+#     port: 22
+#     username: user1
+#     key_file: ~/.ssh/id_rsa
 
-# SSH systems for ZOAU tools (optional — omit if ZOAU is not needed)
-# ssh_systems:
-#   - name: "MVSA"
-#     host: "mvsa.example.com"
-#     port: 22                    # optional, default: 22
-#     username: "ibmuser"
-#     key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key
-
-transport:
-  stdio: true                   # For MCP integration (VS Code, Claude Code, etc.)
-  http:
-    enabled: false              # Optional: HTTP transport for n8n HTTP Request nodes, curl, etc.
-    listen: ":8080"
-  streamable_http:
-    enabled: false              # Optional: Streamable HTTP for n8n MCP Client Tool Node (v1.88+)
-    listen: ":8081"
+# defaultServer: PROD            # used by vscode-smpe; ignored by zosmf-mcp
 ```
+
+### Compatibility Aliases
+
+The following fields are accepted as aliases for compatibility with other z/OSMF tools:
+
+| Alias                | Equivalent to                 |
+|----------------------|-------------------------------|
+| `servers`            | `systems`                     |
+| `user`               | `auth.username`               |
+| `rejectUnauthorized` | `skip_tls_verify` (inverted)  |
+
+This means you can use the simpler `servers:` key with `user:` and `rejectUnauthorized:` fields (as shown in the canonical example above) instead of the older nested `systems:` + `auth:` structure.
 
 ### Configuration Reference
 
@@ -140,16 +143,6 @@ transport:
 | `tso_proc`        | No       | TSO logon procedure (required for `zosmf_tso_command`)           |
 | `tso_charset`     | No       | TSO character set, default: `697`                                 |
 | `tso_codepage`    | No       | TSO code page, default: `1047`                                    |
-
-### Compatibility Aliases
-
-The following fields are accepted as aliases for compatibility with other z/OSMF tools:
-
-| Alias                | Equivalent to                 |
-|----------------------|-------------------------------|
-| `servers`            | `systems`                     |
-| `user`               | `auth.username`               |
-| `rejectUnauthorized` | `skip_tls_verify` (inverted)  |
 
 ### Passing Passwords Securely
 

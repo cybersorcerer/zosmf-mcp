@@ -197,6 +197,9 @@ func (c *Config) validate() error {
 				return fmt.Errorf("system %s: certificate auth requires cert_file and key_file", sys.Name)
 			}
 		case "":
+			if sys.Auth.CertFile != "" || sys.Auth.KeyFile != "" {
+				return fmt.Errorf("system %s: certificate files configured but auth type missing — set \"type: certificate\"", sys.Name)
+			}
 			// Tolerated: legacy smpe_ls entries without user/auth. The client
 			// rejects tool calls with a NO_CREDENTIALS marker instead of
 			// blocking server startup for all other systems.
@@ -255,19 +258,34 @@ const (
 // given: cwd, then ~/.config/smpe_ls/, then the deprecated legacy name in
 // cwd. deprecated is true when the legacy file was chosen.
 func ResolveDefaultPath(cwd, home string) (path string, deprecated bool, err error) {
-	candidates := []struct {
+	type candidate struct {
 		path       string
 		deprecated bool
-	}{
-		{filepath.Join(cwd, DefaultConfigName), false},
-		{filepath.Join(home, ".config", "smpe_ls", DefaultConfigName), false},
-		{filepath.Join(cwd, LegacyConfigName), true},
 	}
+	var candidates []candidate
+	candidates = append(candidates, candidate{filepath.Join(cwd, DefaultConfigName), false})
+	if home != "" {
+		candidates = append(candidates, candidate{filepath.Join(home, ".config", "smpe_ls", DefaultConfigName), false})
+	}
+	candidates = append(candidates, candidate{filepath.Join(cwd, LegacyConfigName), true})
+
+	var searched []string
+	var statErrs []error
 	for _, c := range candidates {
+		searched = append(searched, c.path)
 		if _, statErr := os.Stat(c.path); statErr == nil {
 			return c.path, c.deprecated, nil
+		} else if !os.IsNotExist(statErr) {
+			statErrs = append(statErrs, statErr)
 		}
 	}
-	return "", false, fmt.Errorf("no configuration file found; searched: %s, %s, %s",
-		candidates[0].path, candidates[1].path, candidates[2].path)
+	msg := fmt.Sprintf("no configuration file found; searched: %s", strings.Join(searched, ", "))
+	if len(statErrs) > 0 {
+		errStrs := make([]string, len(statErrs))
+		for i, e := range statErrs {
+			errStrs[i] = e.Error()
+		}
+		msg += fmt.Sprintf("; errors: %s", strings.Join(errStrs, "; "))
+	}
+	return "", false, fmt.Errorf("%s", msg)
 }

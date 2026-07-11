@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
@@ -47,6 +48,13 @@ func main() {
 		}
 		if deprecated {
 			logger.Printf("WARNING: %s is deprecated — rename to %s", config.LegacyConfigName, config.DefaultConfigName)
+		} else {
+			legacyPath := filepath.Join(cwd, config.LegacyConfigName)
+			if legacyPath != path {
+				if _, statErr := os.Stat(legacyPath); statErr == nil {
+					logger.Printf("NOTE: using %s; ignoring legacy %s in %s", path, config.LegacyConfigName, cwd)
+				}
+			}
 		}
 		resolvedConfig = path
 	}
@@ -66,6 +74,9 @@ func main() {
 		}
 		clients.Register(sys.Name, client)
 		logger.Printf("registered system: %s (%s)", sys.Name, sys.Host)
+		if sys.Auth.Type == "" {
+			logger.Printf("WARNING: system %s has no user configured — tool calls will fail until 'user:' is added", sys.Name)
+		}
 	}
 
 	// Build SSH client registry if ssh_systems are configured

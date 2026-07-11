@@ -141,6 +141,61 @@ systems:
 	}
 }
 
+func TestLoad_CertFilesWithoutType_Fails(t *testing.T) {
+	t.Setenv("ZOSMF_PASSWORD", "")
+	yaml := `
+systems:
+  - name: SYSA
+    host: https://zosmf.example.com
+    auth:
+      cert_file: /path/cert.pem
+      key_file: /path/key.pem
+`
+	_, err := Load(writeConfig(t, yaml))
+	if err == nil {
+		t.Fatal("expected error for cert files configured without auth type")
+	}
+	want := `system SYSA: certificate files configured but auth type missing — set "type: certificate"`
+	if err.Error() != "validating config: "+want {
+		t.Errorf("error = %q, want suffix %q", err.Error(), want)
+	}
+}
+
+func TestResolveDefaultPath_CwdBeatsLegacy(t *testing.T) {
+	cwd := t.TempDir()
+	home := t.TempDir()
+	writeFile(t, filepath.Join(cwd, ".smpe-zosmf.yaml"))
+	writeFile(t, filepath.Join(cwd, ".zosmf-mcp-config.yaml"))
+
+	path, deprecated, err := ResolveDefaultPath(cwd, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deprecated {
+		t.Error("deprecated must be false when the new-name file is found first")
+	}
+	if path != filepath.Join(cwd, ".smpe-zosmf.yaml") {
+		t.Errorf("path = %q", path)
+	}
+}
+
+func TestResolveDefaultPath_EmptyHome_SkipsHomeCandidate(t *testing.T) {
+	cwd := t.TempDir()
+	want := filepath.Join(cwd, ".zosmf-mcp-config.yaml")
+	writeFile(t, want)
+
+	path, deprecated, err := ResolveDefaultPath(cwd, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deprecated {
+		t.Error("legacy file must report deprecated=true")
+	}
+	if path != want {
+		t.Errorf("path = %q", path)
+	}
+}
+
 func writeFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

@@ -71,7 +71,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Configuration is done via a YAML file. By default the server searches for configuration in the following order (first match wins):
 
-1. Path specified via `--config` flag (or `MCP_CONFIG` environment variable)
+1. Path specified via `--config` flag
 2. `.smpe-zosmf.yaml` in the current working directory
 3. `.smpe-zosmf.yaml` in `~/.config/smpe_ls/`
 4. `.zosmf-mcp-config.yaml` in the current working directory **(deprecated)**
@@ -130,7 +130,7 @@ This means you can use the simpler `servers:` key with `user:` and `rejectUnauth
 | `name`            | Yes      | System name used in prompts (e.g. "PROD", "MAINT")               |
 | `host`            | Yes      | z/OSMF base URL including port                                    |
 | `port`            | No       | Port number — appended to `host` if not already present          |
-| `auth.type`       | Yes      | `basic` or `certificate`                                          |
+| `auth.type`       | No       | `basic` or `certificate` — defaults to `basic` when a username is present; entries without any credentials start but reject tool calls |
 | `auth.username`   | Yes*     | TSO user ID (*required for `basic`)                               |
 | `auth.password`   | Yes*     | Password — reference via `${ENV_VAR}` to avoid hardcoding        |
 | `auth.cert_file`  | Yes**    | PEM certificate file (**required for `certificate`)               |
@@ -139,10 +139,12 @@ This means you can use the simpler `servers:` key with `user:` and `rejectUnauth
 | `skip_tls_verify` | No       | Skip TLS validation — not recommended for production             |
 | `csi`             | No       | Default CSI datasets for SMP/E queries (list of dataset names)   |
 | `zones`           | No       | Default SMP/E zones (used when no zone is specified in tool call) |
+| `defaultZones`    | No       | Default SMP/E zones used by vscode-smpe; ignored by zosmf-mcp     |
 | `tso_account`     | No       | TSO account number (required for `zosmf_tso_command`)            |
 | `tso_proc`        | No       | TSO logon procedure (required for `zosmf_tso_command`)           |
 | `tso_charset`     | No       | TSO character set, default: `697`                                 |
 | `tso_codepage`    | No       | TSO code page, default: `1047`                                    |
+| `home`            | No       | USS home directory, used by vscpdf/nvpdf                          |
 
 ### Passing Passwords Securely
 

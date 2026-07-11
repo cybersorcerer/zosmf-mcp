@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -237,4 +238,32 @@ func (c *Config) SystemNames() []string {
 		names[i] = sys.Name
 	}
 	return names
+}
+
+// DefaultConfigName is the canonical config shared by smpe_ls, vscpdf,
+// nvpdf and zosmf-mcp. LegacyConfigName is kept for backwards compatibility.
+const (
+	DefaultConfigName = ".smpe-zosmf.yaml"
+	LegacyConfigName  = ".zosmf-mcp-config.yaml"
+)
+
+// ResolveDefaultPath locates the configuration file when --config is not
+// given: cwd, then ~/.config/smpe_ls/, then the deprecated legacy name in
+// cwd. deprecated is true when the legacy file was chosen.
+func ResolveDefaultPath(cwd, home string) (path string, deprecated bool, err error) {
+	candidates := []struct {
+		path       string
+		deprecated bool
+	}{
+		{filepath.Join(cwd, DefaultConfigName), false},
+		{filepath.Join(home, ".config", "smpe_ls", DefaultConfigName), false},
+		{filepath.Join(cwd, LegacyConfigName), true},
+	}
+	for _, c := range candidates {
+		if _, statErr := os.Stat(c.path); statErr == nil {
+			return c.path, c.deprecated, nil
+		}
+	}
+	return "", false, fmt.Errorf("no configuration file found; searched: %s, %s, %s",
+		candidates[0].path, candidates[1].path, candidates[2].path)
 }

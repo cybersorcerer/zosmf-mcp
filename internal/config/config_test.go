@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -61,5 +62,75 @@ systems:
 `
 	if _, err := Load(writeConfig(t, yaml)); err == nil {
 		t.Fatal("expected error for basic auth without username")
+	}
+}
+
+func TestResolveDefaultPath_CwdFirst(t *testing.T) {
+	cwd := t.TempDir()
+	home := t.TempDir()
+	writeFile(t, filepath.Join(cwd, ".smpe-zosmf.yaml"))
+	writeFile(t, filepath.Join(home, ".config", "smpe_ls", ".smpe-zosmf.yaml"))
+
+	path, deprecated, err := ResolveDefaultPath(cwd, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deprecated {
+		t.Error("cwd .smpe-zosmf.yaml must not be deprecated")
+	}
+	if path != filepath.Join(cwd, ".smpe-zosmf.yaml") {
+		t.Errorf("path = %q", path)
+	}
+}
+
+func TestResolveDefaultPath_HomeSecond(t *testing.T) {
+	cwd := t.TempDir()
+	home := t.TempDir()
+	want := filepath.Join(home, ".config", "smpe_ls", ".smpe-zosmf.yaml")
+	writeFile(t, want)
+
+	path, deprecated, err := ResolveDefaultPath(cwd, home)
+	if err != nil || deprecated || path != want {
+		t.Errorf("path=%q deprecated=%v err=%v", path, deprecated, err)
+	}
+}
+
+func TestResolveDefaultPath_LegacyThird(t *testing.T) {
+	cwd := t.TempDir()
+	home := t.TempDir()
+	want := filepath.Join(cwd, ".zosmf-mcp-config.yaml")
+	writeFile(t, want)
+
+	path, deprecated, err := ResolveDefaultPath(cwd, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deprecated {
+		t.Error("legacy file must report deprecated=true")
+	}
+	if path != want {
+		t.Errorf("path = %q", path)
+	}
+}
+
+func TestResolveDefaultPath_NothingFound(t *testing.T) {
+	_, _, err := ResolveDefaultPath(t.TempDir(), t.TempDir())
+	if err == nil {
+		t.Fatal("expected error when no config exists")
+	}
+	for _, frag := range []string{".smpe-zosmf.yaml", "smpe_ls", ".zosmf-mcp-config.yaml"} {
+		if !strings.Contains(err.Error(), frag) {
+			t.Errorf("error %q does not mention %q", err.Error(), frag)
+		}
+	}
+}
+
+func writeFile(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("servers: []\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }

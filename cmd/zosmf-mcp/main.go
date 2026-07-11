@@ -21,7 +21,7 @@ var (
 )
 
 func main() {
-	configPath := flag.String("config", ".zosmf-mcp-config.yaml", "Path to configuration file")
+	configPath := flag.String("config", "", "Path to configuration file (default: search .smpe-zosmf.yaml in cwd and ~/.config/smpe_ls/)")
 	transport := flag.String("transport", "auto", "Transport type: stdio, http, or auto (uses config)")
 	listen := flag.String("listen", "", "HTTP listen address (overrides config)")
 	showVersion := flag.Bool("version", false, "Print version information and exit")
@@ -34,8 +34,25 @@ func main() {
 
 	logger := log.New(os.Stderr, "[zosmf-mcp] ", log.LstdFlags|log.Lmsgprefix)
 
+	resolvedConfig := *configPath
+	if resolvedConfig == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			logger.Fatalf("cannot determine working directory: %v", err)
+		}
+		home, _ := os.UserHomeDir()
+		path, deprecated, err := config.ResolveDefaultPath(cwd, home)
+		if err != nil {
+			logger.Fatalf("%v", err)
+		}
+		if deprecated {
+			logger.Printf("WARNING: %s is deprecated — rename to %s", config.LegacyConfigName, config.DefaultConfigName)
+		}
+		resolvedConfig = path
+	}
+
 	// Load configuration
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load(resolvedConfig)
 	if err != nil {
 		logger.Fatalf("failed to load config: %v", err)
 	}

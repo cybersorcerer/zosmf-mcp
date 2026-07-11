@@ -125,6 +125,22 @@ func TestResolveDefaultPath_NothingFound(t *testing.T) {
 	}
 }
 
+func TestLoad_ServerWithoutUser_Tolerated(t *testing.T) {
+	t.Setenv("ZOSMF_PASSWORD", "")
+	yaml := `
+systems:
+  - name: LEGACY
+    host: https://zosmf.example.com
+`
+	cfg, err := Load(writeConfig(t, yaml))
+	if err != nil {
+		t.Fatalf("Load must tolerate entries without user: %v", err)
+	}
+	if cfg.Systems[0].Auth.Type != "" {
+		t.Errorf("Auth.Type = %q, want empty", cfg.Systems[0].Auth.Type)
+	}
+}
+
 func writeFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

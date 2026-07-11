@@ -138,3 +138,22 @@ func TestWriteDataset_500_KeepsGenericErrorFormat(t *testing.T) {
 		t.Errorf("error %q does not contain generic status message", err.Error())
 	}
 }
+
+func TestDo_MissingUsername_ReturnsNoCredentialsMarker(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("request must not reach the server without a username")
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(config.SystemConfig{Name: "LEGACY", Host: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Get("/zosmf/info")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "NO_CREDENTIALS(LEGACY):") || !strings.Contains(err.Error(), "no username") {
+		t.Errorf("error %q lacks marker/text", err.Error())
+	}
+}

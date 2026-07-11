@@ -17,11 +17,12 @@ import (
 
 // Client is an HTTP client for communicating with a z/OSMF instance.
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	mu         sync.RWMutex
-	auth       config.AuthConfig
-	systemName string
+	httpClient      *http.Client
+	baseURL         string
+	mu              sync.RWMutex
+	auth            config.AuthConfig
+	systemName      string
+	missingUsername bool
 }
 
 // ClientRegistry manages clients for multiple z/OS systems.
@@ -97,11 +98,14 @@ func NewClient(sys config.SystemConfig) (*Client, error) {
 
 	baseURL := strings.TrimRight(sys.Host, "/")
 
+	missingUsername := sys.Auth.Type == ""
+
 	return &Client{
-		httpClient: httpClient,
-		baseURL:    baseURL,
-		auth:       sys.Auth,
-		systemName: sys.Name,
+		httpClient:      httpClient,
+		baseURL:         baseURL,
+		auth:            sys.Auth,
+		systemName:      sys.Name,
+		missingUsername: missingUsername,
 	}, nil
 }
 
@@ -121,6 +125,10 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 	if req.Body != nil && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if c.missingUsername {
+		return nil, fmt.Errorf("NO_CREDENTIALS(%s): no username configured — add 'user:' to the server entry", strings.ToUpper(c.systemName))
 	}
 
 	c.mu.RLock()

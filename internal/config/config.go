@@ -196,6 +196,10 @@ func (c *Config) validate() error {
 			if sys.Auth.CertFile == "" || sys.Auth.KeyFile == "" {
 				return fmt.Errorf("system %s: certificate auth requires cert_file and key_file", sys.Name)
 			}
+		case "":
+			// Tolerated: legacy smpe_ls entries without user/auth. The client
+			// rejects tool calls with a NO_CREDENTIALS marker instead of
+			// blocking server startup for all other systems.
 		default:
 			return fmt.Errorf("system %s: auth type must be 'basic' or 'certificate', got '%s'", sys.Name, sys.Auth.Type)
 		}

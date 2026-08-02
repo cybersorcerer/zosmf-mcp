@@ -30,10 +30,9 @@ func (r *SSHClientRegistry) Get(name string) (config.SSHSystemConfig, error) {
 	return cfg, nil
 }
 
-func RunSSH(cfg config.SSHSystemConfig, command string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
+// sshBaseArgs builds the ssh options shared by RunSSH and RunSSHDetailed.
+// The target and the remote command are appended by the caller.
+func sshBaseArgs(cfg config.SSHSystemConfig) []string {
 	args := []string{
 		"-p", fmt.Sprintf("%d", cfg.Port),
 		"-o", "BatchMode=yes",
@@ -42,6 +41,17 @@ func RunSSH(cfg config.SSHSystemConfig, command string) (string, error) {
 	if cfg.KeyFile != "" {
 		args = append(args, "-i", cfg.KeyFile)
 	}
+	if cfg.ProxyJump != nil && cfg.ProxyJump.Active() {
+		args = append(args, "-J", cfg.ProxyJump.Host)
+	}
+	return args
+}
+
+func RunSSH(cfg config.SSHSystemConfig, command string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	args := sshBaseArgs(cfg)
 
 	remoteCmd := command
 	if len(cfg.Environment) > 0 {
@@ -87,14 +97,7 @@ func RunSSHDetailed(cfg config.SSHSystemConfig, command string, timeoutSeconds i
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	args := []string{
-		"-p", fmt.Sprintf("%d", cfg.Port),
-		"-o", "BatchMode=yes",
-		"-o", "StrictHostKeyChecking=accept-new",
-	}
-	if cfg.KeyFile != "" {
-		args = append(args, "-i", cfg.KeyFile)
-	}
+	args := sshBaseArgs(cfg)
 
 	remoteCmd := command
 	if len(cfg.Environment) > 0 {

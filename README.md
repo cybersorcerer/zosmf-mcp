@@ -9,21 +9,22 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for z/
 1. [Prerequisites](#1-prerequisites)
 2. [Installation](#2-installation)
 3. [Configuration](#3-configuration)
-4. [Registering the MCP Server](#4-registering-the-mcp-server)
-   - [Claude Desktop](#41-claude-desktop-macoswindows)
-   - [Claude Code CLI](#42-claude-code-cli)
-   - [VS Code (Claude Code Extension)](#43-vs-code-claude-code-extension)
-   - [JetBrains IDEs](#44-jetbrains-ides)
-   - [Gemini CLI](#45-gemini-cli)
-   - [Continue.dev](#46-continuedev)
-   - [Cursor](#47-cursor)
-   - [Anthropic API (custom applications)](#48-anthropic-api-custom-applications)
-   - [Direct invocation / custom clients](#49-direct-invocation--custom-clients)
-   - [n8n (HTTP transport)](#410-n8n-http-transport)
-   - [n8n (MCP Client Node)](#411-n8n-mcp-client-node)
-5. [Tools Overview](#5-tools-overview)
-6. [Tool Reference and Example Prompts](#6-tool-reference-and-example-prompts)
-7. [Building Automations](#7-building-automations)
+4. [Request Forwarding, API-Key Authentication and Docker](#4-request-forwarding-api-key-authentication-and-docker)
+5. [Registering the MCP Server](#5-registering-the-mcp-server)
+   - [Claude Desktop](#51-claude-desktop-macoswindows)
+   - [Claude Code CLI](#52-claude-code-cli)
+   - [VS Code (Claude Code Extension)](#53-vs-code-claude-code-extension)
+   - [JetBrains IDEs](#54-jetbrains-ides)
+   - [Gemini CLI](#55-gemini-cli)
+   - [Continue.dev](#56-continuedev)
+   - [Cursor](#57-cursor)
+   - [Anthropic API (custom applications)](#58-anthropic-api-custom-applications)
+   - [Direct invocation / custom clients](#59-direct-invocation--custom-clients)
+   - [n8n (HTTP transport)](#510-n8n-http-transport)
+   - [n8n (MCP Client Node)](#511-n8n-mcp-client-node)
+6. [Tools Overview](#6-tools-overview)
+7. [Tool Reference and Example Prompts](#7-tool-reference-and-example-prompts)
+8. [Building Automations](#8-building-automations)
 
 ---
 
@@ -195,7 +196,127 @@ ZOAU tools are only registered when at least one `ssh_systems` entry is present.
 
 ---
 
-## 4. Registering the MCP Server
+## 4. Request Forwarding, API-Key Authentication and Docker
+
+By default zosmf-mcp needs direct network access to the z/OSMF REST API (and, for ZOAU
+tools, direct SSH access to the target LPARs). This section is for the case where the
+server itself runs somewhere without that access — for example in a container on a
+homelab Docker host that can only reach the z/OS systems indirectly, through another
+machine that does have a route to them.
+
+### Topology
+
+```text
+MacBook (privat)          Homelab-Dockerhost           Maschine 2                z/OS
+──────────────────        ────────────────────         ──────────────            ──────
+Claude Code / Agent  ──▶  zosmf-mcp ──▶ tunnel   ──▶   sshd (Jump)   ──▶  z/OSMF REST
+                 (MCP über HTTP)   (SOCKS5)      (SSH)              (HTTPS)
+```
+
+A tunnel sidecar runs next to the `zosmf-mcp` container and opens an outbound SSH
+connection to the jump host, exposing a local SOCKS5 endpoint (`ssh -D`) that the
+zosmf-mcp container routes its z/OSMF traffic through. Nothing needs to be installed on
+the jump host beyond `sshd` — `ssh -D` is entirely handled by the client side.
+
+The TLS connection to z/OSMF stays end-to-end: it terminates inside the zosmf-mcp
+container, not on the jump host. The jump host only ever sees encrypted bytes, so there
+are no certificate changes to make and `skip_tls_verify` remains unnecessary.
+
+### Config schema
+
+Two independent, optional top-level blocks control forwarding. Neither block, or
+`enabled: false`, means today's behavior — requests go out directly.
+
+```yaml
+# Route all z/OSMF REST calls through a proxy (e.g. a SOCKS5 tunnel to a jump host).
+# Without this block, all requests go out directly.
+# proxy:
+#   enabled: true
+#   url: ${ZOSMF_PROXY}          # socks5://tunnel:1080
+
+# Route ZOAU SSH connections through a jump host (ssh -J).
+# ssh_proxy_jump:
+#   enabled: true
+#   host: jump@jumphost.example.com
+
+# Exempt an individual system from the proxy:
+# servers:
+#   - name: SYS2
+#     host: https://intern.lab:443
+#     proxy:
+#       enabled: false
+```
+
+| Field                  | Scope                | Description                                                              |
+|------------------------|-----------------------|----------------------------------------------------------------------------|
+| `proxy.enabled`        | global                | Turns the global z/OSMF REST proxy on                                     |
+| `proxy.url`            | global                | Proxy URL — scheme must be `http`, `https` or `socks5`                    |
+| `servers[].proxy`      | per system            | Overrides the global `proxy` block for one system                         |
+| `ssh_proxy_jump.enabled` | global              | Turns the global ZOAU SSH jump host on                                    |
+| `ssh_proxy_jump.host`  | global                | Jump host as `user@host`, passed to `ssh -J`                              |
+| `ssh_systems[].proxy_jump` | per SSH system   | Overrides the global `ssh_proxy_jump` block for one SSH system            |
+
+Precedence: a per-system (or per-SSH-system) `proxy` / `proxy_jump` block always wins
+over the global block, whether it turns forwarding on or off for that one entry. If
+`proxy.url` is empty, it is filled from the `ZOSMF_PROXY` environment variable. An
+invalid proxy URL scheme is rejected at config load time, not on the first tool call.
+
+### API-key authentication
+
+The HTTP and Streamable HTTP transports require an API key before they will start:
+
+```bash
+make apikey        # openssl rand -base64 32
+```
+
+Put the generated value in `.env` next to `docker-compose.yml` (already covered by
+`.gitignore`):
+
+```bash
+MCP_API_KEY=...
+ZOSMF_PASSWORD=...
+```
+
+The server reads it as `transport.http.api_key` / `transport.streamable_http.api_key`
+(each transport has its own key) and expects clients to send it as
+`Authorization: Bearer <key>`. Starting an HTTP transport without an `api_key` set
+aborts the server at startup; pass `allow_insecure: true` on that transport to opt into
+running without a key.
+
+Client-side, add the header to the MCP client configuration, e.g. `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "zosmf": {
+      "type": "http",
+      "url": "http://dockerhost:8081/mcp",
+      "headers": { "Authorization": "Bearer ..." }
+    }
+  }
+}
+```
+
+> **Warning:** Over plain HTTP, the API key only protects against a device that
+> stumbles onto or scans the port. It does **not** protect against anyone able to read
+> the traffic — the key and every z/OS command travel in the clear. TLS, via a reverse
+> proxy in front of the transport, is the next step if that matters for your network.
+
+### Docker operation
+
+```bash
+cp .env.example .env    # fill in JUMP_HOST, ZOSMF_PASSWORD, MCP_API_KEY
+make docker-up           # builds the image and starts tunnel + zosmf-mcp
+make docker-logs         # follow both containers' logs
+```
+
+> **Warning:** `depends_on` in `docker-compose.yml` only waits for the `tunnel`
+> container to *start*, not for the SSH connection to actually come up. The first
+> requests after a restart can fail until the tunnel has finished connecting.
+
+---
+
+## 5. Registering the MCP Server
 
 zosmf-mcp supports three transports that can run simultaneously:
 
@@ -213,7 +334,7 @@ For the stdio clients the configuration is the same everywhere:
 
 ---
 
-### 4.1 Claude Desktop (macOS/Windows)
+### 5.1 Claude Desktop (macOS/Windows)
 
 Claude Desktop supports MCP servers via the `claude_desktop_config.json` file.
 
@@ -242,7 +363,7 @@ Restart Claude Desktop after saving. The tools will appear in the chat as availa
 
 ---
 
-### 4.2 Claude Code CLI
+### 5.2 Claude Code CLI
 
 Claude Code (the `claude` CLI tool) reads MCP server configurations from `~/.claude/mcp.json` (global) or `.claude/mcp.json` in the project directory (local).
 
@@ -295,7 +416,7 @@ claude mcp list
 
 ---
 
-### 4.3 VS Code (Claude Code Extension)
+### 5.3 VS Code (Claude Code Extension)
 
 MCP servers are registered in VS Code via an `mcp.json` file in the workspace directory.
 
@@ -322,7 +443,7 @@ MCP servers are registered in VS Code via an `mcp.json` file in the workspace di
 
 ---
 
-### 4.4 JetBrains IDEs
+### 5.4 JetBrains IDEs
 
 JetBrains IDEs (IntelliJ, GoLand, etc.) support MCP via the **AI Assistant plugin**.
 
@@ -355,7 +476,7 @@ Alternatively, as a JSON configuration in `~/.config/JetBrains/mcp.json` (since 
 
 ---
 
-### 4.5 Gemini CLI
+### 5.5 Gemini CLI
 
 Google Gemini CLI supports MCP servers via a `settings.json` configuration file.
 
@@ -384,7 +505,7 @@ All registered tools become available in the session — the model can use them 
 
 ---
 
-### 4.6 Continue.dev
+### 5.6 Continue.dev
 
 [Continue](https://continue.dev) is an open-source AI coding extension for VS Code and JetBrains. MCP servers are configured in `~/.continue/config.json`:
 
@@ -409,7 +530,7 @@ All registered tools become available in the session — the model can use them 
 
 ---
 
-### 4.7 Cursor
+### 5.7 Cursor
 
 [Cursor](https://cursor.sh) supports MCP servers since version 0.43 via `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in the project directory:
 
@@ -431,7 +552,7 @@ After saving, go to `Cursor Settings → MCP` — the server should appear with 
 
 ---
 
-### 4.8 Anthropic API (custom applications)
+### 5.8 Anthropic API (custom applications)
 
 Using the Anthropic API with the **MCP Client SDK**, you can build custom applications that leverage Claude together with zosmf-mcp.
 
@@ -579,7 +700,7 @@ await mcp.close();
 
 ---
 
-### 4.9 Direct invocation / custom clients
+### 5.9 Direct invocation / custom clients
 
 For custom applications or shell scripts, the server can be started directly and addressed via JSON-RPC 2.0 over stdio:
 
@@ -610,7 +731,7 @@ MCP client SDKs are available for several languages:
 
 ---
 
-### 4.10 n8n (HTTP transport)
+### 5.10 n8n (HTTP transport)
 
 [n8n](https://n8n.io) is an open-source workflow automation platform. It can call the zosmf-mcp server via the **HTTP transport** using standard HTTP Request nodes.
 
@@ -694,7 +815,7 @@ Mcp-Session-Id: <uuid>
 
 ---
 
-### 4.11 n8n (MCP Client Node)
+### 5.11 n8n (MCP Client Node)
 
 Since n8n **v1.88**, the native **MCP Client Tool Node** allows AI Agent workflows to use zosmf-mcp tools directly — without manually building HTTP Request nodes or managing session IDs.
 
@@ -731,7 +852,7 @@ The MCP Client Node automatically handles session initialization, tool discovery
 
 ---
 
-## 5. Tools Overview
+## 6. Tools Overview
 
 The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
 
@@ -826,7 +947,7 @@ The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools wh
 
 ---
 
-## 6. Tool Reference and Example Prompts
+## 7. Tool Reference and Example Prompts
 
 ### Jobs
 
@@ -1088,7 +1209,7 @@ Validate the following BPXPRM parmlib content on SYSA: [parmlib text...]
 
 ---
 
-## 7. Building Automations
+## 8. Building Automations
 
 The zosmf-mcp server can be used with Claude Code to build complex automations.
 

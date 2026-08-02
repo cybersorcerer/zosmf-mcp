@@ -136,12 +136,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if useHTTP && cfg.Transport.HTTP.APIKey == "" && !cfg.Transport.HTTP.AllowInsecure {
-		fmt.Fprintf(os.Stderr, "http transport needs transport.http.api_key (or allow_insecure: true)\n")
-		os.Exit(1)
-	}
-	if useStreamableHTTP && cfg.Transport.StreamableHTTP.APIKey == "" && !cfg.Transport.StreamableHTTP.AllowInsecure {
-		fmt.Fprintf(os.Stderr, "streamable-http transport needs transport.streamable_http.api_key (or allow_insecure: true)\n")
+	if err := cfg.ValidateHTTPAuth(useHTTP, useStreamableHTTP); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 

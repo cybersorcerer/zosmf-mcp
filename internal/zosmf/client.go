@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
 )
@@ -97,7 +98,7 @@ func NewClient(sys config.SystemConfig) (*Client, error) {
 	if sys.Proxy != nil && sys.Proxy.Active() {
 		proxyURL, err := url.Parse(sys.Proxy.URL)
 		if err != nil {
-			return nil, fmt.Errorf("parsing proxy URL for system %s: %w", sys.Name, err)
+			return nil, fmt.Errorf("parsing proxy URL for system %s: invalid URL", sys.Name)
 		}
 		transport.Proxy = http.ProxyURL(proxyURL)
 	}
@@ -105,6 +106,7 @@ func NewClient(sys config.SystemConfig) (*Client, error) {
 	httpClient := &http.Client{
 		Jar:       jar,
 		Transport: transport,
+		Timeout:   60 * time.Second,
 	}
 
 	baseURL := strings.TrimRight(sys.Host, "/")

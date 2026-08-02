@@ -2,11 +2,13 @@ package mcp
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 type HTTPTransport struct {
 	addr    string
 	logger  *log.Logger
+	apiKey  string
 	handler MessageHandler
 
 	mu       sync.RWMutex
@@ -39,12 +42,30 @@ type session struct {
 	state     sessionState
 }
 
-func NewHTTPTransport(addr string, logger *log.Logger) *HTTPTransport {
+func NewHTTPTransport(addr string, logger *log.Logger, apiKey string) *HTTPTransport {
 	return &HTTPTransport{
 		addr:     addr,
 		logger:   logger,
+		apiKey:   apiKey,
 		sessions: make(map[string]*session),
 	}
+}
+
+// requireAPIKey rejects requests without a matching bearer token. An empty key
+// disables the check, which keeps stdio-only setups unaffected.
+func requireAPIKey(key string, next http.Handler) http.Handler {
+	if key == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok || subtle.ConstantTimeCompare([]byte(got), []byte(key)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="zosmf-mcp"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (t *HTTPTransport) Run(ctx context.Context, handler MessageHandler) error {
@@ -55,7 +76,7 @@ func (t *HTTPTransport) Run(ctx context.Context, handler MessageHandler) error {
 
 	server := &http.Server{
 		Addr:    t.addr,
-		Handler: mux,
+		Handler: requireAPIKey(t.apiKey, mux),
 	}
 
 	errCh := make(chan error, 1)

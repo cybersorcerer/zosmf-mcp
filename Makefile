@@ -6,7 +6,14 @@ COMMIT    ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS   := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 GOFLAGS   := -trimpath
 
-.PHONY: all build build-all build-local clean test vet fmt lint run install
+# Remote deployment target (macOS Apple Silicon); REMOTE_HOST/REMOTE_USER come from .env
+-include .env
+REMOTE_HOST ?=
+REMOTE_USER ?=
+REMOTE_DIR  ?= ~/.local/bin
+REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
+
+.PHONY: all build build-all build-local clean test vet fmt lint run install deploy
 
 all: fmt vet test build-local
 
@@ -48,6 +55,16 @@ install: build
 	install -d $(HOME)/.local/bin
 	install -m 755 $(BINARY_DIR)/$(BINARY) $(HOME)/.local/bin/$(BINARY)
 
+deploy:
+	@test -n "$(REMOTE_HOST)" -a -n "$(REMOTE_USER)" || { echo "REMOTE_HOST/REMOTE_USER not set — put them in .env or pass on the command line"; exit 1; }
+	@mkdir -p $(BINARY_DIR)
+	GOARCH=arm64 GOOS=darwin go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-darwin-arm64 ./cmd/zosmf-mcp
+	ssh $(REMOTE) 'mkdir -p $(REMOTE_DIR)'
+	scp $(BINARY_DIR)/$(BINARY)-darwin-arm64 $(REMOTE):$(REMOTE_DIR)/$(BINARY)
+	# macOS rejects the linker-signed ad-hoc signature after transfer — re-sign on the target
+	ssh $(REMOTE) 'chmod 755 $(REMOTE_DIR)/$(BINARY) && xattr -c $(REMOTE_DIR)/$(BINARY) && codesign -f -s - $(REMOTE_DIR)/$(BINARY) && $(REMOTE_DIR)/$(BINARY) --version'
+	@echo "deployed to $(REMOTE):$(REMOTE_DIR)/$(BINARY) — restart the server there manually"
+
 tidy:
 	go mod tidy
 
@@ -62,4 +79,6 @@ help:
 	@echo "  lint      - Run golangci-lint"
 	@echo "  run       - Build and run with default config"
 	@echo "  install   - Install binary to ~/.local/bin"
+	@echo "  deploy    - Cross-compile for macOS arm64 and copy to REMOTE_USER@REMOTE_HOST:~/.local/bin"
+	@echo "              REMOTE_HOST/REMOTE_USER are read from .env; override on the command line if needed"
 	@echo "  tidy      - Run go mod tidy"

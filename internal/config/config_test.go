@@ -330,3 +330,53 @@ ssh_systems:
 		t.Errorf("Host = %q, want jump@jumphost.example.com", got)
 	}
 }
+
+func TestHTTPTransportRequiresAPIKey(t *testing.T) {
+	_, err := loadTestConfigErr(t, `
+transport:
+  streamable_http:
+    enabled: true
+    listen: "0.0.0.0:8081"
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if err == nil {
+		t.Fatal("expected error: HTTP transport enabled without api_key")
+	}
+	if !strings.Contains(err.Error(), "api_key") {
+		t.Errorf("error should mention api_key, got: %v", err)
+	}
+}
+
+func TestHTTPTransportAllowInsecureSkipsCheck(t *testing.T) {
+	cfg := loadTestConfig(t, `
+transport:
+  streamable_http:
+    enabled: true
+    listen: "0.0.0.0:8081"
+    allow_insecure: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if cfg.Transport.StreamableHTTP.APIKey != "" {
+		t.Error("expected empty api_key")
+	}
+}
+
+func TestStdioOnlyNeedsNoAPIKey(t *testing.T) {
+	cfg := loadTestConfig(t, `
+transport:
+  stdio: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if !cfg.Transport.Stdio {
+		t.Error("expected stdio enabled")
+	}
+}

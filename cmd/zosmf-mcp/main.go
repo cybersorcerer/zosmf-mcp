@@ -136,6 +136,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if useHTTP && cfg.Transport.HTTP.APIKey == "" && !cfg.Transport.HTTP.AllowInsecure {
+		fmt.Fprintf(os.Stderr, "http transport needs transport.http.api_key (or allow_insecure: true)\n")
+		os.Exit(1)
+	}
+	if useStreamableHTTP && cfg.Transport.StreamableHTTP.APIKey == "" && !cfg.Transport.StreamableHTTP.AllowInsecure {
+		fmt.Fprintf(os.Stderr, "streamable-http transport needs transport.streamable_http.api_key (or allow_insecure: true)\n")
+		os.Exit(1)
+	}
+
 	errCh := make(chan error, 3)
 
 	if useStdio {
@@ -160,8 +169,11 @@ func main() {
 		if addr == "" {
 			addr = ":8080"
 		}
-		t := mcp.NewHTTPTransport(addr, logger)
+		t := mcp.NewHTTPTransport(addr, logger, cfg.Transport.HTTP.APIKey)
 		logger.Printf("starting HTTP transport on %s", addr)
+		if cfg.Transport.HTTP.APIKey == "" {
+			logger.Println("WARNING: HTTP transport running without authentication")
+		}
 		go func() {
 			if err := t.Run(ctx, server.HandleMessage); err != nil && ctx.Err() == nil {
 				errCh <- fmt.Errorf("http: %w", err)
@@ -180,8 +192,11 @@ func main() {
 		if addr == "" {
 			addr = ":8081"
 		}
-		t := mcp.NewHTTPTransport(addr, logger)
+		t := mcp.NewHTTPTransport(addr, logger, cfg.Transport.StreamableHTTP.APIKey)
 		logger.Printf("starting Streamable HTTP transport on %s", addr)
+		if cfg.Transport.StreamableHTTP.APIKey == "" {
+			logger.Println("WARNING: Streamable HTTP transport running without authentication")
+		}
 		go func() {
 			if err := t.Run(ctx, server.HandleMessage); err != nil && ctx.Err() == nil {
 				errCh <- fmt.Errorf("streamable-http: %w", err)

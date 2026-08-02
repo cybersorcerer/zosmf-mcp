@@ -79,8 +79,10 @@ type TransportConfig struct {
 }
 
 type HTTPConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Listen  string `yaml:"listen"`
+	Enabled       bool   `yaml:"enabled"`
+	Listen        string `yaml:"listen"`
+	APIKey        string `yaml:"api_key"`
+	AllowInsecure bool   `yaml:"allow_insecure"`
 }
 
 type SSHSystemConfig struct {
@@ -212,6 +214,13 @@ func (c *Config) validate() error {
 		return err
 	}
 
+	if err := validateHTTPAuth("http", c.Transport.HTTP); err != nil {
+		return err
+	}
+	if err := validateHTTPAuth("streamable_http", c.Transport.StreamableHTTP); err != nil {
+		return err
+	}
+
 	if len(c.Systems) == 0 {
 		return fmt.Errorf("at least one system must be configured")
 	}
@@ -338,6 +347,13 @@ func ResolveDefaultPath(cwd, home string) (path string, deprecated bool, err err
 		msg += fmt.Sprintf("; errors: %s", strings.Join(errStrs, "; "))
 	}
 	return "", false, fmt.Errorf("%s", msg)
+}
+
+func validateHTTPAuth(name string, h HTTPConfig) error {
+	if !h.Enabled || h.AllowInsecure || h.APIKey != "" {
+		return nil
+	}
+	return fmt.Errorf("transport %s: api_key is required — set it, or set allow_insecure: true to run without authentication", name)
 }
 
 func validateProxy(p ProxyConfig) error {

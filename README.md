@@ -222,6 +222,22 @@ The TLS connection to z/OSMF stays end-to-end: it terminates inside the zosmf-mc
 container, not on the jump host. The jump host only ever sees encrypted bytes, so there
 are no certificate changes to make and `skip_tls_verify` remains unnecessary.
 
+ZOAU tools do **not** use the SOCKS tunnel above — they open their own, independent
+outbound SSH connection straight to the target LPAR, using `ssh -J` (`ProxyJump`) to
+reach it via the jump host:
+
+```text
+MacBook (privat)          Homelab-Dockerhost           Maschine 2                z/OS
+──────────────────        ────────────────────         ──────────────            ──────
+Claude Code / Agent  ──▶  zosmf-mcp        ──────────▶ sshd (Jump)   ──▶  sshd (LPAR, ZOAU)
+                 (MCP über HTTP)    (SSH, -J via jump host)
+```
+
+Because the two paths are independent, the jump host has to be configured in two
+places: `JUMP_HOST` in `.env` for the tunnel sidecar (z/OSMF REST), and
+`ssh_proxy_jump.host` in the config file for ZOAU. They are typically the same host but
+nothing enforces that.
+
 ### Config schema
 
 Two independent, optional top-level blocks control forwarding. Neither block, or
@@ -257,9 +273,19 @@ Two independent, optional top-level blocks control forwarding. Neither block, or
 | `ssh_systems[].proxy_jump` | per SSH system   | Overrides the global `ssh_proxy_jump` block for one SSH system            |
 
 Precedence: a per-system (or per-SSH-system) `proxy` / `proxy_jump` block always wins
-over the global block, whether it turns forwarding on or off for that one entry. If
-`proxy.url` is empty, it is filled from the `ZOSMF_PROXY` environment variable. An
-invalid proxy URL scheme is rejected at config load time, not on the first tool call.
+over the global block, whether it turns forwarding on or off for that one entry. If a
+per-system block omits `url` (or a per-SSH-system block omits `host`), it inherits the
+value from the global block — so `proxy: {enabled: true}` on one system means "on for
+this system, using the global proxy URL." If `proxy.url` is empty at the global level,
+it is filled from the `ZOSMF_PROXY` environment variable. An invalid proxy URL scheme is
+rejected at config load time, not on the first tool call, and so is `enabled: true`
+without a `url` / `host`.
+
+> **Constraint:** `ssh -J` (ProxyJump) propagates the `-i` key given to the target
+> connection to the jump-host connection as well, so the jump host and the target z/OS
+> LPAR must accept the *same* private key. Inside the container there is no
+> `~/.ssh/config`, no agent, and `BatchMode=yes` is set, so there is no way to configure
+> a different key per hop — plan the jump host's `authorized_keys` accordingly.
 
 ### API-key authentication
 
@@ -304,15 +330,44 @@ Client-side, add the header to the MCP client configuration, e.g. `.mcp.json`:
 
 ### Docker operation
 
+The container does not ship a config file or SSH key — it mounts existing ones from the
+host. Point it at the production `.smpe-zosmf.yaml` and SSH key(s) you already have
+(anywhere `ResolveDefaultPath` would find them also works, e.g. in
+`~/.config/smpe_ls/`, but the mount paths below can point anywhere on the host):
+
 ```bash
-cp .env.example .env    # fill in JUMP_HOST, ZOSMF_PASSWORD, MCP_API_KEY
+cp .env.example .env
+# edit .env: JUMP_HOST, ZOSMF_PASSWORD, MCP_API_KEY, and the mount paths —
+# ZOSMF_CONFIG (path to your existing .smpe-zosmf.yaml)
+# SSH_KEY_DIR  (directory holding the SSH key(s) used inside the container)
+# JUMP_KEY     (the SSH private key for the tunnel sidecar)
 make docker-up           # builds the image and starts tunnel + zosmf-mcp
 make docker-logs         # follow both containers' logs
 ```
 
+`ZOSMF_CONFIG`, `SSH_KEY_DIR` and `JUMP_KEY` default to `./.smpe-zosmf.yaml`,
+`./secrets` and `./secrets/jump_key` — i.e. files inside the repo directory — if left
+unset, but any absolute or relative host path works.
+
 > **Warning:** `depends_on` in `docker-compose.yml` only waits for the `tunnel`
 > container to *start*, not for the SSH connection to actually come up. The first
 > requests after a restart can fail until the tunnel has finished connecting.
+
+> **Required setup step — key ownership:** the SSH private key(s) under `SSH_KEY_DIR`
+> and `JUMP_KEY` keep the host's file ownership when bind-mounted. `alpine/openssh` runs
+> as root, and OpenSSH refuses to use a key whose owning uid is neither `0` nor the
+> connecting user's uid — under `BatchMode=yes` (used here) that failure is silent and
+> the connection just hangs or is refused. Before starting the containers on a Linux
+> Docker host, make the key(s) root-owned and mode 600:
+>
+> ```bash
+> sudo chown 0:0 secrets/* && chmod 600 secrets/*
+> ```
+>
+> (adjust the path if `SSH_KEY_DIR` points elsewhere). Alternatively, set a matching
+> `user:` on the affected service in `docker-compose.yml`. This does not affect Docker
+> Desktop for macOS, which remaps ownership itself, but it does affect the Linux Docker
+> host that is the actual deployment target.
 
 ---
 

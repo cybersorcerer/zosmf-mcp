@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -89,11 +90,21 @@ func NewClient(sys config.SystemConfig) (*Client, error) {
 		return nil, fmt.Errorf("creating cookie jar: %w", err)
 	}
 
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	if sys.Proxy != nil && sys.Proxy.Active() {
+		proxyURL, err := url.Parse(sys.Proxy.URL)
+		if err != nil {
+			return nil, fmt.Errorf("parsing proxy URL for system %s: %w", sys.Name, err)
+		}
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+
 	httpClient := &http.Client{
-		Jar: jar,
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
+		Jar:       jar,
+		Transport: transport,
 	}
 
 	baseURL := strings.TrimRight(sys.Host, "/")

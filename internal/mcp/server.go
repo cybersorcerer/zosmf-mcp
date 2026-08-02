@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 )
 
 type serverState int
@@ -85,6 +86,8 @@ func (s *Server) HandleMessage(ctx context.Context, msg *JSONRPCMessage) *JSONRP
 }
 
 func (s *Server) handleRequest(ctx context.Context, msg *JSONRPCMessage) *JSONRPCMessage {
+	s.logger.Printf("--> request id=%s method=%s", msg.ID, msg.Method)
+
 	s.mu.RLock()
 	state := s.state
 	s.mu.RUnlock()
@@ -214,10 +217,24 @@ func (s *Server) handleToolsCall(ctx context.Context, msg *JSONRPCMessage) *JSON
 		return NewErrorResponse(msg.ID, ErrCodeInvalidParams, "missing params")
 	}
 
+	var p ToolCallParams
+	if err := json.Unmarshal(msg.Params, &p); err == nil {
+		s.logger.Printf("tool call: %s args=%s", p.Name, formatArgs(p.Arguments))
+	}
+
+	start := time.Now()
 	result, err := s.registry.HandleCall(ctx, msg.Params)
+	elapsed := time.Since(start).Round(time.Millisecond)
 	if err != nil {
+		s.logger.Printf("<-- tool %s failed in %s: %v", p.Name, elapsed, err)
 		return NewErrorResponse(msg.ID, ErrCodeInternal, err.Error())
 	}
+
+	status := "ok"
+	if result.IsError {
+		status = "error"
+	}
+	s.logger.Printf("<-- tool %s %s in %s (%d bytes)", p.Name, status, elapsed, resultSize(result))
 
 	resp, err := NewResponse(msg.ID, result)
 	if err != nil {

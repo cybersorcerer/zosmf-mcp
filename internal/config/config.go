@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,27 +11,50 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ProxyConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	URL     string `yaml:"url"`
+}
+
+// Active reports whether requests should be routed through the proxy.
+func (p ProxyConfig) Active() bool {
+	return p.Enabled && p.URL != ""
+}
+
+type SSHProxyJumpConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Host    string `yaml:"host"`
+}
+
+// Active reports whether SSH connections should be routed via a jump host.
+func (s SSHProxyJumpConfig) Active() bool {
+	return s.Enabled && s.Host != ""
+}
+
 type Config struct {
-	Systems    []SystemConfig    `yaml:"systems"`
-	Servers    []SystemConfig    `yaml:"servers"`
-	SSHSystems []SSHSystemConfig `yaml:"ssh_systems"`
-	Transport  TransportConfig   `yaml:"transport"`
+	Systems      []SystemConfig     `yaml:"systems"`
+	Servers      []SystemConfig     `yaml:"servers"`
+	SSHSystems   []SSHSystemConfig  `yaml:"ssh_systems"`
+	Transport    TransportConfig    `yaml:"transport"`
+	Proxy        ProxyConfig        `yaml:"proxy"`
+	SSHProxyJump SSHProxyJumpConfig `yaml:"ssh_proxy_jump"`
 }
 
 type SystemConfig struct {
-	Name          string     `yaml:"name"`
-	Host          string     `yaml:"host"`
-	Port          int        `yaml:"port"`
-	Auth          AuthConfig `yaml:"auth"`
-	CAFile        string     `yaml:"ca_file"`
-	SkipTLSVerify bool       `yaml:"skip_tls_verify"`
-	CSIDatasets   []string   `yaml:"csi_datasets"`
-	TargetZones   []string   `yaml:"target_zones"`
-	DlibZones     []string   `yaml:"dlib_zones"`
-	TSOAccount    string     `yaml:"tso_account"`
-	TSOProc       string     `yaml:"tso_proc"`
-	TSOCharset    string     `yaml:"tso_charset"`
-	TSOCodepage   string     `yaml:"tso_codepage"`
+	Name          string       `yaml:"name"`
+	Host          string       `yaml:"host"`
+	Port          int          `yaml:"port"`
+	Auth          AuthConfig   `yaml:"auth"`
+	CAFile        string       `yaml:"ca_file"`
+	SkipTLSVerify bool         `yaml:"skip_tls_verify"`
+	CSIDatasets   []string     `yaml:"csi_datasets"`
+	TargetZones   []string     `yaml:"target_zones"`
+	DlibZones     []string     `yaml:"dlib_zones"`
+	TSOAccount    string       `yaml:"tso_account"`
+	TSOProc       string       `yaml:"tso_proc"`
+	TSOCharset    string       `yaml:"tso_charset"`
+	TSOCodepage   string       `yaml:"tso_codepage"`
+	Proxy         *ProxyConfig `yaml:"proxy"`
 
 	// smpe_ls-compatible aliases
 	User               string   `yaml:"user"`
@@ -60,12 +84,13 @@ type HTTPConfig struct {
 }
 
 type SSHSystemConfig struct {
-	Name        string            `yaml:"name"`
-	Host        string            `yaml:"host"`
-	Port        int               `yaml:"port"`
-	Username    string            `yaml:"username"`
-	KeyFile     string            `yaml:"key_file"`
-	Environment map[string]string `yaml:"environment"`
+	Name        string              `yaml:"name"`
+	Host        string              `yaml:"host"`
+	Port        int                 `yaml:"port"`
+	Username    string              `yaml:"username"`
+	KeyFile     string              `yaml:"key_file"`
+	Environment map[string]string   `yaml:"environment"`
+	ProxyJump   *SSHProxyJumpConfig `yaml:"proxy_jump"`
 }
 
 var envVarPattern = regexp.MustCompile(`\$\{([^}]+)\}`)
@@ -107,6 +132,10 @@ func expandEnvVars(s string) string {
 }
 
 func (c *Config) normalize() {
+	if c.Proxy.URL == "" {
+		c.Proxy.URL = os.Getenv("ZOSMF_PROXY")
+	}
+
 	envPassword := os.Getenv("ZOSMF_PASSWORD")
 
 	for i := range c.Systems {
@@ -158,16 +187,31 @@ func (c *Config) normalize() {
 		if len(s.TargetZones) == 0 && len(s.Zones) > 0 {
 			s.TargetZones = s.Zones
 		}
+
+		// proxy: global default, per-system override wins
+		if s.Proxy == nil {
+			global := c.Proxy
+			s.Proxy = &global
+		}
 	}
 
 	for i := range c.SSHSystems {
 		if c.SSHSystems[i].Port == 0 {
 			c.SSHSystems[i].Port = 22
 		}
+
+		if c.SSHSystems[i].ProxyJump == nil {
+			global := c.SSHProxyJump
+			c.SSHSystems[i].ProxyJump = &global
+		}
 	}
 }
 
 func (c *Config) validate() error {
+	if err := validateProxy(c.Proxy); err != nil {
+		return err
+	}
+
 	if len(c.Systems) == 0 {
 		return fmt.Errorf("at least one system must be configured")
 	}
@@ -205,6 +249,12 @@ func (c *Config) validate() error {
 			// blocking server startup for all other systems.
 		default:
 			return fmt.Errorf("system %s: auth type must be 'basic' or 'certificate', got '%s'", sys.Name, sys.Auth.Type)
+		}
+
+		if sys.Proxy != nil {
+			if err := validateProxy(*sys.Proxy); err != nil {
+				return fmt.Errorf("system %s: %w", sys.Name, err)
+			}
 		}
 	}
 
@@ -288,4 +338,23 @@ func ResolveDefaultPath(cwd, home string) (path string, deprecated bool, err err
 		msg += fmt.Sprintf("; errors: %s", strings.Join(errStrs, "; "))
 	}
 	return "", false, fmt.Errorf("%s", msg)
+}
+
+func validateProxy(p ProxyConfig) error {
+	if p.URL == "" {
+		return nil
+	}
+	u, err := url.Parse(p.URL)
+	if err != nil {
+		return fmt.Errorf("parsing proxy URL: %w", err)
+	}
+	switch u.Scheme {
+	case "http", "https", "socks5":
+	default:
+		return fmt.Errorf("proxy URL scheme must be http, https or socks5, got '%s'", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("proxy URL is missing a host: %s", p.URL)
+	}
+	return nil
 }

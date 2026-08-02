@@ -7,3 +7,7 @@ docs/
 *.md
 .smpe-zosmf.yaml
 .zosmf-mcp-config.yaml
+*.pem
+*.key
+id_rsa*
+.superpowers/

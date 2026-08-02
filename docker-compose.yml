@@ -1,0 +1,31 @@
+services:
+  tunnel:
+    image: alpine/openssh
+    command: >
+      ssh -N -D 0.0.0.0:1080 -i /key
+      -o ExitOnForwardFailure=yes
+      -o ServerAliveInterval=30
+      -o ServerAliveCountMax=3
+      -o StrictHostKeyChecking=accept-new
+      ${JUMP_HOST}
+    volumes:
+      - ./secrets/jump_key:/key:ro
+    restart: unless-stopped
+
+  zosmf-mcp:
+    build:
+      context: .
+      args:
+        VERSION: docker
+    depends_on:
+      - tunnel
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./.smpe-zosmf.yaml:/config/.smpe-zosmf.yaml:ro
+      - ./secrets:/keys:ro
+    environment:
+      ZOSMF_PASSWORD: ${ZOSMF_PASSWORD}
+      ZOSMF_PROXY: socks5://tunnel:1080
+      MCP_API_KEY: ${MCP_API_KEY}
+    restart: unless-stopped

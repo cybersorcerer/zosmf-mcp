@@ -1,0 +1,9 @@
+bin/
+dist/
+.git/
+.env
+secrets/
+docs/
+*.md
+.smpe-zosmf.yaml
+.zosmf-mcp-config.yaml

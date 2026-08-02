@@ -332,7 +332,7 @@ ssh_systems:
 }
 
 func TestHTTPTransportRequiresAPIKey(t *testing.T) {
-	_, err := loadTestConfigErr(t, `
+	cfg := loadTestConfig(t, `
 transport:
   streamable_http:
     enabled: true
@@ -342,6 +342,7 @@ servers:
     host: https://zos1.example.com
     user: IBMUSER
 `)
+	err := cfg.ValidateHTTPAuth(false, true)
 	if err == nil {
 		t.Fatal("expected error: HTTP transport enabled without api_key")
 	}
@@ -365,6 +366,9 @@ servers:
 	if cfg.Transport.StreamableHTTP.APIKey != "" {
 		t.Error("expected empty api_key")
 	}
+	if err := cfg.ValidateHTTPAuth(false, true); err != nil {
+		t.Errorf("expected no error with allow_insecure, got: %v", err)
+	}
 }
 
 func TestStdioOnlyNeedsNoAPIKey(t *testing.T) {
@@ -378,5 +382,123 @@ servers:
 `)
 	if !cfg.Transport.Stdio {
 		t.Error("expected stdio enabled")
+	}
+	if err := cfg.ValidateHTTPAuth(false, false); err != nil {
+		t.Errorf("expected no error for stdio-only, got: %v", err)
+	}
+}
+
+func TestHTTPEnabledWithoutAPIKeyLoadsFineWhenOnlyStdioStarted(t *testing.T) {
+	cfg := loadTestConfig(t, `
+transport:
+  stdio: true
+  http:
+    enabled: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if err := cfg.ValidateHTTPAuth(false, false); err != nil {
+		t.Errorf("expected no error when http is enabled in config but only stdio is started, got: %v", err)
+	}
+}
+
+func TestProxyEnabledWithoutURLFails(t *testing.T) {
+	_, err := loadTestConfigErr(t, `
+proxy:
+  enabled: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if err == nil {
+		t.Fatal("expected error: proxy enabled without url")
+	}
+	if !strings.Contains(err.Error(), "url") {
+		t.Errorf("error should mention url, got: %v", err)
+	}
+}
+
+func TestSSHProxyJumpEnabledWithoutHostFails(t *testing.T) {
+	_, err := loadTestConfigErr(t, `
+ssh_proxy_jump:
+  enabled: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if err == nil {
+		t.Fatal("expected error: ssh_proxy_jump enabled without host")
+	}
+	if !strings.Contains(err.Error(), "host") {
+		t.Errorf("error should mention host, got: %v", err)
+	}
+}
+
+func TestSSHProxyJumpPerSystemEnabledWithoutHostFails(t *testing.T) {
+	_, err := loadTestConfigErr(t, `
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+ssh_systems:
+  - name: SYS1
+    host: zos1.example.com
+    username: ibmuser
+    proxy_jump:
+      enabled: true
+`)
+	if err == nil {
+		t.Fatal("expected error: per-system ssh proxy_jump enabled without host")
+	}
+	if !strings.Contains(err.Error(), "host") {
+		t.Errorf("error should mention host, got: %v", err)
+	}
+}
+
+func TestProxyPerSystemInheritsGlobalURL(t *testing.T) {
+	cfg := loadTestConfig(t, `
+proxy:
+  enabled: true
+  url: socks5://tunnel:1080
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+    proxy:
+      enabled: true
+`)
+	if !cfg.Systems[0].Proxy.Active() {
+		t.Fatal("expected proxy active on SYS1")
+	}
+	if got := cfg.Systems[0].Proxy.URL; got != "socks5://tunnel:1080" {
+		t.Errorf("URL = %q, want inherited socks5://tunnel:1080", got)
+	}
+}
+
+func TestSSHProxyJumpPerSystemInheritsGlobalHost(t *testing.T) {
+	cfg := loadTestConfig(t, `
+ssh_proxy_jump:
+  enabled: true
+  host: jump@jumphost.example.com
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+ssh_systems:
+  - name: SYS1
+    host: zos1.example.com
+    username: ibmuser
+    proxy_jump:
+      enabled: true
+`)
+	if !cfg.SSHSystems[0].ProxyJump.Active() {
+		t.Fatal("expected proxy jump active")
+	}
+	if got := cfg.SSHSystems[0].ProxyJump.Host; got != "jump@jumphost.example.com" {
+		t.Errorf("Host = %q, want inherited jump@jumphost.example.com", got)
 	}
 }

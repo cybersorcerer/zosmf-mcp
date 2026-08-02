@@ -194,6 +194,8 @@ func (c *Config) normalize() {
 		if s.Proxy == nil {
 			global := c.Proxy
 			s.Proxy = &global
+		} else if s.Proxy.URL == "" {
+			s.Proxy.URL = c.Proxy.URL
 		}
 	}
 
@@ -205,6 +207,8 @@ func (c *Config) normalize() {
 		if c.SSHSystems[i].ProxyJump == nil {
 			global := c.SSHProxyJump
 			c.SSHSystems[i].ProxyJump = &global
+		} else if c.SSHSystems[i].ProxyJump.Host == "" {
+			c.SSHSystems[i].ProxyJump.Host = c.SSHProxyJump.Host
 		}
 	}
 }
@@ -214,10 +218,7 @@ func (c *Config) validate() error {
 		return err
 	}
 
-	if err := validateHTTPAuth("http", c.Transport.HTTP); err != nil {
-		return err
-	}
-	if err := validateHTTPAuth("streamable_http", c.Transport.StreamableHTTP); err != nil {
+	if err := validateSSHProxyJump(c.SSHProxyJump); err != nil {
 		return err
 	}
 
@@ -282,6 +283,11 @@ func (c *Config) validate() error {
 		}
 		if ssh.Username == "" {
 			return fmt.Errorf("ssh_systems %s: username is required", ssh.Name)
+		}
+		if ssh.ProxyJump != nil {
+			if err := validateSSHProxyJump(*ssh.ProxyJump); err != nil {
+				return fmt.Errorf("ssh_systems %s: %w", ssh.Name, err)
+			}
 		}
 	}
 
@@ -349,6 +355,24 @@ func ResolveDefaultPath(cwd, home string) (path string, deprecated bool, err err
 	return "", false, fmt.Errorf("%s", msg)
 }
 
+// ValidateHTTPAuth checks the api_key requirement for the transports that
+// are actually being started. Call this after the --transport flag has been
+// resolved, not from Load(), so that a config with http.enabled: true but no
+// api_key still loads fine when the process is started with --transport stdio.
+func (c *Config) ValidateHTTPAuth(useHTTP, useStreamableHTTP bool) error {
+	if useHTTP {
+		if err := validateHTTPAuth("http", c.Transport.HTTP); err != nil {
+			return err
+		}
+	}
+	if useStreamableHTTP {
+		if err := validateHTTPAuth("streamable_http", c.Transport.StreamableHTTP); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func validateHTTPAuth(name string, h HTTPConfig) error {
 	if !h.Enabled || h.AllowInsecure || h.APIKey != "" {
 		return nil
@@ -357,12 +381,15 @@ func validateHTTPAuth(name string, h HTTPConfig) error {
 }
 
 func validateProxy(p ProxyConfig) error {
+	if p.Enabled && p.URL == "" {
+		return fmt.Errorf("proxy is enabled but url is not set")
+	}
 	if p.URL == "" {
 		return nil
 	}
 	u, err := url.Parse(p.URL)
 	if err != nil {
-		return fmt.Errorf("parsing proxy URL: %w", err)
+		return fmt.Errorf("parsing proxy URL: invalid URL")
 	}
 	switch u.Scheme {
 	case "http", "https", "socks5":
@@ -370,7 +397,14 @@ func validateProxy(p ProxyConfig) error {
 		return fmt.Errorf("proxy URL scheme must be http, https or socks5, got '%s'", u.Scheme)
 	}
 	if u.Host == "" {
-		return fmt.Errorf("proxy URL is missing a host: %s", p.URL)
+		return fmt.Errorf("proxy URL is missing a host: %s", u.Redacted())
+	}
+	return nil
+}
+
+func validateSSHProxyJump(s SSHProxyJumpConfig) error {
+	if s.Enabled && s.Host == "" {
+		return fmt.Errorf("ssh_proxy_jump is enabled but host is not set")
 	}
 	return nil
 }

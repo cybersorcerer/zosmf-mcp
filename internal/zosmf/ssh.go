@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,6 +29,16 @@ func (r *SSHClientRegistry) Get(name string) (config.SSHSystemConfig, error) {
 		return config.SSHSystemConfig{}, fmt.Errorf("SSH system not found: %s", name)
 	}
 	return cfg, nil
+}
+
+// SystemNames returns the configured SSH system names in sorted order.
+func (r *SSHClientRegistry) SystemNames() []string {
+	names := make([]string, 0, len(r.systems))
+	for name := range r.systems {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // sshBaseArgs builds the ssh options shared by RunSSH and RunSSHDetailed.

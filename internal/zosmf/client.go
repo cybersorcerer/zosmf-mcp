@@ -10,6 +10,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -50,11 +51,15 @@ func (r *ClientRegistry) Get(name string) (*Client, error) {
 	return c, nil
 }
 
+// SystemNames returns the registered system names in sorted order.
+// The order is stable so that schema enums built from it do not reshuffle
+// between tools/list calls.
 func (r *ClientRegistry) SystemNames() []string {
 	names := make([]string, 0, len(r.clients))
 	for name := range r.clients {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 

@@ -32,13 +32,11 @@ func (t *listDatasetsTool) Definition() mcp.Tool {
 		Description: "List z/OS datasets matching a pattern. Use standard z/OS dataset level patterns " +
 			"(e.g. 'SYS1.PARM*', 'USER.**.JCL'). Returns dataset attributes: DSORG, RECFM, LRECL, BLKSIZE, " +
 			"volume serial, creation/reference/expiry dates, used space, migration status, and dataset type (PDS, PDSE, etc.).",
+		Annotations: readOnlyTool("List Datasets"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"dslevel": map[string]any{
 					"type":        "string",
 					"description": "Dataset name pattern (e.g. 'SYS1.PARM*', 'USER.**'). Supports * and ** wildcards.",
@@ -98,13 +96,11 @@ func (t *listMembersTool) Definition() mcp.Tool {
 		Description: "List members of a PDS or PDSE dataset on z/OS. Returns member statistics: " +
 			"name, version, modification count, creation/modification date and time, " +
 			"current/initial/modified line counts, last modifying user, and SCLM indicator.",
+		Annotations: readOnlyTool("List PDS Members"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"dataset": map[string]any{
 					"type":        "string",
 					"description": "PDS/PDSE dataset name (e.g. 'SYS1.PARMLIB')",
@@ -161,13 +157,11 @@ func (t *readDatasetTool) Definition() mcp.Tool {
 			"For a PDS member, use the format 'DATASET.NAME(MEMBER)'. " +
 			"Optionally performs a server-side search via the z/OSMF search= query parameter; " +
 			"when 'search' is supplied the response is a JSON object {content, found, first_match, num_records}.",
+		Annotations: readOnlyTool("Read Dataset"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"dataset": map[string]any{
 					"type":        "string",
 					"description": "Dataset name, e.g. 'SYS1.PARMLIB(IEASYS00)' or 'USER.DATA.SEQ'",
@@ -251,13 +245,11 @@ func (t *writeDatasetTool) Definition() mcp.Tool {
 		Description: "Write content to a z/OS sequential dataset or PDS/PDSE member. " +
 			"WARNING: This overwrites the existing content. " +
 			"For a PDS member, use the format 'DATASET.NAME(MEMBER)'.",
+		Annotations: writeTool("Write Dataset", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"dataset": map[string]any{
 					"type":        "string",
 					"description": "Dataset name, e.g. 'USER.JCL(MYJOB)' or 'USER.DATA.SEQ'",
@@ -333,12 +325,15 @@ func NewCreateDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *createDatasetTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_create_dataset",
-		Description: "Allocate a new z/OS dataset (sequential PS or partitioned PDS/PDSE).",
+		Name: "zosmf_create_dataset",
+		Description: "Allocate a new z/OS dataset (sequential PS or partitioned PDS/PDSE). " +
+			"Fails if the dataset already exists — this is not an overwrite. " +
+			"Space is given in the unit selected by alcunit ('TRK' or 'CYL'); for a PDS/PDSE set dsorg to 'PO'.",
+		Annotations: writeTool("Allocate Dataset", false, false, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":    map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":    systemProperty(t.clients.SystemNames()),
 				"dataset":   map[string]any{"type": "string", "description": "Dataset name to create (e.g. 'USER.NEW.DATA')"},
 				"dsorg":     map[string]any{"type": "string", "description": "Dataset organization: 'PS' (sequential) or 'PO' (partitioned)", "enum": []string{"PS", "PO"}},
 				"alcunit":   map[string]any{"type": "string", "description": "Allocation unit: 'TRK' or 'CYL'", "enum": []string{"TRK", "CYL"}},
@@ -414,10 +409,11 @@ func (t *deleteDatasetTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_delete_dataset",
 		Description: "Delete a z/OS dataset or PDS member. WARNING: Permanent deletion. For a PDS member use 'DATASET.NAME(MEMBER)' format.",
+		Annotations: writeTool("Delete Dataset", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":  map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":  systemProperty(t.clients.SystemNames()),
 				"dataset": map[string]any{"type": "string", "description": "Dataset name or PDS member (e.g. 'USER.DATA' or 'USER.PDS(MEMBER)')"},
 			},
 			"required": []string{"system", "dataset"},
@@ -468,10 +464,11 @@ func (t *acquireDatasetEnqTool) Definition() mcp.Tool {
 			"Returns a session_ref that must be passed to zosmf_release_dataset_enq when done, " +
 			"and to zosmf_read_dataset / zosmf_write_dataset to associate operations with this ENQ session. " +
 			"Returns an ENQ_NOT_AVAILABLE error if the dataset is already locked.",
+		Annotations: writeTool("Acquire Dataset ENQ", false, false, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":  map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":  systemProperty(t.clients.SystemNames()),
 				"dataset": map[string]any{"type": "string", "description": "Dataset name, e.g. 'HLQ.PDS(MEMBER)' or 'HLQ.SEQ'"},
 				"enq_type": map[string]any{
 					"type":        "string",
@@ -528,10 +525,11 @@ func (t *releaseDatasetEnqTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_release_dataset_enq",
 		Description: "Release a previously acquired ENQ lock on a z/OS dataset. Pass the session_ref returned by zosmf_acquire_dataset_enq.",
+		Annotations: writeTool("Release Dataset ENQ", false, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":      map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":      systemProperty(t.clients.SystemNames()),
 				"dataset":     map[string]any{"type": "string", "description": "Same dataset name used when acquiring the ENQ"},
 				"session_ref": map[string]any{"type": "string", "description": "Session reference returned by zosmf_acquire_dataset_enq"},
 			},

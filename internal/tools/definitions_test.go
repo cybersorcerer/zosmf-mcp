@@ -144,3 +144,39 @@ func TestDestructiveJobTools_WarnInProse(t *testing.T) {
 		}
 	}
 }
+
+func TestDatasetTools_Annotations(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	cases := []struct {
+		name                                         string
+		title                                        string
+		readOnly, destructive, idempotent, openWorld bool
+	}{
+		{"zosmf_list_datasets", "List Datasets", true, false, true, false},
+		{"zosmf_list_members", "List PDS Members", true, false, true, false},
+		{"zosmf_read_dataset", "Read Dataset", true, false, true, false},
+		{"zosmf_write_dataset", "Write Dataset", false, true, true, false},
+		{"zosmf_create_dataset", "Allocate Dataset", false, false, false, false},
+		{"zosmf_delete_dataset", "Delete Dataset", false, true, true, false},
+		{"zosmf_acquire_dataset_enq", "Acquire Dataset ENQ", false, false, false, false},
+		{"zosmf_release_dataset_enq", "Release Dataset ENQ", false, false, true, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tool := findTool(t, reg, tc.name)
+			assertAnnotations(t, tool, tc.title, tc.readOnly, tc.destructive, tc.idempotent, tc.openWorld)
+			if enum := systemEnum(t, tool, "system"); len(enum) != 2 {
+				t.Errorf("system enum = %v, want 2 entries", enum)
+			}
+		})
+	}
+}
+
+func TestCreateDataset_SaysItFailsOnExisting(t *testing.T) {
+	tool := findTool(t, newTestRegistry(t), "zosmf_create_dataset")
+	if !strings.Contains(tool.Description, "already exists") {
+		t.Errorf("create_dataset must state that it fails on an existing dataset, got: %q", tool.Description)
+	}
+}

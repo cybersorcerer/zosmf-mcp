@@ -152,10 +152,23 @@ type Implementation struct {
 
 // MCP Tool types
 
+// ToolAnnotations carries the MCP behaviour hints a client uses to decide
+// whether a tool may run unattended. The hint fields are serialised even
+// when false: the MCP spec defaults destructiveHint to true, so an omitted
+// false would be read as "destructive".
+type ToolAnnotations struct {
+	Title           string `json:"title"`
+	ReadOnlyHint    bool   `json:"readOnlyHint"`
+	DestructiveHint bool   `json:"destructiveHint"`
+	IdempotentHint  bool   `json:"idempotentHint"`
+	OpenWorldHint   bool   `json:"openWorldHint"`
+}
+
 type Tool struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"inputSchema"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	InputSchema json.RawMessage  `json:"inputSchema"`
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
 }
 
 type ToolsListResult struct {

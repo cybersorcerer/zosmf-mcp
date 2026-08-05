@@ -301,3 +301,107 @@ func TestArbitraryCommandTools_AreOpenWorld(t *testing.T) {
 		}
 	}
 }
+
+func TestZOAUTools_UseTheirOwnNamespace(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	names := make(map[string]bool)
+	for _, tool := range reg.List() {
+		names[tool.Name] = true
+	}
+
+	for _, old := range []string{
+		"zosmf_zoau_pll", "zosmf_zoau_zinfo", "zosmf_zoau_llwhence", "zosmf_zoau_parmgrep",
+		"zosmf_zoau_parmwhence", "zosmf_zoau_pproc", "zosmf_zoau_procgrep", "zosmf_zoau_procwhence",
+		"zosmf_zoau_vtocls", "zosmf_zoau_version", "zosmf_zoau_exec",
+	} {
+		if names[old] {
+			t.Errorf("legacy tool name %q is still registered — the rename is deliberate and has no alias", old)
+		}
+	}
+
+	for _, want := range []string{
+		"zoau_pll", "zoau_zinfo", "zoau_llwhence", "zoau_parmgrep", "zoau_parmwhence",
+		"zoau_pproc", "zoau_procgrep", "zoau_procwhence", "zoau_vtocls", "zoau_version", "zoau_exec",
+	} {
+		if !names[want] {
+			t.Errorf("tool %q is not registered", want)
+		}
+	}
+}
+
+func TestZOAUTools_AnnotationsAndSSHSystemEnum(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	readOnly := []struct{ name, title string }{
+		{"zoau_pll", "Show Linklist"},
+		{"zoau_zinfo", "Show System Information"},
+		{"zoau_llwhence", "Locate Linklist Member"},
+		{"zoau_parmgrep", "Search Parmlib"},
+		{"zoau_parmwhence", "Locate Parmlib Member"},
+		{"zoau_pproc", "Show Proclib"},
+		{"zoau_procgrep", "Search Proclib"},
+		{"zoau_procwhence", "Locate Proclib Member"},
+		{"zoau_vtocls", "List Volume VTOC"},
+		{"zoau_version", "Show ZOAU Version"},
+	}
+
+	for _, tc := range readOnly {
+		t.Run(tc.name, func(t *testing.T) {
+			tool := findTool(t, reg, tc.name)
+			assertAnnotations(t, tool, tc.title, true, false, true, false)
+
+			enum := systemEnum(t, tool, "ssh_system")
+			if len(enum) != 1 || enum[0] != "LPAR1" {
+				t.Errorf("ssh_system enum = %v, want [LPAR1]", enum)
+			}
+		})
+	}
+
+	exec := findTool(t, reg, "zoau_exec")
+	assertAnnotations(t, exec, "Execute USS Command", false, true, false, true)
+	if enum := systemEnum(t, exec, "ssh_system"); len(enum) != 1 {
+		t.Errorf("zoau_exec ssh_system enum = %v, want 1 entry", enum)
+	}
+	if !strings.Contains(exec.Description, "WARNING") {
+		t.Errorf("zoau_exec must carry a WARNING, got: %q", exec.Description)
+	}
+	if !strings.Contains(exec.Description, "unrestricted") {
+		t.Errorf("zoau_exec must say the access is unrestricted, got: %q", exec.Description)
+	}
+}
+
+// No ZOAU tool may keep a 'system' parameter — that name belongs to the
+// z/OSMF namespace and having both is what confused callers.
+func TestZOAUTools_HaveNoSystemParameter(t *testing.T) {
+	for _, tool := range newTestRegistry(t).List() {
+		if !strings.HasPrefix(tool.Name, "zoau_") {
+			continue
+		}
+		var schema struct {
+			Properties map[string]any `json:"properties"`
+			Required   []string       `json:"required"`
+		}
+		if err := json.Unmarshal(tool.InputSchema, &schema); err != nil {
+			t.Fatalf("%s: %v", tool.Name, err)
+		}
+		if _, ok := schema.Properties["system"]; ok {
+			t.Errorf("%s: still has a 'system' property, want 'ssh_system'", tool.Name)
+		}
+		if _, ok := schema.Properties["ssh_system"]; !ok {
+			t.Errorf("%s: missing 'ssh_system' property", tool.Name)
+		}
+		found := false
+		for _, r := range schema.Required {
+			if r == "ssh_system" {
+				found = true
+			}
+			if r == "system" {
+				t.Errorf("%s: 'system' is still listed as required", tool.Name)
+			}
+		}
+		if !found {
+			t.Errorf("%s: 'ssh_system' must be required", tool.Name)
+		}
+	}
+}

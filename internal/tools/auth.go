@@ -29,14 +29,14 @@ func (t *setPasswordTool) Definition() mcp.Tool {
 		Description: "Set the z/OSMF password for a configured system at runtime. " +
 			"The password is kept in memory only and is used for all subsequent " +
 			"requests to that system. Use this when a tool call failed with a " +
-			"NO_CREDENTIALS or AUTH_FAILED error.",
+			"NO_CREDENTIALS or AUTH_FAILED error. " +
+			"The password is held in memory for this server process only and is not written to the " +
+			"configuration file — it is lost on restart.",
+		Annotations: writeTool("Set System Password", false, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"password": map[string]any{
 					"type":        "string",
 					"description": "Password for the system's configured username",

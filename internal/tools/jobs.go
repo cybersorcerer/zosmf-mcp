@@ -35,13 +35,11 @@ func (t *listJobsTool) Definition() mcp.Tool {
 		Description: "List z/OS jobs on a system. Filter by owner, job name prefix, job ID, and/or status (ACTIVE, OUTPUT, INPUT). " +
 			"To list ALL jobs (not just your own), set owner and prefix to '*'. " +
 			"Set exec_data=true to include execution timestamps (exec-started, exec-ended, exec-submitted, exec-system, exec-member).",
+		Annotations: readOnlyTool("List Jobs"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system to query (as configured)",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"owner": map[string]any{
 					"type":        "string",
 					"description": "Job owner (TSO user ID). Use '*' for all owners. Supports wildcards (e.g. 'SYS*'). Defaults to the authenticated user if omitted.",
@@ -115,10 +113,11 @@ func (t *getJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_job",
 		Description: "Get details of a specific z/OS job including status, return code, execution data (exec-system, exec-member, exec-submitted, exec-started, exec-ended) and step data (step name, number, completion code) for all completed steps.",
+		Annotations: readOnlyTool("Get Job Details"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name (e.g. MYJOB1)"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID (e.g. JOB12345)"},
 			},
@@ -161,10 +160,11 @@ func (t *getJobOutputTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_job_output",
 		Description: "List spool files (DD names) of a z/OS job. Use zosmf_get_spool_content to read individual spool file contents.",
+		Annotations: readOnlyTool("List Job Spool Files"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 			},
@@ -214,10 +214,11 @@ func (t *getSpoolContentTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_spool_content",
 		Description: "Read the content of a specific spool file (DD) from a z/OS job. Use zosmf_get_job_output first to get available file IDs.",
+		Annotations: readOnlyTool("Read Spool File"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 				"file_id":  map[string]any{"type": "string", "description": "Spool file ID (from zosmf_get_job_output)"},
@@ -267,10 +268,11 @@ func (t *getAllSpoolsTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_all_spools",
 		Description: "Read all spool file contents of a z/OS job in a single call. Returns all DD names and their content concatenated.",
+		Annotations: readOnlyTool("Read All Spool Files"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 			},
@@ -326,12 +328,16 @@ func NewSubmitJobTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *submitJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_submit_job",
-		Description: "Submit a z/OS job. Provide either inline JCL or a dataset name containing the JCL.",
+		Name: "zosmf_submit_job",
+		Description: "Submit a z/OS job. Provide either inline JCL or a dataset name containing the JCL. " +
+			"Returns the job name and job ID immediately — the job is not finished at that point. " +
+			"Poll zosmf_get_job with the returned job_name and job_id until status is OUTPUT, " +
+			"then read the result with zosmf_get_all_spools.",
+		Annotations: writeTool("Submit Job", false, false, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":  map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":  systemProperty(t.clients.SystemNames()),
 				"jcl":     map[string]any{"type": "string", "description": "Inline JCL to submit"},
 				"dataset": map[string]any{"type": "string", "description": "Dataset name containing JCL (e.g. USER.JCL(MYJOB))"},
 			},
@@ -384,12 +390,15 @@ func NewCancelJobTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *cancelJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_cancel_job",
-		Description: "Cancel a running z/OS job.",
+		Name: "zosmf_cancel_job",
+		Description: "Cancel a running z/OS job. WARNING: This interrupts work in progress — the job stops at " +
+			"an arbitrary point and may leave partial output or held resources behind. " +
+			"The job stays on the spool; use zosmf_purge_job to remove it.",
+		Annotations: writeTool("Cancel Job", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 			},
@@ -428,12 +437,14 @@ func NewPurgeJobTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *purgeJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_purge_job",
-		Description: "Purge (delete) a z/OS job's output from the spool.",
+		Name: "zosmf_purge_job",
+		Description: "Purge (delete) a z/OS job's output from the spool. WARNING: Permanent — the job's spool " +
+			"files cannot be read afterwards. Read anything you need with zosmf_get_all_spools first.",
+		Annotations: writeTool("Purge Job", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 			},
@@ -472,12 +483,14 @@ func NewHoldJobTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *holdJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_hold_job",
-		Description: "Place a z/OS job on hold.",
+		Name: "zosmf_hold_job",
+		Description: "Place a z/OS job on hold. A held job stays in the queue and does not run until it is " +
+			"released with zosmf_release_job.",
+		Annotations: writeTool("Hold Job", false, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 			},
@@ -516,12 +529,14 @@ func NewReleaseJobTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *releaseJobTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_release_job",
-		Description: "Release a held z/OS job.",
+		Name: "zosmf_release_job",
+		Description: "Release a held z/OS job so it becomes eligible to run again. " +
+			"Use this to undo a zosmf_hold_job, or to release a job submitted with TYPRUN=HOLD.",
+		Annotations: writeTool("Release Job", false, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system":   map[string]any{"type": "string", "description": "Name of the z/OS system"},
+				"system":   systemProperty(t.clients.SystemNames()),
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 			},

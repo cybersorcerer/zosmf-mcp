@@ -29,14 +29,15 @@ func (t *tsoCommandTool) Definition() mcp.Tool {
 		Name: "zosmf_tso_command",
 		Description: "Execute a TSO/E command on a z/OS system and return the output. " +
 			"A TSO session is started automatically, the command is executed, and the session is stopped. " +
-			"Examples: 'LISTDS USER.JCL', 'LISTCAT LVL(USER)', 'TRANSMIT USER.JCL(MYJOB)'.",
+			"Examples: 'LISTDS USER.JCL', 'LISTCAT LVL(USER)', 'TRANSMIT USER.JCL(MYJOB)'. " +
+			"Requires tso_account and tso_proc to be set for this system in the server configuration; " +
+			"without them the call fails before the command runs. " +
+			"WARNING: TSO commands are unrestricted — 'DELETE' and 'ALTER' reach real data.",
+		Annotations: writeTool("Execute TSO Command", true, false, true),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"command": map[string]any{
 					"type":        "string",
 					"description": "TSO/E command to execute (e.g. 'LISTDS USER.JCL', 'LISTCAT LVL(USER)')",

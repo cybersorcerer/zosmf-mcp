@@ -911,6 +911,20 @@ The MCP Client Node automatically handles session initialization, tool discovery
 
 The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
 
+### Tool annotations
+
+Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`,
+`idempotentHint`, `openWorldHint`). Clients use them to decide what may run
+unattended. Read-only tools such as `zosmf_list_datasets` are safe to
+auto-approve; tools marked destructive — `zosmf_delete_dataset`,
+`zosmf_write_dataset`, `zosmf_purge_job`, `zosmf_cancel_job`,
+`zosmf_unmount_filesystem`, `zosmf_delete_zfs`, `zosmf_delete_uss_file`,
+`zosmf_write_uss_file`, `zosmf_issue_command`, `zosmf_tso_command` and
+`zoau_exec` — change or destroy state and should stay behind a confirmation.
+
+The `system` parameter of each tool is enumerated from your configuration, so
+a client sees the systems you actually have instead of guessing a name.
+
 ### Jobs (10 tools)
 | Tool                      | Description                                  |
 |---------------------------|----------------------------------------------|
@@ -986,19 +1000,28 @@ The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools wh
 
 ### ZOAU (11 tools) — requires `ssh_systems` configuration
 
+> **Breaking change:** As of this version the ZOAU tools are named `zoau_*`
+> (previously `zosmf_zoau_*`) and take an `ssh_system` parameter (previously
+> `system`). The old names are no longer registered — update any n8n workflow,
+> agent prompt or saved client configuration that calls them.
+>
+> `ssh_system` resolves against the `ssh_systems:` config block; the `system`
+> parameter of the `zosmf_*` tools resolves against `systems:`. They are
+> separate namespaces.
+
 | Tool                      | Description                                          |
 |---------------------------|------------------------------------------------------|
-| `zosmf_zoau_pll`          | Display the z/OS linklist (LLA) concatenation        |
-| `zosmf_zoau_zinfo`        | Display z/OS system information                      |
-| `zosmf_zoau_llwhence`     | Locate which linklist dataset a member comes from    |
-| `zosmf_zoau_parmgrep`     | Search parmlib members for a pattern                 |
-| `zosmf_zoau_parmwhence`   | Locate which parmlib dataset a member comes from     |
-| `zosmf_zoau_pproc`        | Display the z/OS proclib concatenation               |
-| `zosmf_zoau_procgrep`     | Search proclib members for a pattern                 |
-| `zosmf_zoau_procwhence`   | Locate which proclib dataset a member comes from     |
-| `zosmf_zoau_version`      | Display the installed ZOAU version                   |
-| `zosmf_zoau_vtocls`       | List the VTOC contents of a z/OS volume              |
-| `zosmf_zoau_exec`         | Execute a USS command or script via SSH; returns stdout, stderr and exit code as JSON         |
+| `zoau_pll`          | Display the z/OS linklist (LLA) concatenation        |
+| `zoau_zinfo`        | Display z/OS system information                      |
+| `zoau_llwhence`     | Locate which linklist dataset a member comes from    |
+| `zoau_parmgrep`     | Search parmlib members for a pattern                 |
+| `zoau_parmwhence`   | Locate which parmlib dataset a member comes from     |
+| `zoau_pproc`        | Display the z/OS proclib concatenation               |
+| `zoau_procgrep`     | Search proclib members for a pattern                 |
+| `zoau_procwhence`   | Locate which proclib dataset a member comes from     |
+| `zoau_version`      | Display the installed ZOAU version                   |
+| `zoau_vtocls`       | List the VTOC contents of a z/OS volume              |
+| `zoau_exec`         | Execute a USS command or script via SSH; returns stdout, stderr and exit code as JSON         |
 
 ---
 

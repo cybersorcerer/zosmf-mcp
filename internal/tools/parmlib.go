@@ -46,14 +46,13 @@ func (t *parmlibValidateTool) Definition() mcp.Tool {
 			"Supported types: ALLOC, AUTOR, AXR, BPXPRM, CEAPRM, CEEPARM, CLOCK, COMMND, " +
 			"CONSOL, COUPLE, CUNUNI, DEVSUP, DIAG, EXIT, FXEPRM, GRSCNF, GRSRNL, IEAFIX, " +
 			"IEALPA, IEAPAK, IEASVC, IEASYM, IEASYS, IEFOPZ, IEFSSN, IFAPRD, IGDSMS, IGGCAT, " +
-			"IKJTSO, IQPPRM, IRRPRM, IXGCNF, IZUPRM, LOAD, LPALST, PROG, SCHED, VATLST.",
+			"IKJTSO, IQPPRM, IRRPRM, IXGCNF, IZUPRM, LOAD, LPALST, PROG, SCHED, VATLST. " +
+			"This checks syntax only — nothing is activated or changed on the system.",
+		Annotations: readOnlyTool("Validate Parmlib Member"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system (e.g. 'MAINT')",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"member_type": map[string]any{
 					"type":        "string",
 					"description": "Parmlib member type without xx suffix (e.g. 'BPXPRM', 'IEASYS', 'LOAD')",

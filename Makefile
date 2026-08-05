@@ -13,7 +13,7 @@ REMOTE_USER ?=
 REMOTE_DIR  ?= ~/.local/bin
 REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
 
-.PHONY: all build build-all build-local clean test vet fmt lint run install deploy
+.PHONY: all build build-all build-local clean test vet fmt lint run install deploy apikey docker-build docker-up docker-down docker-logs
 
 all: fmt vet test build-local
 
@@ -67,6 +67,21 @@ deploy:
 
 tidy:
 	go mod tidy
+
+apikey:
+	@openssl rand -base64 32
+
+docker-build:
+	docker compose build
+
+docker-up: docker-build
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
 
 help:
 	@echo "Targets:"

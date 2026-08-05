@@ -45,6 +45,25 @@ systems:
   #     cert_file: "/path/to/client.pem"
   #     key_file:  "/path/to/client.key"
   #   ca_file: "/path/to/ca.pem"
+  #   # Per-system override of the global proxy block below — if url is
+  #   # omitted, it inherits the global proxy.url.
+  #   proxy:
+  #     enabled: false
+
+# ---------------------------------------------------------------------------
+# Request forwarding (optional)
+# Route all z/OSMF REST calls through a proxy (e.g. a SOCKS5 tunnel to a jump
+# host), and/or route ZOAU SSH connections through a jump host (ssh -J).
+# Neither block, or enabled: false, means requests go out directly — the
+# default, unchanged behavior.
+# ---------------------------------------------------------------------------
+# proxy:
+#   enabled: true
+#   url: ${ZOSMF_PROXY}            # e.g. socks5://tunnel:1080; scheme must be http, https or socks5
+#
+# ssh_proxy_jump:
+#   enabled: true
+#   host: jump@jumphost.example.com       # passed to ssh -J
 
 # ---------------------------------------------------------------------------
 # SSH Systems (optional — required for ZOAU tools)
@@ -69,12 +88,20 @@ systems:
 # http.enabled:           used by n8n (HTTP Request nodes), curl, and custom HTTP clients.
 # streamable_http.enabled: used by n8n MCP Client Tool Node (v1.88+), supports SSE and Streamable HTTP.
 # All transports can run simultaneously.
+#
+# api_key:        required for a started HTTP/Streamable HTTP transport unless
+#                  allow_insecure is set; clients send it as "Authorization: Bearer <key>".
+# allow_insecure: opt into starting that transport without an api_key.
 # ---------------------------------------------------------------------------
 transport:
   stdio: true
   http:
     enabled: false
     listen: ":8080"
+    # api_key: ${MCP_API_KEY}
+    # allow_insecure: false
   streamable_http:
     enabled: false
     listen: ":8081"
+    # api_key: ${MCP_API_KEY}
+    # allow_insecure: false

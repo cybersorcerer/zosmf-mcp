@@ -405,3 +405,90 @@ func TestZOAUTools_HaveNoSystemParameter(t *testing.T) {
 		}
 	}
 }
+
+// Every registered tool must be fully described. This is the gate that
+// catches a new tool added without annotations or without a system enum.
+func TestAllTools_AreFullyDescribed(t *testing.T) {
+	reg := newTestRegistry(t)
+	tools := reg.List()
+
+	if len(tools) != 45 {
+		t.Errorf("registered %d tools, expected 45 — update this count deliberately when adding one", len(tools))
+	}
+
+	for _, tool := range tools {
+		t.Run(tool.Name, func(t *testing.T) {
+			if tool.Annotations == nil {
+				t.Fatal("Annotations is nil")
+			}
+			if tool.Annotations.Title == "" {
+				t.Error("Annotations.Title is empty")
+			}
+			if tool.Annotations.ReadOnlyHint && tool.Annotations.DestructiveHint {
+				t.Error("a read-only tool cannot be destructive")
+			}
+
+			if len(tool.Description) < 60 {
+				t.Errorf("description is too thin (%d chars): %q", len(tool.Description), tool.Description)
+			}
+
+			var schema struct {
+				Properties map[string]struct {
+					Type        string   `json:"type"`
+					Description string   `json:"description"`
+					Enum        []string `json:"enum"`
+				} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.InputSchema, &schema); err != nil {
+				t.Fatalf("input schema is not valid JSON: %v", err)
+			}
+
+			for name, prop := range schema.Properties {
+				if prop.Description == "" {
+					t.Errorf("property %q has no description", name)
+				}
+			}
+
+			// Exactly one of the two system parameters, and it must be enumerated.
+			_, hasSystem := schema.Properties["system"]
+			_, hasSSHSystem := schema.Properties["ssh_system"]
+			switch {
+			case hasSystem && hasSSHSystem:
+				t.Error("has both 'system' and 'ssh_system'")
+			case hasSystem:
+				if len(schema.Properties["system"].Enum) == 0 {
+					t.Error("'system' has no enum")
+				}
+			case hasSSHSystem:
+				if len(schema.Properties["ssh_system"].Enum) == 0 {
+					t.Error("'ssh_system' has no enum")
+				}
+			default:
+				t.Error("has neither 'system' nor 'ssh_system'")
+			}
+		})
+	}
+}
+
+// A server with no systems configured must still produce a valid schema —
+// an empty enum would match nothing and make every call impossible.
+func TestTools_OmitEnumWhenNothingIsConfigured(t *testing.T) {
+	reg := mcp.NewToolRegistry()
+	if err := RegisterAll(reg, zosmf.NewClientRegistry(), &config.Config{}, nil); err != nil {
+		t.Fatalf("RegisterAll: %v", err)
+	}
+
+	for _, tool := range reg.List() {
+		var schema struct {
+			Properties map[string]struct {
+				Enum []string `json:"enum"`
+			} `json:"properties"`
+		}
+		if err := json.Unmarshal(tool.InputSchema, &schema); err != nil {
+			t.Fatalf("%s: %v", tool.Name, err)
+		}
+		if prop, ok := schema.Properties["system"]; ok && prop.Enum != nil {
+			t.Errorf("%s: enum must be absent when no systems are configured, got %v", tool.Name, prop.Enum)
+		}
+	}
+}

@@ -71,6 +71,8 @@ systems:
 # can see all LPARs in a sysplex, but SSH requires a separate entry per LPAR.
 # Only SSH key authentication is supported (no passwords).
 # ZOAU tools are only registered when at least one ssh_systems entry is present.
+# The 'ssh_system' parameter of the zoau_* tools refers to the names defined
+# here, not to the 'systems:' block above.
 # ---------------------------------------------------------------------------
 # ssh_systems:
 #   - name: "SYSA"

@@ -105,9 +105,9 @@ cp .env.example .env
 Fill it in. The file is in `.gitignore`.
 
 ```bash
-JUMP_HOST=user@host.example.com
+JUMP_HOST=jumpuser@jumphost.example.com
 JUMP_KEY=./secrets/jump_key
-ZOSMF_CONFIG=/home/ronny/.config/smpe_ls/.smpe-zosmf.yaml
+ZOSMF_CONFIG=/home/youruser/.config/smpe_ls/.smpe-zosmf.yaml
 SSH_KEY_DIR=./secrets
 MCP_API_KEY=<output of: make apikey>
 ZOSMF_SYSA_PASSWORD=…
@@ -279,7 +279,7 @@ container run -d --name zosmf-tunnel \
   -N -D 0.0.0.0:1080 -i /key \
   -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
   -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new \
-  -o BatchMode=yes user@host.example.com
+  -o BatchMode=yes jumpuser@jumphost.example.com
 
 # 3) Resolve the tunnel's IP
 TUNNEL_IP=$(container ls | awk '/^zosmf-tunnel/{print $6}' | cut -d/ -f1)

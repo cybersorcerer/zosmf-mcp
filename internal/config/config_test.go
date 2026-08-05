@@ -538,3 +538,137 @@ ssh_systems:
 		t.Errorf("Host = %q, want inherited jump@jumphost.example.com", got)
 	}
 }
+
+// An unresolved ${VAR} used to survive into the parsed config as its own
+// literal text, which surfaced much later as an unexplained 401 from z/OSMF.
+// Failing at load time names the variable instead.
+func TestLoadFailsOnUnresolvedEnvVars(t *testing.T) {
+	_, err := loadTestConfigErr(t, `
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+    password: ${ZOSMF_SYS1_PASSWORD}
+`)
+	if err == nil {
+		t.Fatal("expected an error for an unresolved ${VAR}")
+	}
+	if !strings.Contains(err.Error(), "ZOSMF_SYS1_PASSWORD") {
+		t.Errorf("error must name the unresolved variable, got: %v", err)
+	}
+}
+
+func TestLoadReportsAllUnresolvedEnvVars(t *testing.T) {
+	_, err := loadTestConfigErr(t, `
+servers:
+  - name: SYS1
+    host: ${SYS1_HOST}
+    user: IBMUSER
+    password: ${SYS1_PASSWORD}
+`)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	for _, want := range []string{"SYS1_HOST", "SYS1_PASSWORD"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error must name %q, got: %v", want, err)
+		}
+	}
+}
+
+func TestLoadAcceptsResolvedEnvVars(t *testing.T) {
+	t.Setenv("ZOSMF_SYS1_PASSWORD", "secret")
+	cfg := loadTestConfig(t, `
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    auth:
+      type: basic
+      username: IBMUSER
+      password: ${ZOSMF_SYS1_PASSWORD}
+`)
+	if cfg.Systems[0].Auth.Password != "secret" {
+		t.Errorf("password not expanded, got %q", cfg.Systems[0].Auth.Password)
+	}
+}
+
+// The docker-compose setup passes the API key in the environment so the
+// mounted production config never has to carry it.
+func TestAPIKeyFromEnv(t *testing.T) {
+	t.Setenv("MCP_API_KEY", "key-from-env")
+	cfg := loadTestConfig(t, `
+transport:
+  streamable_http:
+    enabled: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if got := cfg.Transport.StreamableHTTP.APIKey; got != "key-from-env" {
+		t.Errorf("StreamableHTTP.APIKey = %q, want key-from-env", got)
+	}
+	if got := cfg.Transport.HTTP.APIKey; got != "key-from-env" {
+		t.Errorf("HTTP.APIKey = %q, want key-from-env", got)
+	}
+	if err := cfg.ValidateHTTPAuth(false, true); err != nil {
+		t.Errorf("ValidateHTTPAuth must pass with the env key: %v", err)
+	}
+}
+
+func TestAPIKeyInConfigWinsOverEnv(t *testing.T) {
+	t.Setenv("MCP_API_KEY", "key-from-env")
+	cfg := loadTestConfig(t, `
+transport:
+  streamable_http:
+    enabled: true
+    api_key: key-from-config
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if got := cfg.Transport.StreamableHTTP.APIKey; got != "key-from-config" {
+		t.Errorf("APIKey = %q, want key-from-config", got)
+	}
+}
+
+// --transport streamable-http turns a transport on even when the config file
+// leaves it disabled — the container setup relies on exactly that. The api_key
+// requirement must follow the transport that actually runs, not the file's
+// enabled flag, or the server comes up unauthenticated on a published port.
+func TestValidateHTTPAuthCoversForcedTransport(t *testing.T) {
+	cfg := loadTestConfig(t, `
+transport:
+  stdio: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if err := cfg.ValidateHTTPAuth(false, true); err == nil {
+		t.Error("forcing streamable_http without an api_key must be refused")
+	}
+	if err := cfg.ValidateHTTPAuth(true, false); err == nil {
+		t.Error("forcing http without an api_key must be refused")
+	}
+	// stdio only stays unaffected.
+	if err := cfg.ValidateHTTPAuth(false, false); err != nil {
+		t.Errorf("stdio-only must not require an api_key: %v", err)
+	}
+}
+
+func TestValidateHTTPAuthAcceptsForcedTransportWithEnvKey(t *testing.T) {
+	t.Setenv("MCP_API_KEY", "key-from-env")
+	cfg := loadTestConfig(t, `
+transport:
+  stdio: true
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if err := cfg.ValidateHTTPAuth(false, true); err != nil {
+		t.Errorf("MCP_API_KEY must satisfy the forced transport: %v", err)
+	}
+}

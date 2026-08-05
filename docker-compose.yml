@@ -1,6 +1,8 @@
 services:
   tunnel:
     image: alpine/openssh
+    # Runs as root so a key owned by root:root with mode 600 is accepted.
+    user: "0:0"
     entrypoint: ["/usr/bin/ssh"]
     command: >
       -N -D 0.0.0.0:1080 -i /key
@@ -8,6 +10,7 @@ services:
       -o ServerAliveInterval=30
       -o ServerAliveCountMax=3
       -o StrictHostKeyChecking=accept-new
+      -o BatchMode=yes
       ${JUMP_HOST}
     volumes:
       - ${JUMP_KEY:-./secrets/jump_key}:/key:ro
@@ -20,13 +23,20 @@ services:
         VERSION: docker
     depends_on:
       - tunnel
+    # The mounted config is a production file that usually selects the stdio
+    # transport. Inside a container nothing is attached to stdin, so the
+    # transport is overridden here rather than by editing that file.
+    command: ["--transport", "streamable-http"]
     ports:
       - "8081:8081"
     volumes:
       - ${ZOSMF_CONFIG:-./.smpe-zosmf.yaml}:/config/.smpe-zosmf.yaml:ro
       - ${SSH_KEY_DIR:-./secrets}:/keys:ro
+    # env_file passes every variable through, including the per-system
+    # ZOSMF_<SYSTEM>_PASSWORD names that the config file references by ${...}.
+    env_file:
+      - .env
     environment:
-      ZOSMF_PASSWORD: ${ZOSMF_PASSWORD}
+      # Never published — the SOCKS port stays inside the compose network.
       ZOSMF_PROXY: socks5://tunnel:1080
-      MCP_API_KEY: ${MCP_API_KEY}
     restart: unless-stopped

@@ -328,46 +328,41 @@ Client-side, add the header to the MCP client configuration, e.g. `.mcp.json`:
 > the traffic — the key and every z/OS command travel in the clear. TLS, via a reverse
 > proxy in front of the transport, is the next step if that matters for your network.
 
-### Docker operation
+### Container operation
 
-The container does not ship a config file or SSH key — it mounts existing ones from the
-host. Point it at the production `.smpe-zosmf.yaml` and SSH key(s) you already have
-(anywhere `ResolveDefaultPath` would find them also works, e.g. in
-`~/.config/smpe_ls/`, but the mount paths below can point anywhere on the host):
+**Full step-by-step guide: [`docs/container-setup.md`](container-setup.md)** — covers
+both Docker/Compose and Apple container, with every command, the required `.env`
+entries, key permissions, verification and troubleshooting.
+
+The short version:
 
 ```bash
-cp .env.example .env
-# edit .env: JUMP_HOST, ZOSMF_PASSWORD, MCP_API_KEY, and the mount paths —
-# ZOSMF_CONFIG (path to your existing .smpe-zosmf.yaml)
-# SSH_KEY_DIR  (directory holding the SSH key(s) used inside the container)
-# JUMP_KEY     (the SSH private key for the tunnel sidecar)
-make docker-up           # builds the image and starts tunnel + zosmf-mcp
-make docker-logs         # follow both containers' logs
+cp .env.example .env     # fill in JUMP_HOST, MCP_API_KEY, per-system passwords, mount paths
+make apikey              # generate the bearer token
+make docker-up           # Docker:          builds and starts tunnel + zosmf-mcp
+make container-up        # Apple container: same, resolving the tunnel IP at runtime
 ```
 
-`ZOSMF_CONFIG`, `SSH_KEY_DIR` and `JUMP_KEY` default to `./.smpe-zosmf.yaml`,
-`./secrets` and `./secrets/jump_key` — i.e. files inside the repo directory — if left
-unset, but any absolute or relative host path works.
+The container mounts your existing configuration — it does not ship one. Three things
+are worth knowing before the first start:
 
-> **Warning:** `depends_on` in `docker-compose.yml` only waits for the `tunnel`
-> container to *start*, not for the SSH connection to actually come up. The first
-> requests after a restart can fail until the tunnel has finished connecting.
+- **The transport is overridden on the command line** (`--transport streamable-http`).
+  A production config usually selects stdio, and nothing is attached to stdin inside a
+  container, so the server would exit immediately and restart in a loop.
+- **The proxy is switched on by `ZOSMF_PROXY`** — no `proxy:` block needed in the
+  mounted file. A block in the file still wins.
+- **Unresolved `${VAR}` references abort the start** and are reported by name, instead
+  of surfacing later as an unexplained 401.
 
-> **Required setup step — key ownership:** the SSH private key(s) under `SSH_KEY_DIR`
-> and `JUMP_KEY` keep the host's file ownership when bind-mounted. `alpine/openssh` runs
-> as root, and OpenSSH refuses to use a key whose owning uid is neither `0` nor the
-> connecting user's uid — under `BatchMode=yes` (used here) that failure is silent and
-> the connection just hangs or is refused. Before starting the containers on a Linux
-> Docker host, make the key(s) root-owned and mode 600:
+> **Required on Linux — key ownership:** a bind-mounted SSH key keeps the host's file
+> ownership. The tunnel container runs as root, and OpenSSH refuses a key owned by
+> anyone else; under `BatchMode=yes` that failure is silent. Before the first start:
 >
 > ```bash
-> sudo chown 0:0 secrets/* && chmod 600 secrets/*
+> sudo chown 0:0 secrets/jump_key && sudo chmod 600 secrets/jump_key
 > ```
 >
-> (adjust the path if `SSH_KEY_DIR` points elsewhere). Alternatively, set a matching
-> `user:` on the affected service in `docker-compose.yml`. This does not affect Docker
-> Desktop for macOS, which remaps ownership itself, but it does affect the Linux Docker
-> host that is the actual deployment target.
+> Not needed on macOS, where the filesystem layer remaps ownership.
 
 ---
 

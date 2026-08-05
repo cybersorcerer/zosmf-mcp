@@ -92,10 +92,10 @@ container-build:
 	container build --platform linux/arm64 -t $(CONTAINER_IMAGE) .
 
 container-up: container-build
-	@test -f .env || { echo ".env fehlt — cp .env.example .env und ausfüllen"; exit 1; }
+	@test -f .env || { echo ".env is missing — run: cp .env.example .env and fill it in"; exit 1; }
 	@set -a; . ./.env; set +a; \
-	test -n "$$JUMP_HOST" || { echo "JUMP_HOST ist nicht gesetzt"; exit 1; }; \
-	test -n "$$MCP_API_KEY" || { echo "MCP_API_KEY ist nicht gesetzt — erzeugen mit: make apikey"; exit 1; }; \
+	test -n "$$JUMP_HOST" || { echo "JUMP_HOST is not set"; exit 1; }; \
+	test -n "$$MCP_API_KEY" || { echo "MCP_API_KEY is not set — generate one with: make apikey"; exit 1; }; \
 	container run -d --name zosmf-tunnel \
 	  -v "$${JUMP_KEY:-./secrets/jump_key}:/key" \
 	  --entrypoint /usr/bin/ssh $(CONTAINER_IMAGE) \
@@ -105,8 +105,8 @@ container-up: container-build
 	  -o BatchMode=yes "$$JUMP_HOST" >/dev/null; \
 	sleep 3; \
 	TUNNEL_IP=$$(container ls | awk '/^zosmf-tunnel/{print $$6}' | cut -d/ -f1); \
-	test -n "$$TUNNEL_IP" || { echo "Tunnel-Container läuft nicht — container logs zosmf-tunnel"; exit 1; }; \
-	echo "Tunnel läuft auf $$TUNNEL_IP:1080"; \
+	test -n "$$TUNNEL_IP" || { echo "tunnel container is not running — check: container logs zosmf-tunnel"; exit 1; }; \
+	echo "tunnel listening on $$TUNNEL_IP:1080"; \
 	ENVFILE=$$(mktemp -t zosmf-mcp-env); chmod 600 "$$ENVFILE"; \
 	trap 'rm -f "$$ENVFILE"' EXIT INT TERM; \
 	sed -E 's/^[[:space:]]*export[[:space:]]+//' .env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' > "$$ENVFILE"; \
@@ -118,12 +118,12 @@ container-up: container-build
 	  -e ZOSMF_PROXY=socks5://$$TUNNEL_IP:1080 \
 	  -p 8081:8081 \
 	  $(CONTAINER_IMAGE) --transport streamable-http >/dev/null; \
-	echo "MCP-Server läuft auf http://localhost:8081/mcp"
+	echo "MCP server listening on http://localhost:8081/mcp"
 
 container-down:
 	-@container stop zosmf-mcp zosmf-tunnel 2>/dev/null
 	-@container rm zosmf-mcp zosmf-tunnel 2>/dev/null
-	@echo "gestoppt"
+	@echo "stopped"
 
 container-logs:
 	container logs -f zosmf-mcp
@@ -144,6 +144,6 @@ help:
 	@echo "  tidy      - Run go mod tidy"
 	@echo "  apikey    - Generate a bearer token for the HTTP transports"
 	@echo ""
-	@echo "Container (siehe docs/container-setup.md):"
-	@echo "  docker-build/-up/-down/-logs      - Docker mit Compose"
+	@echo "Containers (see docs/container-setup.md):"
+	@echo "  docker-build/-up/-down/-logs      - Docker with Compose"
 	@echo "  container-build/-up/-down/-logs   - Apple container (macOS, Apple Silicon)"

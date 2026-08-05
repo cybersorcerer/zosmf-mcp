@@ -1,23 +1,23 @@
-# zosmf-mcp im Container betreiben
+# Running zosmf-mcp in a container
 
-Anleitung zum Aufsetzen von zosmf-mcp in einem Container, wenn der Rechner,
-auf dem der Container läuft, die z/OSMF-Systeme **nicht direkt erreicht** —
-sondern nur über einen Zwischenrechner mit SSH-Zugang.
+How to run zosmf-mcp in a container when the machine hosting it **cannot reach
+the z/OSMF systems directly** — only through an intermediate host you can SSH
+into.
 
-Zwei Wege werden beschrieben: **Docker/Podman mit Compose** (Linux, Windows,
-macOS) und **Apple container** (macOS auf Apple Silicon). Beide Wege wurden
-gegen ein echtes z/OSMF durchgespielt.
+Two paths are covered: **Docker/Podman with Compose** (Linux, Windows, macOS)
+and **Apple container** (macOS on Apple Silicon). Both were exercised against a
+live z/OSMF.
 
 ---
 
-## 1. Topologie
+## 1. Topology
 
 ```text
 Agent (n8n, Claude Code, …)
-      │  HTTP + Bearer-Token
+      │  HTTP + bearer token
       ▼
 ┌─────────────────────────────────────────┐
-│ Container-Host                          │
+│ Container host                          │
 │                                         │
 │  ┌───────────┐        ┌───────────────┐ │
 │  │ zosmf-mcp │───────▶│ tunnel        │ │
@@ -27,106 +27,102 @@ Agent (n8n, Claude Code, …)
                                   │ SSH
                                   ▼
                           ┌───────────────┐
-                          │ Jump-Host     │  nur sshd,
-                          │ (sshd)        │  nichts zu installieren
+                          │ Jump host     │  sshd only,
+                          │ (sshd)        │  nothing to install
                           └───────┬───────┘
                                   │
                                   ▼
                           z/OSMF (HTTPS :443)
 ```
 
-Zwei Container. Der `tunnel`-Container baut per `ssh -N -D` einen
-SOCKS5-Proxy auf und hält ihn offen. Der `zosmf-mcp`-Container schickt seine
-z/OSMF-REST-Aufrufe durch diesen Proxy. Auf dem Jump-Host wird nichts
-installiert — es genügt ein sshd und ein autorisierter Schlüssel.
+Two containers. The `tunnel` container opens a SOCKS5 proxy with `ssh -N -D`
+and keeps it up. The `zosmf-mcp` container sends its z/OSMF REST calls through
+that proxy. Nothing is installed on the jump host — an sshd and an authorized
+key are enough.
 
-Der SOCKS-Port 1080 wird **nie** nach außen veröffentlicht. Nur Port 8081 des
-MCP-Servers ist erreichbar, und der verlangt einen Bearer-Token.
+The SOCKS port 1080 is **never** published. Only the MCP server's port 8081 is
+reachable, and it requires a bearer token.
 
-TLS bleibt Ende-zu-Ende: SOCKS5 tunnelt die TCP-Verbindung, die
-TLS-Aushandlung findet zwischen Container und z/OSMF statt. Der Jump-Host
-sieht nur verschlüsselten Verkehr.
+TLS stays end to end: SOCKS5 tunnels the TCP connection, and the TLS handshake
+happens between the container and z/OSMF. The jump host only ever sees
+encrypted traffic.
 
 ---
 
-## 2. Voraussetzungen
+## 2. Prerequisites
 
-**Auf dem Jump-Host:** ein laufender sshd und ein autorisierter öffentlicher
-Schlüssel. Sonst nichts.
+**On the jump host:** a running sshd and an authorized public key. Nothing else.
 
-**Auf dem Container-Host:** Docker mit Compose-Plugin, oder Apple container
-1.2+ auf macOS 26 (Apple Silicon).
+**On the container host:** Docker with the Compose plugin, or Apple container
+1.2+ on macOS 26 (Apple Silicon).
 
-**Netzwerk:** Prüfe vor allem anderen, dass der Jump-Host die z/OSMF-Systeme
-erreicht:
+**Network:** before anything else, confirm the jump host can reach z/OSMF:
 
 ```bash
 ssh <user>@<jump-host> 'nc -z -w 3 <zosmf-host> 443 && echo OK || echo FAIL'
 ```
 
-Kommt hier kein `OK`, hilft der Rest der Anleitung nicht weiter.
+If that does not print `OK`, the rest of this guide will not help.
 
 ---
 
-## 3. Konfigurationsdatei
+## 3. The configuration file
 
-Der Container mountet deine **bestehende** Konfiguration. Es gibt keine
-separate Container-Konfiguration und du musst deine Produktivdatei nicht
-umschreiben.
+The container mounts your **existing** configuration. There is no separate
+container config, and you do not have to rewrite your production file.
 
-Zwei Dinge sind wichtig:
+Three things matter:
 
-**Der Transport wird beim Start überschrieben.** Deine Datei enthält
-typischerweise `transport: stdio: true`. Im Container hängt nichts an stdin —
-der Server bekäme sofort EOF und würde in einer Neustartschleife landen.
-Deshalb wird der Transport per Kommandozeile erzwungen; die Compose-Datei und
-die Make-Targets tun das bereits:
+**The transport is overridden at startup.** Your file most likely says
+`transport: stdio: true`. Inside a container nothing is attached to stdin — the
+server would hit EOF immediately and end up in a restart loop. So the transport
+is forced on the command line; the Compose file and the make targets already do
+this:
 
 ```
 --transport streamable-http
 ```
 
-**Der Proxy wird über die Umgebung aktiviert.** Du brauchst keinen
-`proxy:`-Block in der Datei. Die Variable `ZOSMF_PROXY` setzt URL und schaltet
-den Proxy ein. Ein `proxy:`-Block in der Datei hat Vorrang, und ein
-`proxy: {enabled: false}` an einem einzelnen System bleibt eine wirksame
-Ausnahme.
+**The proxy is switched on through the environment.** You do not need a
+`proxy:` block in the file. Setting `ZOSMF_PROXY` supplies the URL and enables
+the proxy. A `proxy:` block in the file takes precedence, and a
+`proxy: {enabled: false}` on an individual system remains an effective opt-out.
 
-**Passwörter:** Referenzen wie `${ZOSMF_SYSA_PASSWORD}` werden aus der
-Umgebung des Containers aufgelöst. Ist eine referenzierte Variable nicht
-gesetzt, **startet der Server nicht** und nennt die fehlenden Namen. Das ist
-Absicht — früher blieb der Platzhalter als Text stehen und äußerte sich viel
-später als unerklärlicher 401.
+**Passwords** referenced as `${ZOSMF_SYSA_PASSWORD}` are resolved from the
+container's environment. If a referenced variable is not set, the server
+**refuses to start** and names the missing variables. That is deliberate —
+previously the placeholder survived as literal text and surfaced much later as
+an unexplained 401.
 
 ---
 
-## 4. `.env` anlegen
+## 4. Create `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Ausfüllen. Die Datei ist in `.gitignore`.
+Fill it in. The file is in `.gitignore`.
 
 ```bash
 JUMP_HOST=user@host.example.com
 JUMP_KEY=./secrets/jump_key
 ZOSMF_CONFIG=/home/ronny/.config/smpe_ls/.smpe-zosmf.yaml
 SSH_KEY_DIR=./secrets
-MCP_API_KEY=<Ausgabe von: make apikey>
+MCP_API_KEY=<output of: make apikey>
 ZOSMF_SYSA_PASSWORD=…
 ZOSMF_SYSB_PASSWORD=…
 ```
 
-Die Passwort-Variablennamen müssen **exakt** zu den `${...}`-Referenzen in
-deiner Konfigurationsdatei passen.
+The password variable names must match the `${...}` references in your
+configuration file **exactly**.
 
-> **Nur `KEY=value`, kein `export` davor.** Sowohl `docker compose`
-> (`env_file`) als auch `container run --env-file` lehnen die export-Form ab.
-> Apple container meldet dann:
+> **Plain `KEY=value` only — no leading `export`.** Both `docker compose`
+> (`env_file`) and `container run --env-file` reject the export form. Apple
+> container reports:
 > `Error: variable 'export ZOSMF_SYSA_PASSWORD' contains whitespaces`
 
-API-Key erzeugen:
+Generate the API key:
 
 ```bash
 make apikey          # openssl rand -base64 32
@@ -134,11 +130,11 @@ make apikey          # openssl rand -base64 32
 
 ---
 
-## 5. SSH-Schlüssel bereitlegen
+## 5. Prepare the SSH key
 
-Erzeuge einen **eigenen** Schlüssel nur für den Tunnel. Nimm nicht deinen
-persönlichen Alltagsschlüssel — der Container-Schlüssel liegt unverschlüsselt
-auf dem Host und ist nur für genau diesen einen Jump-Host autorisiert.
+Create a **dedicated** key for the tunnel. Do not reuse your everyday personal
+key — the container key sits unencrypted on the host and should be authorized
+for this one jump host only.
 
 ```bash
 mkdir -p secrets
@@ -146,23 +142,22 @@ ssh-keygen -t ed25519 -N '' -f secrets/jump_key -C 'zosmf-mcp tunnel'
 ssh-copy-id -i secrets/jump_key.pub <user>@<jump-host>
 ```
 
-**Unter Linux zusätzlich nötig:** Der Tunnel-Container läuft als root und
-sieht die echte Host-UID der gemounteten Datei. Gehört sie deinem Benutzer,
-lehnt OpenSSH sie ab und der Container läuft in eine Neustartschleife.
+**Additionally required on Linux:** the tunnel container runs as root and sees
+the real host UID of the mounted file. If it is owned by your user, OpenSSH
+refuses it and the container restarts in a loop.
 
 ```bash
 sudo chown 0:0 secrets/jump_key
 sudo chmod 600 secrets/jump_key
 ```
 
-Unter macOS ist das nicht nötig — die Dateisystem-Virtualisierung bildet die
-Eigentümerschaft passend ab.
+Not needed on macOS, where the filesystem layer remaps ownership.
 
 ---
 
-## 6. Weg A: Docker mit Compose
+## 6. Path A: Docker with Compose
 
-### Bauen und starten
+### Build and start
 
 ```bash
 make docker-build     # docker compose build
@@ -171,7 +166,7 @@ make docker-logs      # docker compose logs -f
 make docker-down      # docker compose down
 ```
 
-Oder ohne Make:
+Or without make:
 
 ```bash
 docker compose build
@@ -179,7 +174,7 @@ docker compose up -d
 docker compose logs -f zosmf-mcp
 ```
 
-### Was die Compose-Datei tut
+### What the Compose file does
 
 ```yaml
 services:
@@ -219,35 +214,33 @@ services:
     restart: unless-stopped
 ```
 
-Der Servicename `tunnel` löst im Compose-Netz per DNS auf, deshalb steht er
-direkt in `ZOSMF_PROXY`. `env_file` reicht **alle** Variablen durch,
-einschließlich der systembezogenen Passwörter.
+The service name `tunnel` resolves via DNS inside the Compose network, which is
+why it appears directly in `ZOSMF_PROXY`. `env_file` passes **every** variable
+through, including the per-system passwords.
 
-`depends_on` wartet nur auf den Start des Tunnels, nicht auf dessen
-Bereitschaft. Der Tunnel steht typischerweise in unter einer Sekunde; ein
-Agent, der sich erst später verbindet, merkt davon nichts.
+`depends_on` only waits for the tunnel container to *start*, not for the SSH
+connection to come up. The tunnel is typically ready in well under a second, so
+an agent connecting later never notices.
 
 ---
 
-## 7. Weg B: Apple container
+## 7. Path B: Apple container
 
-Apple container kennt kein Compose. Die beiden Container werden einzeln
-gestartet, und es gibt **keine Namensauflösung zwischen Containern** ohne
-registrierte DNS-Domain — die IP des Tunnels wird deshalb zur Laufzeit
-ermittelt.
+Apple container has no Compose equivalent. The two containers are started
+individually, and there is **no name resolution between containers** without a
+registered DNS domain — so the tunnel's IP is resolved at runtime.
 
-### Einmalig: Rosetta-Anforderung abschalten
+### One-time: drop the Rosetta requirement
 
-Apples BuildKit-Builder startet in einer VM, die standardmäßig Rosetta
-einbindet, um auch `linux/amd64` bauen zu können. Ohne Rosetta scheitert
-bereits der Start des Builders:
+Apple's BuildKit builder runs in a VM that by default wires in Rosetta so it can
+also build `linux/amd64`. Without Rosetta the builder fails to start at all:
 
 ```
 Error: failed to bootstrap container buildkit … "Rosetta is not installed"
 ```
 
-Unser Image ist reines arm64. Statt Rosetta zu installieren, schaltest du die
-Anforderung ab:
+Our image is pure arm64. Rather than installing Rosetta, turn the requirement
+off:
 
 ```bash
 mkdir -p ~/.config/container
@@ -261,26 +254,25 @@ container system start
 container system property list | head -6   # rosetta = false
 ```
 
-Die Datei wird mit den Standardwerten zusammengeführt; alle übrigen
-Einstellungen bleiben unverändert.
+The file is merged with the defaults; all other settings stay as they were.
 
-### Bauen und starten
+### Build and start
 
 ```bash
 make container-build   # container build --platform linux/arm64 -t zosmf-mcp:latest .
-make container-up      # Tunnel + Server, IP-Auflösung inklusive
+make container-up      # tunnel + server, including IP resolution
 make container-logs    # container logs -f zosmf-mcp
-make container-down    # beide Container stoppen und entfernen
+make container-down    # stop and remove both containers
 ```
 
-### Dieselben Schritte ohne Make
+### The same steps without make
 
 ```bash
-# 1) Builder starten und Image bauen
+# 1) Start the builder and build the image
 container builder start
 container build --platform linux/arm64 -t zosmf-mcp:latest .
 
-# 2) Tunnel starten
+# 2) Start the tunnel
 container run -d --name zosmf-tunnel \
   -v "$PWD/secrets/jump_key:/key" \
   --entrypoint /usr/bin/ssh zosmf-mcp:latest \
@@ -289,16 +281,16 @@ container run -d --name zosmf-tunnel \
   -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new \
   -o BatchMode=yes user@host.example.com
 
-# 3) IP des Tunnels ermitteln
+# 3) Resolve the tunnel's IP
 TUNNEL_IP=$(container ls | awk '/^zosmf-tunnel/{print $6}' | cut -d/ -f1)
 echo "$TUNNEL_IP"
 
-# 4) .env für --env-file aufbereiten (entfernt ein evtl. vorhandenes "export")
+# 4) Normalise .env for --env-file (strips a leading "export" if present)
 sed -E 's/^[[:space:]]*export[[:space:]]+//' .env \
   | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' > /tmp/zosmf-env
 chmod 600 /tmp/zosmf-env
 
-# 5) MCP-Server starten
+# 5) Start the MCP server
 container run -d --name zosmf-mcp \
   -v "$HOME/.config/smpe_ls/.smpe-zosmf.yaml:/config/.smpe-zosmf.yaml" \
   -v "$PWD/secrets:/keys" \
@@ -310,34 +302,34 @@ container run -d --name zosmf-mcp \
 rm -f /tmp/zosmf-env
 ```
 
-Für das eigene Image als Tunnel gibt es einen Grund: `alpine/openssh` ließ
-sich hier nicht anonym von Docker Hub ziehen (`401 Unauthorized`), und unser
-Image enthält ohnehin `openssh-client`. Unter Docker funktioniert
-`alpine/openssh` normal.
+Using our own image for the tunnel has a reason: `alpine/openssh` could not be
+pulled anonymously from Docker Hub here (`401 Unauthorized`), and our image
+already contains `openssh-client`. Under Docker, `alpine/openssh` works
+normally.
 
 ---
 
-## 8. Prüfen, ob alles läuft
+## 8. Verifying the setup
 
 ```bash
-# Container laufen?
-docker compose ps            # bzw.: container ls
+# Are the containers running?
+docker compose ps            # or: container ls
 
-# Tunnel steht?
-docker compose logs tunnel   # bzw.: container logs zosmf-tunnel
-# Erwartet: keine Fehler. "Permanently added … to the list of known hosts"
-# beim ersten Start ist normal.
+# Is the tunnel up?
+docker compose logs tunnel   # or: container logs zosmf-tunnel
+# Expected: no errors. "Permanently added … to the list of known hosts"
+# on the first start is normal.
 
-# Server lauscht und verlangt Authentifizierung?
+# Is the server listening and demanding authentication?
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8081/mcp \
   -H 'Content-Type: application/json' -d '{}'
-# Erwartet: 401
+# Expected: 401
 ```
 
-Vollständiger Durchstich mit einem echten Tool-Aufruf:
+Full round trip with a real tool call:
 
 ```bash
-KEY=<dein MCP_API_KEY>
+KEY=<your MCP_API_KEY>
 
 SID=$(curl -s -D - -o /dev/null -X POST http://localhost:8081/mcp \
   -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
@@ -353,55 +345,51 @@ curl -s -X POST http://localhost:8081/mcp -H "Authorization: Bearer $KEY" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"zosmf_list_datasets","arguments":{"system":"SYSA","dslevel":"SYS1.PARM*"}}}'
 ```
 
-Kommt hier eine Datasetliste zurück, funktioniert die gesamte Kette:
-HTTP-Auth, Proxy, Tunnel, Jump-Host, z/OSMF.
+If that returns a dataset list, the whole chain works: HTTP auth, proxy,
+tunnel, jump host, z/OSMF.
 
 ---
 
-## 9. Client anbinden
+## 9. Connecting a client
 
-Endpunkt: `http://<container-host>:8081/mcp`
+Endpoint: `http://<container-host>:8081/mcp`
 Header: `Authorization: Bearer <MCP_API_KEY>`
 
-Für den n8n MCP Client Tool Node (ab v1.88) trägst du die URL als Server-URL
-ein und den Bearer-Token als Header-Auth.
+For the n8n MCP Client Tool node (v1.88+), enter the URL as the server URL and
+the bearer token as header auth.
 
-Da der Token über das Netz geht, gehört dieses Setup in ein vertrauenswürdiges
-Netz. Willst du es darüber hinaus erreichbar machen, setze einen Reverse-Proxy
-mit TLS davor — der Server selbst spricht kein HTTPS.
+The token travels over the network in clear text, so this setup belongs in a
+trusted network. To expose it more widely, put a TLS-terminating reverse proxy
+in front — the server itself does not speak HTTPS.
 
 ---
 
-## 10. Wenn etwas nicht funktioniert
+## 10. Troubleshooting
 
 **`unresolved environment variables in …: ZOSMF_SYSA_PASSWORD`**
-Die Konfiguration referenziert eine Variable, die im Container nicht ankommt.
-Prüfe, dass der Name in `.env` exakt passt und dass `env_file` bzw.
-`--env-file` gesetzt ist. Unter Apple container: enthält deine `.env` noch
-`export`?
+The configuration references a variable that never reached the container. Check
+that the name in `.env` matches exactly and that `env_file` / `--env-file` is
+set. On Apple container: does your `.env` still use `export`?
 
 **`transport streamable_http: api_key is required`**
-`MCP_API_KEY` ist leer. Mit `make apikey` erzeugen und in `.env` eintragen.
-Bewusst ohne Authentifizierung starten geht nur mit `allow_insecure: true` im
-`transport`-Block der Konfiguration — nur sinnvoll, wenn Port 8081
-nachweislich nicht erreichbar ist.
+`MCP_API_KEY` is empty. Generate one with `make apikey` and put it in `.env`.
+Starting without authentication on purpose requires `allow_insecure: true` in
+the `transport` block — only sensible if port 8081 is demonstrably unreachable.
 
-**Tool-Aufrufe laufen ~60 Sekunden und melden `context deadline exceeded`**
-Der Verkehr geht am Tunnel vorbei. Prüfe, dass `ZOSMF_PROXY` im Container
-gesetzt ist und auf den Tunnel zeigt. Unter Apple container: hat sich die
-Tunnel-IP nach einem Neustart geändert? Dann `make container-down` und
-`make container-up`.
+**Tool calls take ~60 seconds and report `context deadline exceeded`**
+Traffic is bypassing the tunnel. Check that `ZOSMF_PROXY` is set inside the
+container and points at the tunnel. On Apple container: did the tunnel IP change
+after a restart? Run `make container-down` then `make container-up`.
 
-**Tunnel-Container startet immer wieder neu**
-Fast immer der Schlüssel. Unter Linux muss er root gehören und Modus 600
-haben. `docker compose logs tunnel` zeigt die Meldung von OpenSSH.
+**The tunnel container keeps restarting**
+Almost always the key. On Linux it must be owned by root with mode 600.
+`docker compose logs tunnel` shows OpenSSH's message.
 
-**`401` von z/OSMF trotz gesetzter Variablen**
-Echte Zugangsdaten falsch, oder der Benutzer ist auf dem Zielsystem gesperrt.
-Seit der Startprüfung auf unaufgelöste Variablen ist eine fehlende
-Umgebungsvariable als Ursache ausgeschlossen — der Server wäre gar nicht erst
-gestartet.
+**`401` from z/OSMF even though the variables are set**
+Wrong credentials, or the user is revoked on the target system. Since the
+startup check for unresolved variables was added, a missing environment
+variable is ruled out — the server would not have started at all.
 
-**Apple container: `HTTP 000` auf `localhost:8081` direkt nach dem Start**
-Die Portfreigabe braucht einen Moment. Ein paar Sekunden warten und erneut
-versuchen; alternativ direkt gegen die Container-IP aus `container ls`.
+**Apple container: `HTTP 000` on `localhost:8081` right after startup**
+Port publishing takes a moment. Wait a few seconds and retry, or go directly to
+the container IP from `container ls`.

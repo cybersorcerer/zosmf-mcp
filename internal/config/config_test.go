@@ -291,6 +291,42 @@ servers:
 	}
 }
 
+// Setting ZOSMF_PROXY is an explicit act, so it must enable the proxy on its
+// own. The docker-compose setup relies on this: it passes the tunnel URL in
+// the environment and mounts a config that has no proxy block at all. Without
+// this, every request quietly bypasses the tunnel and runs into the timeout.
+func TestProxyFromEnvIsActiveWithoutProxyBlock(t *testing.T) {
+	t.Setenv("ZOSMF_PROXY", "socks5://tunnel:1080")
+	cfg := loadTestConfig(t, `
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+`)
+	if !cfg.Proxy.Active() {
+		t.Errorf("global proxy must be active from env alone, got %+v", cfg.Proxy)
+	}
+	if !cfg.Systems[0].Proxy.Active() {
+		t.Errorf("system proxy must be active from env alone, got %+v", cfg.Systems[0].Proxy)
+	}
+}
+
+// An explicit per-system proxy block must still win over the environment.
+func TestProxyEnvDoesNotOverrideExplicitSystemProxy(t *testing.T) {
+	t.Setenv("ZOSMF_PROXY", "socks5://tunnel:1080")
+	cfg := loadTestConfig(t, `
+servers:
+  - name: SYS1
+    host: https://zos1.example.com
+    user: IBMUSER
+    proxy:
+      enabled: false
+`)
+	if cfg.Systems[0].Proxy.Active() {
+		t.Error("per-system 'enabled: false' must win over ZOSMF_PROXY")
+	}
+}
+
 func TestProxyRejectsUnknownScheme(t *testing.T) {
 	_, err := loadTestConfigErr(t, `
 proxy:

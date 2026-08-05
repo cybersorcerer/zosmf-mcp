@@ -134,8 +134,14 @@ func expandEnvVars(s string) string {
 }
 
 func (c *Config) normalize() {
+	// Setting ZOSMF_PROXY is an explicit act, so it enables the proxy on its
+	// own — a config file that only wants to supply the URL can still set
+	// proxy.url, and a per-system block can opt out again.
 	if c.Proxy.URL == "" {
-		c.Proxy.URL = os.Getenv("ZOSMF_PROXY")
+		if envProxy := os.Getenv("ZOSMF_PROXY"); envProxy != "" {
+			c.Proxy.URL = envProxy
+			c.Proxy.Enabled = true
+		}
 	}
 
 	envPassword := os.Getenv("ZOSMF_PASSWORD")

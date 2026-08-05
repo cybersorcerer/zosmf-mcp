@@ -180,3 +180,59 @@ func TestCreateDataset_SaysItFailsOnExisting(t *testing.T) {
 		t.Errorf("create_dataset must state that it fails on an existing dataset, got: %q", tool.Description)
 	}
 }
+
+func TestFilesystemAndUSSTools_Annotations(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	cases := []struct {
+		name                                         string
+		title                                        string
+		readOnly, destructive, idempotent, openWorld bool
+	}{
+		{"zosmf_list_filesystems", "List Filesystems", true, false, true, false},
+		{"zosmf_mount_filesystem", "Mount Filesystem", false, false, false, false},
+		{"zosmf_unmount_filesystem", "Unmount Filesystem", false, true, true, false},
+		{"zosmf_create_zfs", "Create zFS", false, false, false, false},
+		{"zosmf_delete_zfs", "Delete zFS", false, true, true, false},
+		{"zosmf_list_uss_files", "List USS Directory", true, false, true, false},
+		{"zosmf_read_uss_file", "Read USS File", true, false, true, false},
+		{"zosmf_write_uss_file", "Write USS File", false, true, true, false},
+		{"zosmf_create_uss_file", "Create USS File or Directory", false, false, false, false},
+		{"zosmf_delete_uss_file", "Delete USS File or Directory", false, true, true, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tool := findTool(t, reg, tc.name)
+			assertAnnotations(t, tool, tc.title, tc.readOnly, tc.destructive, tc.idempotent, tc.openWorld)
+			if enum := systemEnum(t, tool, "system"); len(enum) != 2 {
+				t.Errorf("system enum = %v, want 2 entries", enum)
+			}
+		})
+	}
+}
+
+// The listing tools were one-liners that never said what came back. A model
+// had to call them to find out.
+func TestListingTools_EnumerateTheirReturnFields(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	cases := []struct {
+		name   string
+		fields []string
+	}{
+		{"zosmf_list_uss_files", []string{"size", "UID", "group", "symlink"}},
+		{"zosmf_list_filesystems", []string{"mount point", "status", "device number"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			desc := findTool(t, reg, tc.name).Description
+			for _, field := range tc.fields {
+				if !strings.Contains(desc, field) {
+					t.Errorf("description must name the %q it returns, got: %q", field, desc)
+				}
+			}
+		})
+	}
+}

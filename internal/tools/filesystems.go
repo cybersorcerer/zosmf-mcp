@@ -28,16 +28,15 @@ func NewListFilesystemsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 func (t *listFilesystemsTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name: "zosmf_list_filesystems",
-		Description: "List mounted z/OS filesystems (zFS, HFS, etc.). " +
-			"Optionally filter by filesystem name or mount path. " +
-			"Returns filesystem name, mount point, type, status, and I/O counters.",
+		Description: "List mounted z/OS filesystems (zFS, HFS, etc.). Returns for each filesystem: dataset name, " +
+			"mount point, filesystem type, status, mount mode flags, device number, owning system name, " +
+			"and the read/write/directory I/O block counts. " +
+			"Filter by filesystem name (wildcards allowed) or by mount path.",
+		Annotations: readOnlyTool("List Filesystems"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"fsname": map[string]any{
 					"type":        "string",
 					"description": "Filter by filesystem name (e.g. 'OMVS.ZFS*'). Supports wildcards.",
@@ -92,15 +91,15 @@ func NewMountFilesystemTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *mountFilesystemTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_mount_filesystem",
-		Description: "Mount a z/OS filesystem (zFS, HFS, etc.) at a specified mount point.",
+		Name: "zosmf_mount_filesystem",
+		Description: "Mount a z/OS filesystem (zFS, HFS, etc.) at a USS mount point. " +
+			"The mount point directory must already exist. Fails if the filesystem is already mounted. " +
+			"Defaults to read-write ('rdwr') unless mode says otherwise.",
+		Annotations: writeTool("Mount Filesystem", false, false, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"fsname": map[string]any{
 					"type":        "string",
 					"description": "Filesystem dataset name to mount (e.g. 'OMVS.ROOT.ZFS')",
@@ -163,15 +162,15 @@ func NewUnmountFilesystemTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *unmountFilesystemTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_unmount_filesystem",
-		Description: "Unmount a mounted z/OS filesystem.",
+		Name: "zosmf_unmount_filesystem",
+		Description: "Unmount a mounted z/OS filesystem. WARNING: This makes the filesystem's contents " +
+			"inaccessible to every job and user on the system, and fails if files under the mount point " +
+			"are still in use.",
+		Annotations: writeTool("Unmount Filesystem", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"fsname": map[string]any{
 					"type":        "string",
 					"description": "Filesystem dataset name to unmount (e.g. 'OMVS.ROOT.ZFS')",
@@ -226,15 +225,15 @@ func NewCreateZFSTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *createZFSTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_create_zfs",
-		Description: "Create a new zFS (z/OS File System) dataset.",
+		Name: "zosmf_create_zfs",
+		Description: "Create a new zFS (z/OS File System) dataset. Allocates the backing dataset only — " +
+			"it is not mounted afterwards; use zosmf_mount_filesystem for that. " +
+			"Space is given in cylinders. Fails if the dataset already exists.",
+		Annotations: writeTool("Create zFS", false, false, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"zfsname": map[string]any{
 					"type":        "string",
 					"description": "Dataset name for the new zFS (e.g. 'USER.MY.ZFS')",
@@ -331,13 +330,11 @@ func (t *deleteZFSTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_delete_zfs",
 		Description: "Delete a zFS dataset. WARNING: This permanently deletes the filesystem and all its contents.",
+		Annotations: writeTool("Delete zFS", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"zfsname": map[string]any{
 					"type":        "string",
 					"description": "Dataset name of the zFS to delete (e.g. 'USER.MY.ZFS')",

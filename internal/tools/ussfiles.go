@@ -26,15 +26,16 @@ func NewListUSSFilesTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *listUSSFilesTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_list_uss_files",
-		Description: "List files and directories in a z/OS Unix System Services (USS) directory.",
+		Name: "zosmf_list_uss_files",
+		Description: "List files and directories in a z/OS Unix System Services (USS) directory. " +
+			"Returns for each entry: name, permission mode string, size in bytes, owning UID and user name, " +
+			"owning GID and group name, last modification time, and for symlinks the link target. " +
+			"Entries are not listed recursively.",
+		Annotations: readOnlyTool("List USS Directory"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"path": map[string]any{
 					"type":        "string",
 					"description": "Absolute USS path to list (e.g. '/u/ibmuser', '/usr/lpp')",
@@ -83,15 +84,14 @@ func NewReadUSSFileTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *readUSSFileTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_read_uss_file",
-		Description: "Read the content of a z/OS USS file as text.",
+		Name: "zosmf_read_uss_file",
+		Description: "Read the content of a z/OS USS file as text. The file is transferred with " +
+			"EBCDIC-to-ASCII conversion, so this is for text files — binary content will come back corrupted.",
+		Annotations: readOnlyTool("Read USS File"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"path": map[string]any{
 					"type":        "string",
 					"description": "Absolute USS file path (e.g. '/u/ibmuser/.profile')",
@@ -144,15 +144,15 @@ func NewWriteUSSFileTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *writeUSSFileTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_write_uss_file",
-		Description: "Write text content to a z/OS USS file. WARNING: Overwrites the existing content.",
+		Name: "zosmf_write_uss_file",
+		Description: "Write text content to a z/OS USS file. WARNING: Overwrites the existing content — " +
+			"there is no append mode and no backup. The file is created if it does not exist. " +
+			"Content is converted from ASCII to EBCDIC.",
+		Annotations: writeTool("Write USS File", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"path": map[string]any{
 					"type":        "string",
 					"description": "Absolute USS file path (e.g. '/u/ibmuser/myscript.sh')",
@@ -208,15 +208,15 @@ func NewCreateUSSFileTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
 
 func (t *createUSSFileTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_create_uss_file",
-		Description: "Create a new z/OS USS file or directory.",
+		Name: "zosmf_create_uss_file",
+		Description: "Create a new, empty z/OS USS file or directory. Fails if the path already exists. " +
+			"The parent directory must exist. To create a file with content in one step, " +
+			"use zosmf_write_uss_file instead.",
+		Annotations: writeTool("Create USS File or Directory", false, false, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"path": map[string]any{
 					"type":        "string",
 					"description": "Absolute USS path for the new file or directory",
@@ -274,13 +274,11 @@ func (t *deleteUSSFileTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_delete_uss_file",
 		Description: "Delete a z/OS USS file or directory. WARNING: Permanent deletion.",
+		Annotations: writeTool("Delete USS File or Directory", true, true, false),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"path": map[string]any{
 					"type":        "string",
 					"description": "Absolute USS path to delete",

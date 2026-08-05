@@ -103,7 +103,12 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
-	expanded := expandEnvVars(string(data))
+	expanded, missing := expandEnvVars(string(data))
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("unresolved environment variables in %s: %s — "+
+			"set them, or remove the ${...} references from the file",
+			path, strings.Join(missing, ", "))
+	}
 
 	var cfg Config
 	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
@@ -123,14 +128,27 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func expandEnvVars(s string) string {
-	return envVarPattern.ReplaceAllStringFunc(s, func(match string) string {
+// expandEnvVars substitutes ${VAR} references and reports the names of any
+// that are not set. An unresolved reference used to survive as its own literal
+// text, which turned a missing password into an unexplained 401 much later —
+// so the caller refuses to start instead.
+func expandEnvVars(s string) (string, []string) {
+	var missing []string
+	seen := make(map[string]bool)
+
+	expanded := envVarPattern.ReplaceAllStringFunc(s, func(match string) string {
 		varName := match[2 : len(match)-1]
 		if val, ok := os.LookupEnv(varName); ok {
 			return val
 		}
+		if !seen[varName] {
+			seen[varName] = true
+			missing = append(missing, varName)
+		}
 		return match
 	})
+
+	return expanded, missing
 }
 
 func (c *Config) normalize() {
@@ -141,6 +159,17 @@ func (c *Config) normalize() {
 		if envProxy := os.Getenv("ZOSMF_PROXY"); envProxy != "" {
 			c.Proxy.URL = envProxy
 			c.Proxy.Enabled = true
+		}
+	}
+
+	// The API key may come from the environment so a mounted production
+	// config never has to carry it. An explicit api_key in the file wins.
+	if envKey := os.Getenv("MCP_API_KEY"); envKey != "" {
+		if c.Transport.HTTP.APIKey == "" {
+			c.Transport.HTTP.APIKey = envKey
+		}
+		if c.Transport.StreamableHTTP.APIKey == "" {
+			c.Transport.StreamableHTTP.APIKey = envKey
 		}
 	}
 
@@ -379,8 +408,12 @@ func (c *Config) ValidateHTTPAuth(useHTTP, useStreamableHTTP bool) error {
 	return nil
 }
 
+// validateHTTPAuth is only reached for a transport that is actually going to
+// run — the caller resolves that from config and the --transport flag. It must
+// not consult h.Enabled: a transport forced on from the command line would
+// otherwise skip the api_key requirement and listen unauthenticated.
 func validateHTTPAuth(name string, h HTTPConfig) error {
-	if !h.Enabled || h.AllowInsecure || h.APIKey != "" {
+	if h.AllowInsecure || h.APIKey != "" {
 		return nil
 	}
 	return fmt.Errorf("transport %s: api_key is required — set it, or set allow_insecure: true to run without authentication", name)

@@ -13,7 +13,7 @@ REMOTE_USER ?=
 REMOTE_DIR  ?= ~/.local/bin
 REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
 
-.PHONY: all build build-all build-local clean test vet fmt lint run install deploy apikey docker-build docker-up docker-down docker-logs
+.PHONY: all build build-all build-local clean test vet fmt lint run install deploy apikey docker-build docker-up docker-down docker-logs container-build container-up container-down container-logs
 
 all: fmt vet test build-local
 
@@ -83,6 +83,51 @@ docker-down:
 docker-logs:
 	docker compose logs -f
 
+# --- Apple container (macOS, Apple Silicon) -------------------------------
+# Apple's `container` has no compose equivalent, so the two containers are
+# started by hand and the tunnel's IP is resolved at runtime.
+CONTAINER_IMAGE ?= zosmf-mcp:latest
+
+container-build:
+	container build --platform linux/arm64 -t $(CONTAINER_IMAGE) .
+
+container-up: container-build
+	@test -f .env || { echo ".env is missing — run: cp .env.example .env and fill it in"; exit 1; }
+	@set -a; . ./.env; set +a; \
+	test -n "$$JUMP_HOST" || { echo "JUMP_HOST is not set"; exit 1; }; \
+	test -n "$$MCP_API_KEY" || { echo "MCP_API_KEY is not set — generate one with: make apikey"; exit 1; }; \
+	container run -d --name zosmf-tunnel \
+	  -v "$${JUMP_KEY:-./secrets/jump_key}:/key" \
+	  --entrypoint /usr/bin/ssh $(CONTAINER_IMAGE) \
+	  -N -D 0.0.0.0:1080 -i /key \
+	  -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+	  -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new \
+	  -o BatchMode=yes "$$JUMP_HOST" >/dev/null; \
+	sleep 3; \
+	TUNNEL_IP=$$(container ls | awk '/^zosmf-tunnel/{print $$6}' | cut -d/ -f1); \
+	test -n "$$TUNNEL_IP" || { echo "tunnel container is not running — check: container logs zosmf-tunnel"; exit 1; }; \
+	echo "tunnel listening on $$TUNNEL_IP:1080"; \
+	ENVFILE=$$(mktemp -t zosmf-mcp-env); chmod 600 "$$ENVFILE"; \
+	trap 'rm -f "$$ENVFILE"' EXIT INT TERM; \
+	sed -E 's/^[[:space:]]*export[[:space:]]+//' .env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' > "$$ENVFILE"; \
+	container run -d --name zosmf-mcp \
+	  -v "$${ZOSMF_CONFIG:-./.smpe-zosmf.yaml}:/config/.smpe-zosmf.yaml" \
+	  -v "$${SSH_KEY_DIR:-./secrets}:/keys" \
+	  --env-file "$$ENVFILE" \
+	  -e MCP_API_KEY="$$MCP_API_KEY" \
+	  -e ZOSMF_PROXY=socks5://$$TUNNEL_IP:1080 \
+	  -p 8081:8081 \
+	  $(CONTAINER_IMAGE) --transport streamable-http >/dev/null; \
+	echo "MCP server listening on http://localhost:8081/mcp"
+
+container-down:
+	-@container stop zosmf-mcp zosmf-tunnel 2>/dev/null
+	-@container rm zosmf-mcp zosmf-tunnel 2>/dev/null
+	@echo "stopped"
+
+container-logs:
+	container logs -f zosmf-mcp
+
 help:
 	@echo "Targets:"
 	@echo "  all       - fmt, vet, test, build (default)"
@@ -97,3 +142,8 @@ help:
 	@echo "  deploy    - Cross-compile for macOS arm64 and copy to REMOTE_USER@REMOTE_HOST:~/.local/bin"
 	@echo "              REMOTE_HOST/REMOTE_USER are read from .env; override on the command line if needed"
 	@echo "  tidy      - Run go mod tidy"
+	@echo "  apikey    - Generate a bearer token for the HTTP transports"
+	@echo ""
+	@echo "Containers (see docs/container-setup.md):"
+	@echo "  docker-build/-up/-down/-logs      - Docker with Compose"
+	@echo "  container-build/-up/-down/-logs   - Apple container (macOS, Apple Silicon)"

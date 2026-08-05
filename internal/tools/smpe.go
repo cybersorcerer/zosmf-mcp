@@ -35,14 +35,15 @@ func (t *queryCSITool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name: "zosmf_smpe_query_csi",
 		Description: "Query the SMP/E Consolidated Software Inventory (CSI) on a z/OS system. " +
-			"Returns information about installed SYSMODs, DDDEFs, and other SMP/E entries.",
+			"Returns information about installed SYSMODs, DDDEFs, and other SMP/E entries. " +
+			"If csi_dataset or zone is omitted, the first entry from the system's csi_datasets / target_zones " +
+			"configuration is used; if the system has neither configured, the call fails and you must pass " +
+			"both explicitly.",
+		Annotations: readOnlyTool("Query SMP/E CSI"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"csi_dataset": map[string]any{
 					"type":        "string",
 					"description": "CSI dataset name (e.g. SYS1.SMPE.CSI). If omitted, the first CSI dataset from the system configuration is used.",

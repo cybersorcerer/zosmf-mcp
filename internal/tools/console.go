@@ -33,14 +33,15 @@ func (t *issueCommandTool) Definition() mcp.Tool {
 		Description: "Issue a z/OS operator command and return the response. " +
 			"Examples: 'D A,L' (display active jobs), 'D T' (display time), " +
 			"'D M=CPU' (display CPU), 'S jobname' (start STC), 'P jobname' (stop STC). " +
-			"The command is issued synchronously and the response is returned directly.",
+			"The command is issued synchronously and the response is returned directly. " +
+			"WARNING: This is an unrestricted MVS operator console command. Commands such as 'P jobname', " +
+			"'C jobname' or 'V device,OFFLINE' change or stop production work, and there is no confirmation " +
+			"step and no undo.",
+		Annotations: writeTool("Issue Operator Command", true, false, true),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"command": map[string]any{
 					"type":        "string",
 					"description": "z/OS operator command to issue (e.g. 'D A,L', 'D T', 'S MYJOB')",
@@ -108,13 +109,11 @@ func (t *getHardcopyLogTool) Definition() mcp.Tool {
 			"Use 'since' for an absolute start time. " +
 			"Use 'time_range' to set the window size (default '10m'). " +
 			"Use 'direction' to control whether to look forward or backward from the start time.",
+		Annotations: readOnlyTool("Read Hardcopy Log"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"system": map[string]any{
-					"type":        "string",
-					"description": "Name of the z/OS system",
-				},
+				"system": systemProperty(t.clients.SystemNames()),
 				"source": map[string]any{
 					"type":        "string",
 					"description": "Log source: 'operlog' (sysplex-wide) or 'syslog' (single system)",

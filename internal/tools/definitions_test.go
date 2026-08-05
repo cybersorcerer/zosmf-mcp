@@ -236,3 +236,68 @@ func TestListingTools_EnumerateTheirReturnFields(t *testing.T) {
 		})
 	}
 }
+
+func TestConsoleTSOAndInventoryTools_Annotations(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	cases := []struct {
+		name                                         string
+		title                                        string
+		readOnly, destructive, idempotent, openWorld bool
+	}{
+		{"zosmf_issue_command", "Issue Operator Command", false, true, false, true},
+		{"zosmf_get_hardcopy_log", "Read Hardcopy Log", true, false, true, false},
+		{"zosmf_tso_command", "Execute TSO Command", false, true, false, true},
+		{"zosmf_smpe_query_csi", "Query SMP/E CSI", true, false, true, false},
+		{"zosmf_parmlib_validate", "Validate Parmlib Member", true, false, true, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tool := findTool(t, reg, tc.name)
+			assertAnnotations(t, tool, tc.title, tc.readOnly, tc.destructive, tc.idempotent, tc.openWorld)
+			if enum := systemEnum(t, tool, "system"); len(enum) != 2 {
+				t.Errorf("system enum = %v, want 2 entries", enum)
+			}
+		})
+	}
+}
+
+// Finding 6: these preconditions used to surface only as a runtime error.
+func TestToolsDeclareTheirConfigPreconditions(t *testing.T) {
+	reg := newTestRegistry(t)
+
+	cases := []struct {
+		name string
+		keys []string
+	}{
+		{"zosmf_tso_command", []string{"tso_account", "tso_proc"}},
+		{"zosmf_smpe_query_csi", []string{"csi_datasets", "target_zones"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			desc := findTool(t, reg, tc.name).Description
+			for _, key := range tc.keys {
+				if !strings.Contains(desc, key) {
+					t.Errorf("description must name the required config key %q, got: %q", key, desc)
+				}
+			}
+		})
+	}
+}
+
+// The two tools that pass an arbitrary command through to the system must
+// be flagged as open-world, or a client will treat them as bounded.
+func TestArbitraryCommandTools_AreOpenWorld(t *testing.T) {
+	reg := newTestRegistry(t)
+	for _, name := range []string{"zosmf_issue_command", "zosmf_tso_command"} {
+		tool := findTool(t, reg, name)
+		if !tool.Annotations.OpenWorldHint {
+			t.Errorf("%s: OpenWorldHint must be true", name)
+		}
+		if !strings.Contains(tool.Description, "WARNING") {
+			t.Errorf("%s: description must carry a WARNING, got: %q", name, tool.Description)
+		}
+	}
+}

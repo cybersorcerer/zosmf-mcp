@@ -4,6 +4,54 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for z/
 
 ---
 
+## ⚠️ Before You Start
+
+**This server lets an AI assistant change and destroy state on a live z/OS system.** It is not a read-only reporting tool. Point it at a sandbox or test LPAR first, and read this section before connecting it to anything you care about.
+
+### Tools that can destroy data or interrupt running work
+
+These are annotated with `destructiveHint: true`, which well-behaved MCP clients surface as a confirmation prompt — but **the annotation is advisory. Nothing in the protocol forces a client to ask.**
+
+| Tool | What it can do |
+| --- | --- |
+| `zosmf_delete_dataset` | Deletes a dataset or PDS member |
+| `zosmf_write_dataset` | Overwrites dataset content in place |
+| `zosmf_delete_uss_file` | Deletes a USS file or directory |
+| `zosmf_write_uss_file` | Overwrites USS file content in place |
+| `zosmf_delete_zfs` | Deletes a zFS aggregate |
+| `zosmf_unmount_filesystem` | Unmounts a filesystem out from under running work |
+| `zosmf_cancel_job` | Cancels a running job |
+| `zosmf_purge_job` | Purges a job and its output |
+
+### Tools with unbounded reach
+
+Three tools pass an arbitrary command through to the system. Their effect is limited only by the permissions of the configured user — not by anything this server enforces:
+
+| Tool | Passes through to |
+| --- | --- |
+| `zosmf_issue_command` | MVS operator console |
+| `zosmf_tso_command` | TSO |
+| `zoau_exec` | USS shell, via SSH |
+
+An operator command can take down a subsystem. A TSO or USS command can do anything the userid is allowed to do. Treat these as equivalent to handing out a console or shell session.
+
+### The permissions you grant are the real boundary
+
+This server enforces no authorization of its own. Every limit comes from SAF/RACF on the configured userid. An AI assistant asked to "clean up old datasets" will do exactly as much damage as that userid permits.
+
+- Give the userid the **minimum** SAF/RACF permissions the tools you actually use require.
+- Do not reuse a systems-programmer or otherwise privileged userid.
+- Prefer a userid whose access is scoped to a dedicated HLQ.
+
+### Network and credential exposure
+
+- **Never hardcode passwords.** Use `${ENV_VAR}` substitution or the `ZOSMF_PASSWORD` environment variable.
+- **`skip_tls_verify: true` disables certificate validation.** It exists for self-signed test systems. Setting it against a production system exposes credentials to interception.
+- **The HTTP and Streamable HTTP transports listen on all interfaces by default.** Anyone who can reach the port can drive the server with your z/OSMF credentials. Bind to localhost, put it behind a reverse proxy, or enable API-key authentication — see [section 4](#4-request-forwarding-api-key-authentication-and-docker).
+- **ZOAU tools authenticate by SSH key only.** The key grants shell access to the target system; protect it accordingly.
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
@@ -42,7 +90,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for z/
 ### Build from Source
 
 ```bash
-git clone https://github.com/ronaldfunk/zosmf-mcp.git
+git clone https://github.com/cybersorcerer/zosmf-mcp.git
 cd zosmf-mcp
 make install
 ```

@@ -29,7 +29,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("%s (commit: %s)\nCopyright (c) 2025, 2026 Sir Tobi aka Cybersorcerer\n", version, commit)
+		fmt.Printf("%s (commit: %s)\nCopyright 2026 Ronald Funk (Cybersorcerer)\n", version, commit)
 		os.Exit(0)
 	}
 

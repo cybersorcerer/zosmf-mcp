@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 func TestSetPasswordTool_UpdatesClientPassword(t *testing.T) {

@@ -336,7 +336,7 @@ import (
 	"net/http"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 func proxyForClient(t *testing.T, c *Client) *http.Request {
@@ -491,7 +491,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 func hasFlagValue(args []string, flag, value string) bool {

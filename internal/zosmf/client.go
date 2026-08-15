@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 // Client is an HTTP client for communicating with a z/OSMF instance.

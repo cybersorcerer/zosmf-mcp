@@ -195,8 +195,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 func TestClientRegistrySystemNames_SortedAndUppercased(t *testing.T) {
@@ -328,7 +328,7 @@ Create `internal/tools/annotations.go`:
 package tools
 
 import (
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
 )
 
 // readOnlyTool describes a tool that only queries state. Clients may run
@@ -477,9 +477,9 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 // newTestRegistry builds a fully populated tool registry against two z/OSMF

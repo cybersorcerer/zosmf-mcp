@@ -1,4 +1,4 @@
-module gitlab.com/ronaldfunk/zosmf-mcp
+module github.com/cybersorcerer/zosmf-mcp
 
 go 1.26.1
 

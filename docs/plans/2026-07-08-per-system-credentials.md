@@ -47,7 +47,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 // newBasicAuthTestClient returns a Client with basic auth against the given
@@ -452,8 +452,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 func TestSetPasswordTool_UpdatesClientPassword(t *testing.T) {
@@ -541,8 +541,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 // --- Set Password ---

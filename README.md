@@ -1378,3 +1378,9 @@ If any are missing, generate an alert.
 - **TSO**: `tso_account` and `tso_proc` must be set in the configuration to use `zosmf_tso_command`. The logon procedure must be valid on the target system (e.g. `IZUFPROC`).
 - **SMP/E**: If `csi_dataset` and `zone` are not specified explicitly, the default values from the system configuration are used.
 - **Passwords**: Never hardcode passwords in the configuration file. Always use environment variables (`${VAR}`).
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
+
+Copyright 2026 Ronald Funk (Cybersorcerer)

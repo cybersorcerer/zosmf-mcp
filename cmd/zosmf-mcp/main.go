@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/tools"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/tools"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 var (

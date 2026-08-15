@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 type SSHClientRegistry struct {

@@ -306,7 +306,7 @@ Two independent, optional top-level blocks control forwarding. Neither block, or
 # Exempt an individual system from the proxy:
 # servers:
 #   - name: SYS2
-#     host: https://intern.lab:443
+#     host: https://zosmf-internal.example.com:443
 #     proxy:
 #       enabled: false
 ```

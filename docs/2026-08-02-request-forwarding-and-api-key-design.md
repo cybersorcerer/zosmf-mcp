@@ -90,7 +90,7 @@ servers:
     host: https://zos1.example.com:443
     user: IBMUSER
   - name: SYS2
-    host: https://intern.lab:443
+    host: https://zosmf-internal.example.com:443
     proxy:
       enabled: false                  # dieses System direkt, ohne Tunnel
 

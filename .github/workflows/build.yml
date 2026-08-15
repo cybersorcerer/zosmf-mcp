@@ -20,6 +20,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check for installation-specific identifiers
+        run: make check-identifiers
+
       - name: Vet
         run: make vet
 

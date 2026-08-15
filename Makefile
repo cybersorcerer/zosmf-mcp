@@ -13,9 +13,9 @@ REMOTE_USER ?=
 REMOTE_DIR  ?= ~/.local/bin
 REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
 
-.PHONY: all build build-all build-local clean test vet fmt lint run install deploy apikey docker-build docker-up docker-down docker-logs container-build container-up container-down container-logs
+.PHONY: all build build-all build-local clean test vet fmt lint check-identifiers run install deploy apikey docker-build docker-up docker-down docker-logs container-build container-up container-down container-logs
 
-all: fmt vet test build-local
+all: fmt vet check-identifiers test build-local
 
 build-all:
 	@mkdir -p $(BINARY_DIR)
@@ -47,6 +47,9 @@ fmt:
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed"; exit 1; }
 	golangci-lint run ./...
+
+check-identifiers:
+	@./scripts/check-identifiers.sh
 
 run: build
 	./$(BINARY_DIR)/$(BINARY) --config .zosmf-mcp-config.yaml
@@ -137,6 +140,7 @@ help:
 	@echo "  vet       - Run go vet"
 	@echo "  fmt       - Format source code"
 	@echo "  lint      - Run golangci-lint"
+	@echo "  check-identifiers - Fail on private IPs, internal hostnames or keys in tracked files"
 	@echo "  run       - Build and run with default config"
 	@echo "  install   - Install binary to ~/.local/bin"
 	@echo "  deploy    - Cross-compile for macOS arm64 and copy to REMOTE_USER@REMOTE_HOST:~/.local/bin"

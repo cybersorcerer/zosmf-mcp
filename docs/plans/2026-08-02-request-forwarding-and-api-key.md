@@ -96,7 +96,7 @@ servers:
     host: https://zos1.example.com
     user: IBMUSER
   - name: SYS2
-    host: https://intern.lab
+    host: https://zosmf-internal.example.com
     user: IBMUSER
     proxy:
       enabled: false
@@ -1126,7 +1126,7 @@ In der Beispiel-Config die neuen Blöcke ergänzen, auskommentiert, damit die Da
 # Einzelne Systeme vom Proxy ausnehmen:
 # servers:
 #   - name: SYS2
-#     host: https://intern.lab:443
+#     host: https://zosmf-internal.example.com:443
 #     proxy:
 #       enabled: false
 ```

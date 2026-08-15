@@ -248,7 +248,7 @@ servers:
     host: https://zos1.example.com
     user: IBMUSER
   - name: SYS2
-    host: https://intern.lab
+    host: https://zosmf-internal.example.com
     user: IBMUSER
     proxy:
       enabled: false

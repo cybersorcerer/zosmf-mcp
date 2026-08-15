@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 type tsoCommandTool struct {

@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
 )
 
 // readOnlyTool describes a tool that only queries state. Clients may run

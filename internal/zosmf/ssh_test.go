@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 func hasFlagValue(args []string, flag, value string) bool {

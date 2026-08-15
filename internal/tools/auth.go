@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/mcp"
-	"gitlab.com/ronaldfunk/zosmf-mcp/internal/zosmf"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 // --- Set Password ---

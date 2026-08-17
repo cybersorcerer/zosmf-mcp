@@ -50,6 +50,27 @@ func TestRegistryUnknownURI(t *testing.T) {
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
+	// the server classifies through the mcp sentinel, so that must hold too
+	if !errors.Is(err, mcp.ErrResourceNotFound) {
+		t.Errorf("err = %v, want it to wrap mcp.ErrResourceNotFound", err)
+	}
+}
+
+// A URI that does not parse must be distinguishable from one that names
+// nothing: the server answers -32602 for the first and -32002 for the second.
+func TestRegistryMalformedURI(t *testing.T) {
+	r := NewResourceRegistry()
+
+	_, err := r.Read(context.Background(), "http://example.com/not-a-resource")
+	if !errors.Is(err, ErrMalformedURI) {
+		t.Fatalf("err = %v, want ErrMalformedURI", err)
+	}
+	if !errors.Is(err, mcp.ErrInvalidResourceURI) {
+		t.Errorf("err = %v, want it to wrap mcp.ErrInvalidResourceURI", err)
+	}
+	if errors.Is(err, ErrNotFound) {
+		t.Error("a malformed URI must not be reported as a missing resource")
+	}
 }
 
 func TestRegistryRejectsDuplicateURI(t *testing.T) {

@@ -311,7 +311,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, msg *JSONRPCMessage) *
 
 	contents, err := s.resources.Read(ctx, params.URI)
 	if err != nil {
-		return NewErrorResponse(msg.ID, ErrCodeResourceNotFound, err.Error())
+		return NewErrorResponse(msg.ID, resourceErrorCode(err), err.Error())
 	}
 
 	resp, err := NewResponse(msg.ID, ResourcesReadResult{Contents: []ResourceContents{contents}})

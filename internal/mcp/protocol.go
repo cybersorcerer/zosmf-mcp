@@ -1,6 +1,9 @@
 package mcp
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+)
 
 const ProtocolVersion = "2025-06-18"
 
@@ -33,6 +36,33 @@ const (
 // ErrCodeResourceNotFound is the MCP-specific code for a resource URI that
 // does not resolve.
 const ErrCodeResourceNotFound = -32002
+
+// Sentinels a ResourceProvider wraps so the server can pick the right
+// JSON-RPC error code without importing the package that produced the error.
+// They live here rather than in the provider because internal/mcp must not
+// depend on internal/resources. Anything a provider returns that wraps
+// neither is an internal error.
+var (
+	// ErrResourceNotFound marks a well-formed URI that names nothing. The
+	// server answers ErrCodeResourceNotFound.
+	ErrResourceNotFound = errors.New("resource not found")
+
+	// ErrInvalidResourceURI marks a URI the provider cannot parse. The
+	// server answers ErrCodeInvalidParams.
+	ErrInvalidResourceURI = errors.New("invalid resource URI")
+)
+
+// resourceErrorCode classifies a ResourceProvider error.
+func resourceErrorCode(err error) int {
+	switch {
+	case errors.Is(err, ErrInvalidResourceURI):
+		return ErrCodeInvalidParams
+	case errors.Is(err, ErrResourceNotFound):
+		return ErrCodeResourceNotFound
+	default:
+		return ErrCodeInternal
+	}
+}
 
 func NewRequest(id any, method string, params any) (*JSONRPCMessage, error) {
 	var rawID json.RawMessage

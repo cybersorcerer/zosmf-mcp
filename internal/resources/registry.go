@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -11,9 +10,10 @@ import (
 	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
-// ErrNotFound is returned when no handler claims a URI. The server maps it
-// to JSON-RPC -32002.
-var ErrNotFound = errors.New("resource not found")
+// ErrNotFound is returned when no handler claims a URI. It wraps
+// mcp.ErrResourceNotFound, which is how internal/mcp recognises the case and
+// answers JSON-RPC -32002 without importing this package.
+var ErrNotFound = fmt.Errorf("%w", mcp.ErrResourceNotFound)
 
 // ResourceHandler serves one family of resources. Handlers must claim
 // disjoint URI spaces: the registry resolves a read by asking each handler
@@ -88,7 +88,15 @@ func (r *ResourceRegistry) Templates() []mcp.ResourceTemplate {
 
 // Read resolves a URI to its content by asking each handler in registration
 // order and taking the first match.
+//
+// A URI that does not parse is reported as such rather than as an unclaimed
+// URI: no handler matches it either way, but a client that sent nonsense must
+// hear -32602, not "this resource does not exist".
 func (r *ResourceRegistry) Read(ctx context.Context, uri string) (mcp.ResourceContents, error) {
+	if _, err := ParseURI(uri); err != nil {
+		return mcp.ResourceContents{}, err
+	}
+
 	r.mu.RLock()
 	handlers := make([]ResourceHandler, len(r.handlers))
 	copy(handlers, r.handlers)

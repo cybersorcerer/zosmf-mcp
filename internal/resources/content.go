@@ -38,6 +38,19 @@ func buildContents(uri, mimeType, body string) (mcp.ResourceContents, error) {
 	return mcp.ResourceContents{URI: uri, MIMEType: mimeType, Text: body}, nil
 }
 
+// notFoundError carries a describeZOSMFError message verbatim while still
+// unwrapping to ErrNotFound. A plain fmt.Errorf("%w: ...", ErrNotFound)
+// would work for errors.Is but would also prepend ErrNotFound's own text
+// ("resource not found: ...") to the message, which
+// TestDescribeZOSMFErrorNeverEchoesTheUnderlyingError pins byte-for-byte.
+// Overriding Error() while keeping Unwrap() keeps the message untouched.
+type notFoundError struct {
+	msg string
+}
+
+func (e *notFoundError) Error() string { return e.msg }
+func (e *notFoundError) Unwrap() error { return ErrNotFound }
+
 // describeZOSMFError reduces a z/OSMF failure to its statement. Response
 // headers and request URLs are never passed through — they can carry
 // credentials or internal hostnames.
@@ -53,7 +66,7 @@ func describeZOSMFError(err error, subject string) error {
 	msg := err.Error()
 	switch {
 	case strings.Contains(msg, "returned 404:"):
-		return fmt.Errorf("%s not found", subject)
+		return &notFoundError{msg: fmt.Sprintf("%s not found", subject)}
 	case strings.Contains(msg, "returned 403:"):
 		return fmt.Errorf("access to %s denied by SAF/RACF", subject)
 	case strings.Contains(msg, "returned 401:"), strings.HasPrefix(msg, "AUTH_FAILED("):

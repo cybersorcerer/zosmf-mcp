@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
 	"github.com/cybersorcerer/zosmf-mcp/internal/resources"
 )
 
@@ -137,5 +140,65 @@ func TestUSSLinkIsReadableAsResource(t *testing.T) {
 	}
 	if contents.Text != body {
 		t.Errorf("resource read returned %d bytes, want the full %d", len(contents.Text), len(body))
+	}
+}
+
+// TestResourcesReadStatusCodeMapping drives resources/read through a real
+// mcp.Server against a real resources.ResourceRegistry, backed by an
+// httptest server that answers z/OSMF-shaped 404 and 403 responses. It
+// closes the seam between internal/resources and internal/mcp: a dataset
+// that genuinely does not exist must surface as JSON-RPC -32002, while a
+// SAF/RACF denial (403) must stay -32603 rather than being mistaken for
+// not-found.
+func TestResourcesReadStatusCodeMapping(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/ds/NO.SUCH.DATASET"):
+			http.Error(w, `{"details":"not cataloged"}`, http.StatusNotFound)
+		case strings.HasSuffix(r.URL.Path, "/ds/DENIED.DATASET"):
+			http.Error(w, `{"details":"ICH408I"}`, http.StatusForbidden)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	clients := newToolTestClients(t, srv.URL)
+
+	registry := resources.NewResourceRegistry()
+	if err := resources.RegisterAll(registry, clients, &config.Config{}); err != nil {
+		t.Fatalf("RegisterAll: %v", err)
+	}
+
+	server := mcp.NewHTTPServer(mcp.NewToolRegistry(), log.New(os.Stderr, "", 0))
+	server.SetResourceProvider(registry)
+
+	tests := []struct {
+		name string
+		uri  string
+		want int
+	}{
+		{"nonexistent dataset", "zosmf://S0W1/dataset/NO.SUCH.DATASET", mcp.ErrCodeResourceNotFound},
+		{"SAF/RACF denial", "zosmf://S0W1/dataset/DENIED.DATASET", mcp.ErrCodeInternal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params, _ := json.Marshal(map[string]string{"uri": tt.uri})
+			msg := &mcp.JSONRPCMessage{
+				JSONRPC: "2.0",
+				ID:      json.RawMessage(`1`),
+				Method:  "resources/read",
+				Params:  params,
+			}
+
+			resp := server.HandleMessage(context.Background(), msg)
+			if resp.Error == nil {
+				t.Fatalf("resources/read on %q returned no error", tt.uri)
+			}
+			if resp.Error.Code != tt.want {
+				t.Errorf("code = %d, want %d (message: %q)", resp.Error.Code, tt.want, resp.Error.Message)
+			}
+		})
 	}
 }

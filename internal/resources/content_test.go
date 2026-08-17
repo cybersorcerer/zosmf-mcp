@@ -95,6 +95,26 @@ func TestDescribeZOSMFErrorNeverEchoesTheUnderlyingError(t *testing.T) {
 	}
 }
 
+func TestDescribeZOSMFErrorNotFoundIsErrNotFound(t *testing.T) {
+	err := describeZOSMFError(
+		errors.New("z/OSMF /zosmf/restfiles/ds/USER.DATA returned 404: {\"details\":\"not cataloged\"}"),
+		"dataset USER.DATA",
+	)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("errors.Is(%v, ErrNotFound) = false, want true", err)
+	}
+}
+
+func TestDescribeZOSMFErrorForbiddenIsNotErrNotFound(t *testing.T) {
+	err := describeZOSMFError(
+		errors.New("z/OSMF /zosmf/restfiles/ds/USER.DATA returned 403: {\"details\":\"ICH408I\"}"),
+		"dataset USER.DATA",
+	)
+	if errors.Is(err, ErrNotFound) {
+		t.Errorf("errors.Is(%v, ErrNotFound) = true, want false", err)
+	}
+}
+
 func TestDescribeZOSMFErrorDoesNotMatchStatusDigitsInNames(t *testing.T) {
 	// A dataset whose name contains 404 must not be reported as "not found"
 	// just because of its name.

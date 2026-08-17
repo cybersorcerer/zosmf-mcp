@@ -80,7 +80,7 @@ func TestDescribeZOSMFErrorNeverEchoesTheUnderlyingError(t *testing.T) {
 		},
 		{
 			name: "connection failure carries the endpoint but no status",
-			err:  errors.New("Get \"https://zosmf.internal.example.com:443/zosmf/restfiles\": dial tcp 10.1.2.3:443: connect: connection refused"),
+			err:  errors.New("Get \"https://zosmf.example.com:443/zosmf/restfiles\": dial tcp 192.0.2.3:443: connect: connection refused"),
 			want: "reading dataset USER.DATA failed",
 		},
 	}

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 // stubHandler serves one fixed URI.
@@ -69,5 +71,23 @@ func TestRegistryListAndTemplates(t *testing.T) {
 	}
 	if got := len(r.Templates()); got != 0 {
 		t.Errorf("len(Templates()) = %d, want 0", got)
+	}
+}
+
+func TestRegisterAllWiresEveryHandler(t *testing.T) {
+	r := NewResourceRegistry()
+	cfg := &config.Config{
+		Systems: []config.SystemConfig{{Name: "S0W1", Host: "https://zosmf.example.com:443"}},
+	}
+
+	if err := RegisterAll(r, zosmf.NewClientRegistry(), cfg); err != nil {
+		t.Fatalf("RegisterAll: %v", err)
+	}
+
+	if got := len(r.List()); got != 1 {
+		t.Errorf("len(List()) = %d, want 1 (the system inventory)", got)
+	}
+	if got := len(r.Templates()); got != 3 {
+		t.Errorf("len(Templates()) = %d, want 3 (dataset, uss, spool)", got)
 	}
 }

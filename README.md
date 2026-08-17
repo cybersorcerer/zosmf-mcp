@@ -1068,6 +1068,32 @@ a client sees the systems you actually have instead of guessing a name.
 
 ---
 
+## Resources
+
+Besides tools, the server exposes z/OS objects as MCP resources. A client can
+attach them as context directly, and tools return links to them instead of
+dumping large content into the conversation.
+
+| URI | What it addresses |
+| --- | --- |
+| `zosmf:///systems` | The configured z/OSMF endpoints |
+| `zosmf://{system}/dataset/{dsn}` | A dataset or PDS member |
+| `zosmf://{system}/uss/{path}` | A z/OS UNIX file |
+| `zosmf://{system}/job/{jobname}/{jobid}/spool/{id}` | One spool file of a job |
+
+Only `zosmf:///systems` appears in `resources/list` — the others are templates,
+since a system's datasets cannot be enumerated.
+
+Read results above `resources.inline_max_bytes` (32 KB by default) come back as
+a preview plus a `resource_link`. `zosmf_get_all_spools` fills its budget with
+the small JES files first and links the rest, so a job with a large SYSPRINT
+still returns the messages that matter for diagnosis.
+
+Resource access is bounded by SAF/RACF only, exactly like the read tools. See
+[Before You Start](#️-before-you-start).
+
+---
+
 ## 7. Tool Reference and Example Prompts
 
 ### Jobs

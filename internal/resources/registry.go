@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
 // ErrNotFound is returned when no handler claims a URI. The server maps it
@@ -98,4 +100,21 @@ func (r *ResourceRegistry) Read(ctx context.Context, uri string) (mcp.ResourceCo
 		}
 	}
 	return mcp.ResourceContents{}, fmt.Errorf("%w: %s", ErrNotFound, uri)
+}
+
+// RegisterAll registers every resource handler with the given registry.
+func RegisterAll(registry *ResourceRegistry, clients *zosmf.ClientRegistry, cfg *config.Config) error {
+	handlers := []ResourceHandler{
+		NewSystemsHandler(clients, cfg),
+		NewDatasetHandler(clients),
+		NewUSSHandler(clients),
+		NewJobSpoolHandler(clients),
+	}
+
+	for _, h := range handlers {
+		if err := registry.Register(h); err != nil {
+			return err
+		}
+	}
+	return nil
 }

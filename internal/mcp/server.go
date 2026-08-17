@@ -22,6 +22,15 @@ const (
 	ServerVersion = "0.3.0"
 )
 
+// ResourceProvider is the narrow view the server needs of a resource
+// registry. Defined here so internal/mcp does not import the resources
+// package, which would create a cycle.
+type ResourceProvider interface {
+	List() []Resource
+	Templates() []ResourceTemplate
+	Read(ctx context.Context, uri string) (ResourceContents, error)
+}
+
 // Transport defines how the server sends and receives messages.
 type Transport interface {
 	// Run starts the transport, reading messages and passing them to the handler.
@@ -35,11 +44,12 @@ type MessageHandler func(ctx context.Context, msg *JSONRPCMessage) *JSONRPCMessa
 
 // Server is the MCP server that manages lifecycle, tools, and message dispatch.
 type Server struct {
-	mu       sync.RWMutex
-	state    serverState
-	registry *ToolRegistry
-	logger   *log.Logger
-	httpMode bool // when true, initialize resets state per-call (HTTP transport is session-aware)
+	mu        sync.RWMutex
+	state     serverState
+	registry  *ToolRegistry
+	resources ResourceProvider
+	logger    *log.Logger
+	httpMode  bool // when true, initialize resets state per-call (HTTP transport is session-aware)
 }
 
 func NewServer(registry *ToolRegistry, logger *log.Logger) *Server {
@@ -57,6 +67,12 @@ func NewHTTPServer(registry *ToolRegistry, logger *log.Logger) *Server {
 		logger:   logger,
 		httpMode: true,
 	}
+}
+
+// SetResourceProvider attaches a resource registry. When nil, the three
+// resources/* methods return method-not-found.
+func (s *Server) SetResourceProvider(p ResourceProvider) {
+	s.resources = p
 }
 
 // HandleMessage is the main message dispatcher.
@@ -110,6 +126,12 @@ func (s *Server) handleRequest(ctx context.Context, msg *JSONRPCMessage) *JSONRP
 			return s.handleToolsList(msg)
 		case "tools/call":
 			return s.handleToolsCall(ctx, msg)
+		case "resources/list":
+			return s.handleResourcesList(msg)
+		case "resources/templates/list":
+			return s.handleResourceTemplatesList(msg)
+		case "resources/read":
+			return s.handleResourcesRead(ctx, msg)
 		default:
 			return NewErrorResponse(msg.ID, ErrCodeMethodNotFound,
 				fmt.Sprintf("unknown method: %s", msg.Method))
@@ -139,6 +161,12 @@ func (s *Server) handleRequest(ctx context.Context, msg *JSONRPCMessage) *JSONRP
 		return s.handleToolsList(msg)
 	case "tools/call":
 		return s.handleToolsCall(ctx, msg)
+	case "resources/list":
+		return s.handleResourcesList(msg)
+	case "resources/templates/list":
+		return s.handleResourceTemplatesList(msg)
+	case "resources/read":
+		return s.handleResourcesRead(ctx, msg)
 	default:
 		return NewErrorResponse(msg.ID, ErrCodeMethodNotFound,
 			fmt.Sprintf("unknown method: %s", msg.Method))
@@ -238,6 +266,55 @@ func (s *Server) handleToolsCall(ctx context.Context, msg *JSONRPCMessage) *JSON
 	s.logger.Printf("<-- tool %s %s in %s (%d bytes)", p.Name, status, elapsed, resultSize(result))
 
 	resp, err := NewResponse(msg.ID, result)
+	if err != nil {
+		return NewErrorResponse(msg.ID, ErrCodeInternal, err.Error())
+	}
+	return resp
+}
+
+func (s *Server) handleResourcesList(msg *JSONRPCMessage) *JSONRPCMessage {
+	if s.resources == nil {
+		return NewErrorResponse(msg.ID, ErrCodeMethodNotFound, "resources are not enabled")
+	}
+	resp, err := NewResponse(msg.ID, ResourcesListResult{Resources: s.resources.List()})
+	if err != nil {
+		return NewErrorResponse(msg.ID, ErrCodeInternal, err.Error())
+	}
+	return resp
+}
+
+func (s *Server) handleResourceTemplatesList(msg *JSONRPCMessage) *JSONRPCMessage {
+	if s.resources == nil {
+		return NewErrorResponse(msg.ID, ErrCodeMethodNotFound, "resources are not enabled")
+	}
+	resp, err := NewResponse(msg.ID, ResourceTemplatesListResult{
+		ResourceTemplates: s.resources.Templates(),
+	})
+	if err != nil {
+		return NewErrorResponse(msg.ID, ErrCodeInternal, err.Error())
+	}
+	return resp
+}
+
+func (s *Server) handleResourcesRead(ctx context.Context, msg *JSONRPCMessage) *JSONRPCMessage {
+	if s.resources == nil {
+		return NewErrorResponse(msg.ID, ErrCodeMethodNotFound, "resources are not enabled")
+	}
+
+	var params ResourcesReadParams
+	if err := json.Unmarshal(msg.Params, &params); err != nil {
+		return NewErrorResponse(msg.ID, ErrCodeInvalidParams, "invalid resources/read params")
+	}
+	if params.URI == "" {
+		return NewErrorResponse(msg.ID, ErrCodeInvalidParams, "uri is required")
+	}
+
+	contents, err := s.resources.Read(ctx, params.URI)
+	if err != nil {
+		return NewErrorResponse(msg.ID, ErrCodeResourceNotFound, err.Error())
+	}
+
+	resp, err := NewResponse(msg.ID, ResourcesReadResult{Contents: []ResourceContents{contents}})
 	if err != nil {
 		return NewErrorResponse(msg.ID, ErrCodeInternal, err.Error())
 	}

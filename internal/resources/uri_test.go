@@ -1,6 +1,9 @@
 package resources
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestParseURI(t *testing.T) {
 	tests := []struct {
@@ -76,10 +79,31 @@ func TestParseURIRejects(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := ParseURI(tt.uri); err == nil {
-				t.Errorf("ParseURI(%q) succeeded, want error", tt.uri)
+			_, err := ParseURI(tt.uri)
+			if err == nil {
+				t.Fatalf("ParseURI(%q) succeeded, want error", tt.uri)
+			}
+			if !errors.Is(err, ErrMalformedURI) {
+				t.Errorf("ParseURI(%q) error %v does not wrap ErrMalformedURI", tt.uri, err)
 			}
 		})
+	}
+}
+
+// The URI form is what a user reads and pastes, so characters that are legal
+// in a URI path must not be escaped away.
+func TestBuildersKeepReadableForms(t *testing.T) {
+	tests := []struct{ got, want string }{
+		{DatasetURI("S0W1", "SYS1.PARMLIB(IEASYS00)"), "zosmf://S0W1/dataset/SYS1.PARMLIB(IEASYS00)"},
+		{USSURI("S0W1", "/etc/profile"), "zosmf://S0W1/uss/etc/profile"},
+		{SpoolURI("S0W1", "MYJOB", "JOB12345", 2), "zosmf://S0W1/job/MYJOB/JOB12345/spool/2"},
+		{USSURI("S0W1", "/u/ibmuser/notes #1.txt"), "zosmf://S0W1/uss/u/ibmuser/notes%20%231.txt"},
+	}
+
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("built %q, want %q", tt.got, tt.want)
+		}
 	}
 }
 
@@ -96,6 +120,16 @@ func TestBuildersRoundTrip(t *testing.T) {
 		{"spool", SpoolURI("S0W1", "MYJOB", "JOB12345", 2),
 			Ref{Kind: KindSpool, System: "S0W1", JobName: "MYJOB", JobID: "JOB12345", FileID: 2}},
 		{"systems", SystemsURI, Ref{Kind: KindSystems}},
+		{"uss with a space", USSURI("S0W1", "/u/ibmuser/my notes.txt"),
+			Ref{Kind: KindUSS, System: "S0W1", Path: "/u/ibmuser/my notes.txt"}},
+		{"uss with a hash", USSURI("S0W1", "/u/ibmuser/notes #1.txt"),
+			Ref{Kind: KindUSS, System: "S0W1", Path: "/u/ibmuser/notes #1.txt"}},
+		{"uss with a percent", USSURI("S0W1", "/u/ibmuser/100%done.txt"),
+			Ref{Kind: KindUSS, System: "S0W1", Path: "/u/ibmuser/100%done.txt"}},
+		{"uss with a question mark", USSURI("S0W1", "/u/ibmuser/what?.txt"),
+			Ref{Kind: KindUSS, System: "S0W1", Path: "/u/ibmuser/what?.txt"}},
+		{"dataset with a national character", DatasetURI("S0W1", "SYS1.MAC#LIB(ENTRY)"),
+			Ref{Kind: KindDataset, System: "S0W1", Dataset: "SYS1.MAC#LIB(ENTRY)"}},
 	}
 
 	for _, tt := range tests {

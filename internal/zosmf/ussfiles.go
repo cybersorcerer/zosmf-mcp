@@ -3,7 +3,6 @@ package zosmf
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -40,7 +39,7 @@ func (c *Client) ListUSSFiles(path string) ([]USSFile, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading USS list response: %w", err)
 	}
@@ -56,6 +55,18 @@ func (c *Client) ListUSSFiles(path string) ([]USSFile, error) {
 	}
 
 	return result.Items, nil
+}
+
+// ussAPIPath builds the /zosmf/restfiles/fs request path for a USS path.
+// The segments are percent-encoded: a USS file name may legally contain a
+// space, a '#' or a '%', and concatenating those raw produces a URL where
+// everything after the '#' is read as a fragment and never reaches z/OSMF.
+func ussAPIPath(path string) string {
+	segments := strings.Split(path, "/")
+	for i, s := range segments {
+		segments[i] = url.PathEscape(s)
+	}
+	return "/zosmf/restfiles/fs" + strings.Join(segments, "/")
 }
 
 // dataTypeForTag returns the X-IBM-Data-Type header value based on the file tag.
@@ -84,7 +95,7 @@ func dataTypeForTag(tag string) string {
 // tag is the file tag from ListUSSFiles (e.g. "t IBM-1047", "t UTF-8", "b", "-").
 // Pass an empty string to use the z/OSMF default (text conversion).
 func (c *Client) ReadUSSFile(path, tag string) (string, error) {
-	apiPath := "/zosmf/restfiles/fs" + path
+	apiPath := ussAPIPath(path)
 
 	reqURL := c.baseURL + apiPath
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
@@ -99,7 +110,7 @@ func (c *Client) ReadUSSFile(path, tag string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("reading response body: %w", err)
 	}
@@ -114,7 +125,7 @@ func (c *Client) ReadUSSFile(path, tag string) (string, error) {
 // WriteUSSFile writes content to a USS file.
 // tag is the file tag from ListUSSFiles — used to set the correct X-IBM-Data-Type header.
 func (c *Client) WriteUSSFile(path, content, tag string) error {
-	apiPath := "/zosmf/restfiles/fs" + path
+	apiPath := ussAPIPath(path)
 
 	reqURL := c.baseURL + apiPath
 	req, err := http.NewRequest(http.MethodPut, reqURL, strings.NewReader(content))
@@ -130,7 +141,7 @@ func (c *Client) WriteUSSFile(path, content, tag string) error {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
 		return fmt.Errorf("reading response body: %w", err)
 	}
@@ -146,7 +157,7 @@ func (c *Client) WriteUSSFile(path, content, tag string) error {
 // fileType: "file" or "dir"
 // mode: permissions string e.g. "rwxr-xr-x" (optional, defaults to "rwxr-xr-x" for dir, "rw-r--r--" for file)
 func (c *Client) CreateUSSFile(path, fileType, mode string) error {
-	apiPath := "/zosmf/restfiles/fs" + path
+	apiPath := ussAPIPath(path)
 
 	if mode == "" {
 		if fileType == "dir" {
@@ -172,7 +183,7 @@ func (c *Client) CreateUSSFile(path, fileType, mode string) error {
 // DeleteUSSFile deletes a USS file or directory.
 // recursive: if true, delete non-empty directories recursively
 func (c *Client) DeleteUSSFile(path string, recursive bool) error {
-	apiPath := "/zosmf/restfiles/fs" + path
+	apiPath := ussAPIPath(path)
 
 	reqURL := c.baseURL + apiPath
 	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
@@ -190,7 +201,7 @@ func (c *Client) DeleteUSSFile(path string, recursive bool) error {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
 		return fmt.Errorf("reading response body: %w", err)
 	}

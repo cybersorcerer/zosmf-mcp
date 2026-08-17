@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"os"
@@ -82,5 +83,29 @@ func TestResourceLinkMarshalling(t *testing.T) {
 	}
 	if _, present := got["text"]; present {
 		t.Error("text must be omitted on a resource_link")
+	}
+}
+
+func TestResourceMethodsWithoutProvider(t *testing.T) {
+	for _, method := range []string{"resources/list", "resources/templates/list", "resources/read"} {
+		t.Run(method, func(t *testing.T) {
+			s := NewHTTPServer(NewToolRegistry(), log.New(os.Stderr, "", 0))
+
+			msg := &JSONRPCMessage{
+				JSONRPC: "2.0",
+				ID:      json.RawMessage(`1`),
+				Method:  method,
+				Params:  json.RawMessage(`{"uri":"zosmf:///systems"}`),
+			}
+
+			resp := s.HandleMessage(context.Background(), msg)
+
+			if resp.Error == nil {
+				t.Fatalf("%s without a provider returned no error, want method-not-found", method)
+			}
+			if resp.Error.Code != ErrCodeMethodNotFound {
+				t.Errorf("code = %d, want %d", resp.Error.Code, ErrCodeMethodNotFound)
+			}
+		})
 	}
 }

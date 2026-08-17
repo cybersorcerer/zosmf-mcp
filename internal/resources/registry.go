@@ -13,7 +13,12 @@ import (
 // to JSON-RPC -32002.
 var ErrNotFound = errors.New("resource not found")
 
-// ResourceHandler serves one family of resources.
+// ResourceHandler serves one family of resources. Handlers must claim
+// disjoint URI spaces: the registry resolves a read by asking each handler
+// in registration order and taking the first that matches, so two handlers
+// claiming the same URI would leave the second one's resources unreachable.
+// The registry cannot detect that — URI templates are not literal strings —
+// so it is the handler authors' contract to keep.
 type ResourceHandler interface {
 	// Definitions returns concrete, listable resources. Most handlers
 	// return nil: a system's datasets cannot be enumerated.
@@ -44,10 +49,13 @@ func (r *ResourceRegistry) Register(h ResourceHandler) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, def := range h.Definitions() {
+	defs := h.Definitions()
+	for _, def := range defs {
 		if r.seen[def.URI] {
 			return fmt.Errorf("resource already registered: %s", def.URI)
 		}
+	}
+	for _, def := range defs {
 		r.seen[def.URI] = true
 	}
 	r.handlers = append(r.handlers, h)
@@ -76,6 +84,8 @@ func (r *ResourceRegistry) Templates() []mcp.ResourceTemplate {
 	return out
 }
 
+// Read resolves a URI to its content by asking each handler in registration
+// order and taking the first match.
 func (r *ResourceRegistry) Read(ctx context.Context, uri string) (mcp.ResourceContents, error) {
 	r.mu.RLock()
 	handlers := make([]ResourceHandler, len(r.handlers))

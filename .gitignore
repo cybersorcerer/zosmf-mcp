@@ -32,3 +32,6 @@ TESTJOB.jcl
 .claude
 CLAUDE.md
 docs/superpowers
+
+# SDD scratch workspace (subagent-driven-development)
+.superpowers/

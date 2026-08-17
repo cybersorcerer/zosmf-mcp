@@ -107,3 +107,12 @@ transport:
     listen: ":8081"
     # api_key: ${MCP_API_KEY}
     # allow_insecure: false
+
+# ---------------------------------------------------------------------------
+# Resources
+# How much content a tool result may carry as inline text before it switches
+# to a preview plus a resource link. Clients read the full content through
+# resources/read.
+# ---------------------------------------------------------------------------
+resources:
+  inline_max_bytes: 32768

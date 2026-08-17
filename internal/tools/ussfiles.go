@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/resources"
 	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
@@ -69,7 +70,8 @@ func (t *listUSSFilesTool) Execute(ctx context.Context, arguments json.RawMessag
 // --- Read USS File ---
 
 type readUSSFileTool struct {
-	clients *zosmf.ClientRegistry
+	clients   *zosmf.ClientRegistry
+	inlineMax int
 }
 
 type readUSSFileArgs struct {
@@ -78,8 +80,8 @@ type readUSSFileArgs struct {
 	Tag    string `json:"tag,omitempty"`
 }
 
-func NewReadUSSFileTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
-	return &readUSSFileTool{clients: clients}
+func NewReadUSSFileTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
+	return &readUSSFileTool{clients: clients, inlineMax: inlineMax}
 }
 
 func (t *readUSSFileTool) Definition() mcp.Tool {
@@ -122,7 +124,14 @@ func (t *readUSSFileTool) Execute(ctx context.Context, arguments json.RawMessage
 		return mcp.ErrorResult("failed to read USS file: " + err.Error()), nil
 	}
 
-	return mcp.TextResult(content), nil
+	link := mcp.ResourceLink(
+		resources.USSURI(args.System, args.Path),
+		args.Path,
+		"full file content",
+		"text/plain",
+		int64(len(content)),
+	)
+	return mcp.ToolCallResult{Content: textOrLink(content, t.inlineMax, link)}, nil
 }
 
 // --- Write USS File ---

@@ -12,6 +12,7 @@ import (
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/resources"
 	"github.com/cybersorcerer/zosmf-mcp/internal/tools"
 	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
@@ -93,6 +94,12 @@ func main() {
 	}
 	logger.Printf("registered %d tools", len(registry.List()))
 
+	// Create resource registry and register all resource handlers
+	resourceRegistry := resources.NewResourceRegistry()
+	if err := resources.RegisterAll(resourceRegistry, clients, cfg); err != nil {
+		logger.Fatalf("registering resources: %v", err)
+	}
+
 	// Setup context with signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -145,6 +152,7 @@ func main() {
 
 	if useStdio {
 		server := mcp.NewServer(registry, logger)
+		server.SetResourceProvider(resourceRegistry)
 		t := mcp.NewStdioTransport(logger)
 		logger.Println("starting stdio transport")
 		go func() {
@@ -158,6 +166,7 @@ func main() {
 
 	if useHTTP {
 		server := mcp.NewHTTPServer(registry, logger)
+		server.SetResourceProvider(resourceRegistry)
 		addr := cfg.Transport.HTTP.Listen
 		if *listen != "" {
 			addr = *listen
@@ -181,6 +190,7 @@ func main() {
 
 	if useStreamableHTTP {
 		server := mcp.NewHTTPServer(registry, logger)
+		server.SetResourceProvider(resourceRegistry)
 		addr := cfg.Transport.StreamableHTTP.Listen
 		if *listen != "" {
 			addr = *listen

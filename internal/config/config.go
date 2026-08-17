@@ -38,7 +38,18 @@ type Config struct {
 	Transport    TransportConfig    `yaml:"transport"`
 	Proxy        ProxyConfig        `yaml:"proxy"`
 	SSHProxyJump SSHProxyJumpConfig `yaml:"ssh_proxy_jump"`
+	Resources    ResourcesConfig    `yaml:"resources"`
 }
+
+// ResourcesConfig tunes how much content a tool result carries inline before
+// it switches to a resource_link.
+type ResourcesConfig struct {
+	InlineMaxBytes int `yaml:"inline_max_bytes"`
+}
+
+// defaultInlineMaxBytes mirrors tools.DefaultInlineMaxBytes. Duplicated
+// rather than imported: internal/config must not depend on internal/tools.
+const defaultInlineMaxBytes = 32768
 
 type SystemConfig struct {
 	Name          string       `yaml:"name"`
@@ -152,6 +163,10 @@ func expandEnvVars(s string) (string, []string) {
 }
 
 func (c *Config) normalize() {
+	if c.Resources.InlineMaxBytes <= 0 {
+		c.Resources.InlineMaxBytes = defaultInlineMaxBytes
+	}
+
 	// Setting ZOSMF_PROXY is an explicit act, so it enables the proxy on its
 	// own — a config file that only wants to supply the URL can still set
 	// proxy.url, and a per-system block can opt out again.

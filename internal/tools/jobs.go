@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/resources"
 	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
@@ -196,7 +197,8 @@ func (t *getJobOutputTool) Execute(ctx context.Context, arguments json.RawMessag
 // --- Get Spool Content ---
 
 type getSpoolContentTool struct {
-	clients *zosmf.ClientRegistry
+	clients   *zosmf.ClientRegistry
+	inlineMax int
 }
 
 type getSpoolContentArgs struct {
@@ -206,8 +208,8 @@ type getSpoolContentArgs struct {
 	FileID  json.RawMessage `json:"file_id"`
 }
 
-func NewGetSpoolContentTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
-	return &getSpoolContentTool{clients: clients}
+func NewGetSpoolContentTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
+	return &getSpoolContentTool{clients: clients, inlineMax: inlineMax}
 }
 
 func (t *getSpoolContentTool) Definition() mcp.Tool {
@@ -251,23 +253,31 @@ func (t *getSpoolContentTool) Execute(ctx context.Context, arguments json.RawMes
 		return mcp.ErrorResult("failed to get spool content: " + err.Error()), nil
 	}
 
-	return mcp.TextResult(content), nil
+	link := mcp.ResourceLink(
+		resources.SpoolURI(args.System, args.JobName, args.JobID, fileID),
+		fmt.Sprintf("%s.%s.spool.%d", args.JobName, args.JobID, fileID),
+		"full spool file content",
+		"text/plain",
+		int64(len(content)),
+	)
+	return mcp.ToolCallResult{Content: textOrLink(content, t.inlineMax, link)}, nil
 }
 
 // --- Get All Spools ---
 
 type getAllSpoolsTool struct {
-	clients *zosmf.ClientRegistry
+	clients   *zosmf.ClientRegistry
+	inlineMax int
 }
 
-func NewGetAllSpoolsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
-	return &getAllSpoolsTool{clients: clients}
+func NewGetAllSpoolsTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
+	return &getAllSpoolsTool{clients: clients, inlineMax: inlineMax}
 }
 
 func (t *getAllSpoolsTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_all_spools",
-		Description: "Read all spool file contents of a z/OS job in a single call. Returns all DD names and their content concatenated.",
+		Description: "Read the spool files of a z/OS job. Small files are returned in full; files that would not fit are returned as resource links which can be read individually.",
 		Annotations: readOnlyTool("Read All Spool Files"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
@@ -297,17 +307,53 @@ func (t *getAllSpoolsTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult("failed to get job files: " + err.Error()), nil
 	}
 
-	var result strings.Builder
+	var contents []mcp.Content
+	budget := t.inlineMax
+
 	for _, f := range files {
-		content, err := client.GetJobFileContent(args.JobName, args.JobID, f.ID)
-		if err != nil {
-			result.WriteString(fmt.Sprintf("--- %s (step: %s) ---\n(error: %s)\n\n", f.DDName, f.StepName, err.Error()))
+		uri := resources.SpoolURI(args.System, args.JobName, args.JobID, f.ID)
+		desc := fmt.Sprintf("%s (step: %s)", f.DDName, f.StepName)
+
+		// z/OSMF already reported the size in the directory call, so a file
+		// that cannot fit need not be pulled over the wire at all. The size
+		// is omitempty and unreliable while a job is still running, so an
+		// absent byte-count falls back to fetch-then-measure; a file that
+		// still fits is fetched; and an oversized *first* file is fetched
+		// anyway, because the preview below needs its content.
+		if f.ByteCount > 0 && f.ByteCount > int64(budget) && len(contents) > 0 {
+			contents = append(contents, mcp.ResourceLink(uri, f.DDName, desc, "text/plain", f.ByteCount))
 			continue
 		}
-		result.WriteString(fmt.Sprintf("--- %s (step: %s) ---\n%s\n\n", f.DDName, f.StepName, content))
+
+		content, err := client.GetJobFileContent(args.JobName, args.JobID, f.ID)
+		if err != nil {
+			contents = append(contents, mcp.TextContent(
+				fmt.Sprintf("--- %s ---\n(error: %s)\n\n", desc, err.Error())))
+			continue
+		}
+
+		link := mcp.ResourceLink(uri, f.DDName, desc, "text/plain", int64(len(content)))
+
+		switch {
+		case len(content) <= budget:
+			contents = append(contents, mcp.TextContent(
+				fmt.Sprintf("--- %s ---\n%s\n\n", desc, content)))
+			budget -= len(content)
+
+		case len(contents) == 0:
+			// Nothing inline yet — emit a preview so the result is never a
+			// bare pointer, then the link.
+			contents = append(contents,
+				mcp.TextContent(fmt.Sprintf("--- %s (truncated) ---\n%s\n\n", desc, preview(content))),
+				link)
+			budget = 0
+
+		default:
+			contents = append(contents, link)
+		}
 	}
 
-	return mcp.TextResult(result.String()), nil
+	return mcp.ToolCallResult{Content: contents}, nil
 }
 
 // --- Submit Job ---

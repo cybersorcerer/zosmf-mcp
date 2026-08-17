@@ -3,7 +3,6 @@ package zosmf
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 )
@@ -118,7 +117,7 @@ func (c *Client) putRaw(path string, body []byte, contentType string) ([]byte, e
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}

@@ -53,13 +53,23 @@ func NewHTTPTransport(addr string, logger *log.Logger, apiKey string) *HTTPTrans
 
 // requireAPIKey rejects requests without a matching bearer token. An empty key
 // disables the check, which keeps stdio-only setups unaffected.
-func requireAPIKey(key string, next http.Handler) http.Handler {
+//
+// Rejections are logged. Without that line an operator sees nothing at all for
+// a request that never reached a handler, which makes a wrong key on the client
+// side indistinguishable from the server being unreachable. The log records
+// only whether a token was present, never the token itself.
+func requireAPIKey(key string, logger *log.Logger, next http.Handler) http.Handler {
 	if key == "" {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok || subtle.ConstantTimeCompare([]byte(got), []byte(key)) != 1 {
+			reason := "no bearer token"
+			if ok {
+				reason = "wrong bearer token"
+			}
+			logger.Printf("rejected %s %s: %s", r.Method, r.URL.Path, reason)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="zosmf-mcp"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -76,7 +86,7 @@ func (t *HTTPTransport) Run(ctx context.Context, handler MessageHandler) error {
 
 	server := &http.Server{
 		Addr:    t.addr,
-		Handler: requireAPIKey(t.apiKey, mux),
+		Handler: requireAPIKey(t.apiKey, t.logger, mux),
 	}
 
 	errCh := make(chan error, 1)

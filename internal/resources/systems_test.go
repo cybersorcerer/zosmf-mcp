@@ -13,8 +13,17 @@ import (
 func TestSystemsHandlerListsConfiguredSystems(t *testing.T) {
 	cfg := &config.Config{
 		Systems: []config.SystemConfig{
-			{Name: "S0W1", Host: "https://zosmf.example.com:443", CSIDatasets: []string{"SYS1.SMPE.CSI"}},
-			{Name: "S0W2", Host: "https://zosmf2.example.com:443"},
+			{
+				Name:        "S0W1",
+				Host:        "https://zosmf.example.com:443",
+				CSIDatasets: []string{"SYS1.SMPE.CSI"},
+				Auth:        config.AuthConfig{Username: "IBMUSER", Password: "hunter2-should-not-leak"},
+			},
+			{
+				Name: "S0W2",
+				Host: "https://zosmf2.example.com:443",
+				Auth: config.AuthConfig{Username: "IBMUSER", Password: "hunter2-should-not-leak"},
+			},
 		},
 	}
 	clients := zosmf.NewClientRegistry()
@@ -60,8 +69,11 @@ func TestSystemsHandlerListsConfiguredSystems(t *testing.T) {
 	if payload.Systems[0].Name != "S0W1" {
 		t.Errorf("first system = %q, want S0W1", payload.Systems[0].Name)
 	}
-	if strings.Contains(got.Text, "password") {
-		t.Error("payload leaks credential fields")
+	if strings.Contains(got.Text, "hunter2-should-not-leak") {
+		t.Error("payload leaks the configured password")
+	}
+	if strings.Contains(strings.ToLower(got.Text), "password") {
+		t.Error("payload contains a password field")
 	}
 }
 

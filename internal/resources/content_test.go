@@ -57,83 +57,52 @@ func TestBuildContentsRejectsOversize(t *testing.T) {
 	}
 }
 
-func TestDescribeZOSMFError404(t *testing.T) {
-	err := errors.New("HTTP 404 not found")
-	got := describeZOSMFError(err, "dataset")
-	expected := "dataset not found"
-	if got.Error() != expected {
-		t.Errorf("got %q, want %q", got.Error(), expected)
+func TestDescribeZOSMFErrorNeverEchoesTheUnderlyingError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "not found",
+			err:  errors.New("z/OSMF /zosmf/restfiles/ds/USER.DATA returned 404: {\"details\":\"not cataloged\"}"),
+			want: "dataset USER.DATA not found",
+		},
+		{
+			name: "forbidden",
+			err:  errors.New("z/OSMF /zosmf/restfiles/ds/USER.DATA returned 403: {\"details\":\"ICH408I\"}"),
+			want: "access to dataset USER.DATA denied by SAF/RACF",
+		},
+		{
+			name: "unauthorized with marker",
+			err:  errors.New("AUTH_FAILED(S0W1): z/OSMF /zosmf/restfiles/ds/USER.DATA returned 401: bad password"),
+			want: "authentication failed for dataset USER.DATA",
+		},
+		{
+			name: "connection failure carries the endpoint but no status",
+			err:  errors.New("Get \"https://zosmf.internal.example.com:443/zosmf/restfiles\": dial tcp 10.1.2.3:443: connect: connection refused"),
+			want: "reading dataset USER.DATA failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := describeZOSMFError(tt.err, "dataset USER.DATA")
+			if got.Error() != tt.want {
+				t.Errorf("got %q, want %q", got.Error(), tt.want)
+			}
+		})
 	}
 }
 
-func TestDescribeZOSMFError403(t *testing.T) {
-	err := errors.New("HTTP 403 forbidden")
-	got := describeZOSMFError(err, "file")
-	expected := "access to file denied by SAF/RACF"
-	if got.Error() != expected {
-		t.Errorf("got %q, want %q", got.Error(), expected)
-	}
-}
+func TestDescribeZOSMFErrorDoesNotMatchStatusDigitsInNames(t *testing.T) {
+	// A dataset whose name contains 404 must not be reported as "not found"
+	// just because of its name.
+	err := errors.New("z/OSMF /zosmf/restfiles/ds/USER.T404.DATA returned 500: internal error")
 
-func TestDescribeZOSMFError401(t *testing.T) {
-	err := errors.New("HTTP 401 unauthorized")
-	got := describeZOSMFError(err, "resource")
-	expected := "authentication failed for resource"
-	if got.Error() != expected {
-		t.Errorf("got %q, want %q", got.Error(), expected)
-	}
-}
+	got := describeZOSMFError(err, "dataset USER.T404.DATA")
 
-func TestDescribeZOSMFErrorFallback(t *testing.T) {
-	err := errors.New("some other error")
-	got := describeZOSMFError(err, "item")
-	expected := "reading item failed"
-	if got.Error() != expected {
-		t.Errorf("got %q, want %q", got.Error(), expected)
-	}
-}
-
-func TestDescribeZOSMFErrorDoesNotLeakCredentials(t *testing.T) {
-	// Test that URL/hostname credentials are not leaked in error messages
-	err := errors.New("HTTP 404 from https://user:password@zosmf.example.com:8080/api/v1")
-	got := describeZOSMFError(err, "dataset")
-
-	errMsg := got.Error()
-
-	// Should NOT contain the URL or password
-	if strings.Contains(errMsg, "https://") {
-		t.Errorf("error message leaked URL: %s", errMsg)
-	}
-	if strings.Contains(errMsg, "password") {
-		t.Errorf("error message leaked password: %s", errMsg)
-	}
-	if strings.Contains(errMsg, "example.com") {
-		t.Errorf("error message leaked hostname: %s", errMsg)
-	}
-
-	// Should contain the safe message
-	if !strings.Contains(errMsg, "dataset not found") {
-		t.Errorf("error message should contain 'dataset not found', got: %s", errMsg)
-	}
-}
-
-func TestDescribeZOSMFErrorDoesNotLeakInternalHostnames(t *testing.T) {
-	// Test with internal hostname in error
-	err := errors.New("connection to zosmf-internal.prod.ibm.local:8080 failed: HTTP 403")
-	got := describeZOSMFError(err, "file")
-
-	errMsg := got.Error()
-
-	// Should NOT contain the internal hostname
-	if strings.Contains(errMsg, "zosmf-internal.prod.ibm.local") {
-		t.Errorf("error message leaked internal hostname: %s", errMsg)
-	}
-	if strings.Contains(errMsg, ".ibm.local") {
-		t.Errorf("error message leaked internal domain: %s", errMsg)
-	}
-
-	// Should contain the safe message
-	if !strings.Contains(errMsg, "access to file denied by SAF/RACF") {
-		t.Errorf("error message should contain 'access to file denied by SAF/RACF', got: %s", errMsg)
+	if got.Error() != "reading dataset USER.T404.DATA failed" {
+		t.Errorf("got %q, want the generic message", got.Error())
 	}
 }

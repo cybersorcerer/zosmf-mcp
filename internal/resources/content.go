@@ -41,14 +41,22 @@ func buildContents(uri, mimeType, body string) (mcp.ResourceContents, error) {
 // describeZOSMFError reduces a z/OSMF failure to its statement. Response
 // headers and request URLs are never passed through — they can carry
 // credentials or internal hostnames.
+//
+// Status code matching is anchored to the error format that internal/zosmf/client.go
+// produces: "returned 404:", "returned 403:", "returned 401:", or "AUTH_FAILED(".
+// A future change to that format must update these matches.
+//
+// subject is echoed into the returned message and must therefore be built only from
+// what the client itself supplied — the dataset name or path out of the requested URI.
+// Never pass anything derived from the z/OSMF response.
 func describeZOSMFError(err error, subject string) error {
 	msg := err.Error()
 	switch {
-	case strings.Contains(msg, "404"):
+	case strings.Contains(msg, "returned 404:"):
 		return fmt.Errorf("%s not found", subject)
-	case strings.Contains(msg, "403"):
+	case strings.Contains(msg, "returned 403:"):
 		return fmt.Errorf("access to %s denied by SAF/RACF", subject)
-	case strings.Contains(msg, "401"):
+	case strings.Contains(msg, "returned 401:"), strings.HasPrefix(msg, "AUTH_FAILED("):
 		return fmt.Errorf("authentication failed for %s", subject)
 	}
 	return fmt.Errorf("reading %s failed", subject)

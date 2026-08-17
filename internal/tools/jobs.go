@@ -314,6 +314,17 @@ func (t *getAllSpoolsTool) Execute(ctx context.Context, arguments json.RawMessag
 		uri := resources.SpoolURI(args.System, args.JobName, args.JobID, f.ID)
 		desc := fmt.Sprintf("%s (step: %s)", f.DDName, f.StepName)
 
+		// z/OSMF already reported the size in the directory call, so a file
+		// that cannot fit need not be pulled over the wire at all. The size
+		// is omitempty and unreliable while a job is still running, so an
+		// absent byte-count falls back to fetch-then-measure; a file that
+		// still fits is fetched; and an oversized *first* file is fetched
+		// anyway, because the preview below needs its content.
+		if f.ByteCount > 0 && f.ByteCount > int64(budget) && len(contents) > 0 {
+			contents = append(contents, mcp.ResourceLink(uri, f.DDName, desc, "text/plain", f.ByteCount))
+			continue
+		}
+
 		content, err := client.GetJobFileContent(args.JobName, args.JobID, f.ID)
 		if err != nil {
 			contents = append(contents, mcp.TextContent(

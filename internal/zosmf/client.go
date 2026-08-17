@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -164,6 +165,33 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
+// maxResponseBytes caps how much of any z/OSMF response body is read into
+// memory. No legitimate z/OSMF response is larger, and without the cap an
+// accidental read of a very large dataset materialises in full before any
+// higher layer can reject it. It mirrors resources.MaxReadBytes, which
+// applies the same ceiling to resources/read; the constant is duplicated
+// rather than imported so that internal/zosmf keeps no dependency on
+// internal/resources.
+const maxResponseBytes = 10 * 1024 * 1024
+
+// ErrResponseTooLarge is returned when a z/OSMF response body exceeds
+// maxResponseBytes.
+var ErrResponseTooLarge = errors.New("z/OSMF response exceeds the 10 MB limit")
+
+// readLimited reads a response body, refusing to buffer more than
+// maxResponseBytes. It reads one byte past the limit so that a body of
+// exactly the limit still succeeds while anything larger is detected.
+func readLimited(r io.Reader) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxResponseBytes {
+		return nil, ErrResponseTooLarge
+	}
+	return body, nil
+}
+
 // httpError converts a non-2xx z/OSMF response into an error. 401 is marked
 // with the AUTH_FAILED marker so clients can react to wrong credentials.
 func (c *Client) httpError(path string, status int, body []byte) error {
@@ -187,7 +215,7 @@ func (c *Client) Get(path string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
@@ -223,7 +251,7 @@ func (c *Client) Delete(path string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
@@ -254,7 +282,7 @@ func (c *Client) GetWithStatus(fullURL string) (int, []byte, error) {
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readLimited(resp.Body)
 	if err != nil {
 		return 0, nil, fmt.Errorf("reading response body: %w", err)
 	}
@@ -280,7 +308,7 @@ func (c *Client) doWithBodyAndStatus(method, path string, body any) (int, []byte
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readLimited(resp.Body)
 	if err != nil {
 		return 0, nil, fmt.Errorf("reading response body: %w", err)
 	}
@@ -310,7 +338,7 @@ func (c *Client) doWithBody(method, path string, body any) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}

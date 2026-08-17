@@ -3,7 +3,6 @@ package zosmf
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -67,7 +66,7 @@ func (c *Client) ListDatasets(dslevel, volser, start string) ([]Dataset, error) 
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading dataset list response: %w", err)
 	}
@@ -100,7 +99,7 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading member list response: %w", err)
 	}
@@ -185,7 +184,7 @@ func (c *Client) ReadDatasetEx(dsname, encoding, search string, insensitive bool
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
@@ -240,7 +239,7 @@ func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string, rele
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return fmt.Errorf("reading response body: %w", err)
 	}
@@ -339,7 +338,7 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType, encoding string) (content, s
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body)
 	if err != nil {
 		return "", "", fmt.Errorf("reading ENQ response body: %w", err)
 	}
@@ -375,7 +374,7 @@ func (c *Client) ReleaseDatasetEnq(dsname, sessionRef string) error {
 		return fmt.Errorf("release ENQ failed: %w", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := readLimited(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return c.httpError("/zosmf/restfiles/ping", resp.StatusCode, body)

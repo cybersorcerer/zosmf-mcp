@@ -17,7 +17,7 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		NewGetJobTool(clients),
 		NewGetJobOutputTool(clients),
 		NewGetSpoolContentTool(clients, cfg.Resources.InlineMaxBytes),
-		NewGetAllSpoolsTool(clients),
+		NewGetAllSpoolsTool(clients, cfg.Resources.InlineMaxBytes),
 		NewSubmitJobTool(clients),
 		NewCancelJobTool(clients),
 		NewPurgeJobTool(clients),

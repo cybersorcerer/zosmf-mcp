@@ -266,17 +266,18 @@ func (t *getSpoolContentTool) Execute(ctx context.Context, arguments json.RawMes
 // --- Get All Spools ---
 
 type getAllSpoolsTool struct {
-	clients *zosmf.ClientRegistry
+	clients   *zosmf.ClientRegistry
+	inlineMax int
 }
 
-func NewGetAllSpoolsTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
-	return &getAllSpoolsTool{clients: clients}
+func NewGetAllSpoolsTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
+	return &getAllSpoolsTool{clients: clients, inlineMax: inlineMax}
 }
 
 func (t *getAllSpoolsTool) Definition() mcp.Tool {
 	return mcp.Tool{
 		Name:        "zosmf_get_all_spools",
-		Description: "Read all spool file contents of a z/OS job in a single call. Returns all DD names and their content concatenated.",
+		Description: "Read the spool files of a z/OS job. Small files are returned in full; files that would not fit are returned as resource links which can be read individually.",
 		Annotations: readOnlyTool("Read All Spool Files"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
@@ -306,17 +307,42 @@ func (t *getAllSpoolsTool) Execute(ctx context.Context, arguments json.RawMessag
 		return mcp.ErrorResult("failed to get job files: " + err.Error()), nil
 	}
 
-	var result strings.Builder
+	var contents []mcp.Content
+	budget := t.inlineMax
+
 	for _, f := range files {
+		uri := resources.SpoolURI(args.System, args.JobName, args.JobID, f.ID)
+		desc := fmt.Sprintf("%s (step: %s)", f.DDName, f.StepName)
+
 		content, err := client.GetJobFileContent(args.JobName, args.JobID, f.ID)
 		if err != nil {
-			result.WriteString(fmt.Sprintf("--- %s (step: %s) ---\n(error: %s)\n\n", f.DDName, f.StepName, err.Error()))
+			contents = append(contents, mcp.TextContent(
+				fmt.Sprintf("--- %s ---\n(error: %s)\n\n", desc, err.Error())))
 			continue
 		}
-		result.WriteString(fmt.Sprintf("--- %s (step: %s) ---\n%s\n\n", f.DDName, f.StepName, content))
+
+		link := mcp.ResourceLink(uri, f.DDName, desc, "text/plain", int64(len(content)))
+
+		switch {
+		case len(content) <= budget:
+			contents = append(contents, mcp.TextContent(
+				fmt.Sprintf("--- %s ---\n%s\n\n", desc, content)))
+			budget -= len(content)
+
+		case len(contents) == 0:
+			// Nothing inline yet — emit a preview so the result is never a
+			// bare pointer, then the link.
+			contents = append(contents,
+				mcp.TextContent(fmt.Sprintf("--- %s (truncated) ---\n%s\n\n", desc, preview(content))),
+				link)
+			budget = 0
+
+		default:
+			contents = append(contents, link)
+		}
 	}
 
-	return mcp.TextResult(result.String()), nil
+	return mcp.ToolCallResult{Content: contents}, nil
 }
 
 // --- Submit Job ---

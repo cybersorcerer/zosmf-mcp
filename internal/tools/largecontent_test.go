@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,5 +121,29 @@ func TestReadDatasetReturnsLinkWhenLarge(t *testing.T) {
 	}
 	if result.Content[1].URI != "zosmf://S0W1/dataset/BIG.DATA" {
 		t.Errorf("URI = %q", result.Content[1].URI)
+	}
+}
+
+// DefaultInlineMaxBytes is deliberately duplicated in internal/config, which
+// must not import this package. Nothing but this test keeps the two halves
+// from drifting apart.
+func TestDefaultInlineMaxBytesMatchesConfigDefault(t *testing.T) {
+	if DefaultInlineMaxBytes != 32768 {
+		t.Errorf("DefaultInlineMaxBytes = %d, want 32768", DefaultInlineMaxBytes)
+	}
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	yaml := "systems:\n  - name: SYSA\n    host: https://zosmf.example.com\n    user: USER1\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	if cfg.Resources.InlineMaxBytes != DefaultInlineMaxBytes {
+		t.Errorf("config default = %d, tools default = %d — the duplicated constants have drifted",
+			cfg.Resources.InlineMaxBytes, DefaultInlineMaxBytes)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/resources"
 	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
@@ -196,7 +197,8 @@ func (t *getJobOutputTool) Execute(ctx context.Context, arguments json.RawMessag
 // --- Get Spool Content ---
 
 type getSpoolContentTool struct {
-	clients *zosmf.ClientRegistry
+	clients   *zosmf.ClientRegistry
+	inlineMax int
 }
 
 type getSpoolContentArgs struct {
@@ -206,8 +208,8 @@ type getSpoolContentArgs struct {
 	FileID  json.RawMessage `json:"file_id"`
 }
 
-func NewGetSpoolContentTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
-	return &getSpoolContentTool{clients: clients}
+func NewGetSpoolContentTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
+	return &getSpoolContentTool{clients: clients, inlineMax: inlineMax}
 }
 
 func (t *getSpoolContentTool) Definition() mcp.Tool {
@@ -251,7 +253,14 @@ func (t *getSpoolContentTool) Execute(ctx context.Context, arguments json.RawMes
 		return mcp.ErrorResult("failed to get spool content: " + err.Error()), nil
 	}
 
-	return mcp.TextResult(content), nil
+	link := mcp.ResourceLink(
+		resources.SpoolURI(args.System, args.JobName, args.JobID, fileID),
+		fmt.Sprintf("%s.%s.spool.%d", args.JobName, args.JobID, fileID),
+		"full spool file content",
+		"text/plain",
+		int64(len(content)),
+	)
+	return mcp.ToolCallResult{Content: textOrLink(content, t.inlineMax, link)}, nil
 }
 
 // --- Get All Spools ---

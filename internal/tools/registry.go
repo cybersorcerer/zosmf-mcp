@@ -16,7 +16,7 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		NewListJobsTool(clients),
 		NewGetJobTool(clients),
 		NewGetJobOutputTool(clients),
-		NewGetSpoolContentTool(clients),
+		NewGetSpoolContentTool(clients, cfg.Resources.InlineMaxBytes),
 		NewGetAllSpoolsTool(clients),
 		NewSubmitJobTool(clients),
 		NewCancelJobTool(clients),
@@ -28,7 +28,7 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		// Dataset tools
 		NewListDatasetsTool(clients),
 		NewListMembersTool(clients),
-		NewReadDatasetTool(clients),
+		NewReadDatasetTool(clients, cfg.Resources.InlineMaxBytes),
 		NewWriteDatasetTool(clients),
 		NewAcquireDatasetEnqTool(clients),
 		NewReleaseDatasetEnqTool(clients),
@@ -43,7 +43,7 @@ func RegisterAll(registry *mcp.ToolRegistry, clients *zosmf.ClientRegistry, cfg 
 		NewGetHardcopyLogTool(clients),
 		// USS Files tools
 		NewListUSSFilesTool(clients),
-		NewReadUSSFileTool(clients),
+		NewReadUSSFileTool(clients, cfg.Resources.InlineMaxBytes),
 		NewWriteUSSFileTool(clients),
 		NewCreateUSSFileTool(clients),
 		NewDeleteUSSFileTool(clients),

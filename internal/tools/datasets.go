@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/mcp"
+	"github.com/cybersorcerer/zosmf-mcp/internal/resources"
 	"github.com/cybersorcerer/zosmf-mcp/internal/zosmf"
 )
 
@@ -134,7 +135,8 @@ func (t *listMembersTool) Execute(ctx context.Context, arguments json.RawMessage
 // --- Read Dataset ---
 
 type readDatasetTool struct {
-	clients *zosmf.ClientRegistry
+	clients   *zosmf.ClientRegistry
+	inlineMax int
 }
 
 type readDatasetArgs struct {
@@ -146,8 +148,8 @@ type readDatasetArgs struct {
 	MaxReturnSize int    `json:"maxreturnsize,omitempty"`
 }
 
-func NewReadDatasetTool(clients *zosmf.ClientRegistry) mcp.ToolHandler {
-	return &readDatasetTool{clients: clients}
+func NewReadDatasetTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
+	return &readDatasetTool{clients: clients, inlineMax: inlineMax}
 }
 
 func (t *readDatasetTool) Definition() mcp.Tool {
@@ -217,7 +219,14 @@ func (t *readDatasetTool) Execute(ctx context.Context, arguments json.RawMessage
 		return mcp.ErrorResult("failed to read dataset: " + err.Error()), nil
 	}
 
-	return mcp.TextResult(content), nil
+	link := mcp.ResourceLink(
+		resources.DatasetURI(args.System, args.Dataset),
+		args.Dataset,
+		"full dataset content",
+		"text/plain",
+		int64(len(content)),
+	)
+	return mcp.ToolCallResult{Content: textOrLink(content, t.inlineMax, link)}, nil
 }
 
 // --- Write Dataset ---

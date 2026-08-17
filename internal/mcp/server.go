@@ -183,6 +183,7 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) *JSONRPCMessage {
 			Tools: &ToolsCapability{
 				ListChanged: true,
 			},
+			Resources: &ResourcesCapability{},
 		},
 		ServerInfo: Implementation{
 			Name:    ServerName,

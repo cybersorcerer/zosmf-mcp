@@ -2,7 +2,7 @@ package mcp
 
 import "encoding/json"
 
-const ProtocolVersion = "2025-03-26"
+const ProtocolVersion = "2025-06-18"
 
 // JSON-RPC 2.0 base types
 
@@ -29,6 +29,10 @@ const (
 	ErrCodeInvalidParams  = -32602
 	ErrCodeInternal       = -32603
 )
+
+// ErrCodeResourceNotFound is the MCP-specific code for a resource URI that
+// does not resolve.
+const ErrCodeResourceNotFound = -32002
 
 func NewRequest(id any, method string, params any) (*JSONRPCMessage, error) {
 	var rawID json.RawMessage
@@ -138,11 +142,64 @@ type InitializeResult struct {
 }
 
 type ServerCapabilities struct {
-	Tools *ToolsCapability `json:"tools,omitempty"`
+	Tools     *ToolsCapability     `json:"tools,omitempty"`
+	Resources *ResourcesCapability `json:"resources,omitempty"`
 }
 
 type ToolsCapability struct {
 	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+// ResourcesCapability advertises resource support. Both flags stay false:
+// the resource inventory is static, so there is nothing to subscribe to and
+// nothing that changes.
+type ResourcesCapability struct {
+	Subscribe   bool `json:"subscribe,omitempty"`
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+// Resource is a concrete, listable resource.
+type Resource struct {
+	URI         string `json:"uri"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+	Size        int64  `json:"size,omitempty"`
+}
+
+// ResourceTemplate describes a family of resources whose members cannot be
+// enumerated — every dataset on a system, for instance.
+type ResourceTemplate struct {
+	URITemplate string `json:"uriTemplate"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+}
+
+// ResourceContents carries the body of one resource. Text and Blob are
+// mutually exclusive; Blob is base64 and used when the content is not valid
+// UTF-8.
+type ResourceContents struct {
+	URI      string `json:"uri"`
+	MIMEType string `json:"mimeType,omitempty"`
+	Text     string `json:"text,omitempty"`
+	Blob     string `json:"blob,omitempty"`
+}
+
+type ResourcesListResult struct {
+	Resources []Resource `json:"resources"`
+}
+
+type ResourceTemplatesListResult struct {
+	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
+}
+
+type ResourcesReadParams struct {
+	URI string `json:"uri"`
+}
+
+type ResourcesReadResult struct {
+	Contents []ResourceContents `json:"contents"`
 }
 
 type Implementation struct {
@@ -191,10 +248,14 @@ type ToolCallResult struct {
 }
 
 type Content struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	Data     string `json:"data,omitempty"`
-	MIMEType string `json:"mimeType,omitempty"`
+	Type        string `json:"type"`
+	Text        string `json:"text,omitempty"`
+	Data        string `json:"data,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+	URI         string `json:"uri,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Size        int64  `json:"size,omitempty"`
 }
 
 func TextContent(text string) Content {
@@ -211,6 +272,19 @@ func ErrorResult(text string) ToolCallResult {
 	return ToolCallResult{
 		Content: []Content{TextContent(text)},
 		IsError: true,
+	}
+}
+
+// ResourceLink returns a pointer to a resource instead of its content. Used
+// when a result would otherwise be too large to put in the model's context.
+func ResourceLink(uri, name, description, mimeType string, size int64) Content {
+	return Content{
+		Type:        "resource_link",
+		URI:         uri,
+		Name:        name,
+		Description: description,
+		MIMEType:    mimeType,
+		Size:        size,
 	}
 }
 

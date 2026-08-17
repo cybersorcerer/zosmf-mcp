@@ -136,8 +136,16 @@ The existing test for `zosmf_get_all_spools` in `internal/tools/` expects full c
 
 ## Compatibility
 
-The server will advertise `2025-06-18`. A client requesting `2025-03-26` receives the version the server will speak; since the changes are additive, such clients work in practice. This is not something to assume — verify against n8n and at least one other older client after implementation, as an explicit step in the plan.
+The server will advertise `2025-06-18`. A client requesting `2025-03-26` receives the version the server will speak; since the changes are additive, such clients work in practice.
+
+Covered by a unit test on the handshake: an `initialize` carrying `protocolVersion: "2025-03-26"` must still produce a well-formed result advertising the resources capability, and a subsequent `tools/call` must behave unchanged. That is the part under our control and it gates the work.
+
+Trying it against a real n8n instance stays worthwhile but is not a gate — it verifies that client's behaviour, not ours.
 
 ## Success criterion
 
-A job whose SYSPRINT exceeds the threshold returns, via `zosmf_get_all_spools`, the small JES files in full and SYSPRINT as a `resource_link`; a subsequent `resources/read` on that link returns the complete content.
+**Binding, no z/OS required.** An `httptest` server serves a spool directory of three files — JESYSMSG 2 KB, JESJCL 4 KB, SYSPRINT 200 KB — against the default 32 KB budget. `zosmf_get_all_spools` must return the two small files as full text and SYSPRINT as a `resource_link` carrying the correct `size`. A following `resources/read` on that URI must return all 200 KB.
+
+This runs in CI and gates the work. It exercises the whole path — directory fetch, budget accounting, link construction, URI parsing, content fetch — without depending on a system being reachable.
+
+**Optional, against a live system.** The same sequence by hand, where a test LPAR is available. It confirms the real z/OSMF response shapes but is not a gate. A large SYSPRINT is cheap to produce with `IEBGENER` reading a PDS member and writing to `SYSOUT=*`.

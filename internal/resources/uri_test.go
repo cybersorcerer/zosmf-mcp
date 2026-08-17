@@ -67,6 +67,7 @@ func TestParseURIRejects(t *testing.T) {
 		{"unknown kind", "zosmf://S0W1/volume/VOL001"},
 		{"dataset without name", "zosmf://S0W1/dataset/"},
 		{"uss without path", "zosmf://S0W1/uss"},
+		{"uss with empty path", "zosmf://S0W1/uss/"},
 		{"spool with non-numeric id", "zosmf://S0W1/job/MYJOB/JOB12345/spool/abc"},
 		{"spool truncated", "zosmf://S0W1/job/MYJOB/JOB12345"},
 		{"system-scoped without system", "zosmf:///dataset/USER.DATA"},

@@ -6,6 +6,9 @@ COMMIT    ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS   := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 GOFLAGS   := -trimpath
 
+# Keep in step with the version in .github/workflows/build.yml
+GOLANGCI_VERSION ?= v2.12.0
+
 # Remote deployment target (macOS Apple Silicon); REMOTE_HOST/REMOTE_USER come from .env
 -include .env
 REMOTE_HOST ?=
@@ -44,9 +47,10 @@ vet:
 fmt:
 	gofmt -s -w .
 
+# Pinned to the version the CI lint job uses, and run through `go run` so a
+# local install is not required and cannot drift from CI.
 lint:
-	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed"; exit 1; }
-	golangci-lint run ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run ./...
 
 check-identifiers:
 	@./scripts/check-identifiers.sh

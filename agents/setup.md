@@ -49,14 +49,17 @@ fill in and `[...]` marks something optional; neither is typed literally.
    Check: the file it wrote exists and is mode 600 (`stat -f %Lp .env` on
    macOS/BSD, `stat -c %a .env` on Linux, must print `600`).
 
-4. Choose the transport: `stdio` for a client that runs the binary itself
-   (Claude Code, Claude Desktop, VS Code, Cursor, opencode), `streamable-http`
-   for a container or n8n. This is not a configuration field — it is never
-   written into the YAML, only named with `--transport <mode>` on every
-   command line that starts the server. Carry the value into step 5 or 6.
-   Check: the command you run in step 5 or 6 names `--transport` explicitly.
-   Skipping it and relying on the file is the one failure this rule exists
-   to catch — the server then refuses to start at all.
+4. Transport: `init config` already added `stdio: true` to `<CFG>` if the
+   file had no transport block yet, so a client that runs the binary itself
+   (Claude Code, Claude Desktop, VS Code, Cursor, opencode) needs nothing
+   extra in step 5. `streamable-http` (a container, n8n) is never written to
+   the file — name it explicitly with `--transport streamable-http` on that
+   invocation, in step 6.
+   Check: `grep -q 'stdio: true' <CFG>` exits 0, or the command you run in
+   step 6 names `--transport streamable-http` explicitly. Neither: `<CFG>`
+   already carries a different transport block from an earlier setup — add
+   `--transport stdio` explicitly to the step 5 command instead of editing
+   the file.
 
 5. Register with the client. See the table below.
    Check: the client lists zosmf-mcp as connected.
@@ -78,8 +81,8 @@ fill in and `[...]` marks something optional; neither is typed literally.
 
 | Client | Command / configuration | Check |
 | --- | --- | --- |
-| Claude Code | `claude mcp add zosmf-mcp -- <path-to-zosmf-mcp> --transport stdio --config <CFG>` | `claude mcp list` shows `zosmf-mcp` as `✔ Connected` |
-| opencode | `opencode mcp add zosmf-mcp -- <path-to-zosmf-mcp> --transport stdio --config <CFG>` | `opencode mcp list` shows `zosmf-mcp` as `connected` |
+| Claude Code | `claude mcp add zosmf-mcp -- <path-to-zosmf-mcp> --config <CFG>` | `claude mcp list` shows `zosmf-mcp` as `✔ Connected` |
+| opencode | `opencode mcp add zosmf-mcp -- <path-to-zosmf-mcp> --config <CFG>` | `opencode mcp list` shows `zosmf-mcp` as `connected` |
 | pi | pi has no built-in MCP client by design. If the `pi-mcp-adapter` extension is installed, it reads the same `.mcp.json` the Claude Code row writes — otherwise use pi to run this procedure for a client that does have one. | not applicable, or `/mcp` (adapter installed) shows zosmf-mcp connected |
 | n8n | Run the server with `--transport streamable-http` (the container already does). In n8n, add an **MCP Client Tool** node: transport `Streamable HTTP`, URL `http://<host>:8081/mcp`. | the node's connection test succeeds |
 

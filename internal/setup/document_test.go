@@ -129,6 +129,54 @@ func TestLoadDocumentOfMissingFileStartsEmpty(t *testing.T) {
 	}
 }
 
+func TestEnsureDefaultTransportAddsWhenAbsent(t *testing.T) {
+	path := fixture(t)
+	doc, _ := LoadDocument(path)
+	if changed := doc.EnsureDefaultTransport(); !changed {
+		t.Error("expected a change: the fixture carries no transport key")
+	}
+	out, _ := doc.Bytes()
+	text := string(out)
+	if !strings.Contains(text, "transport:") || !strings.Contains(text, "stdio: true") {
+		t.Errorf("expected transport: {stdio: true} to be added:\n%s", text)
+	}
+}
+
+func TestEnsureDefaultTransportLeavesExistingAlone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "http.yaml")
+	src := "servers:\n  - name: MAINT\n    host: https://zos1.example.com:443\n" +
+		"    user: IBMUSER\ntransport:\n  streamable_http:\n    enabled: true\n    listen: \":8081\"\n"
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := LoadDocument(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed := doc.EnsureDefaultTransport(); changed {
+		t.Error("an existing transport block must not be reported as changed")
+	}
+	out, _ := doc.Bytes()
+	if string(out) != src {
+		t.Errorf("existing transport block was altered:\nwant:\n%s\ngot:\n%s", src, out)
+	}
+}
+
+func TestEnsureDefaultTransportIsIdempotent(t *testing.T) {
+	path := fixture(t)
+	doc, _ := LoadDocument(path)
+	if !doc.EnsureDefaultTransport() {
+		t.Fatal("first call should add the block")
+	}
+	if doc.EnsureDefaultTransport() {
+		t.Error("second call should report no change")
+	}
+	out, _ := doc.Bytes()
+	if n := strings.Count(string(out), "transport:"); n != 1 {
+		t.Errorf("expected exactly one transport: key, got %d:\n%s", n, out)
+	}
+}
+
 func TestSaveLeavesABackup(t *testing.T) {
 	path := fixture(t)
 	doc, _ := LoadDocument(path)

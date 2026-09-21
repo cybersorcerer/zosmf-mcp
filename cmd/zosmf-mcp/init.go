@@ -247,6 +247,12 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		}
 	}
 
+	// A file with no transport key at all cannot start the server. Fill it
+	// with the common default rather than leaving a wizard-written
+	// configuration unable to run without an extra flag; any existing
+	// transport block, of any shape, is left untouched.
+	doc.EnsureDefaultTransport()
+
 	if *print {
 		out, err := doc.Bytes()
 		if err != nil {

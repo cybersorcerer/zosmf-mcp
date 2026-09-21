@@ -59,6 +59,19 @@ func (d *Document) UpsertSSHSystem(name string, entries []Entry) (bool, error) {
 	return d.upsert("ssh_systems", name, entries)
 }
 
+// EnsureDefaultTransport adds transport: {stdio: true} when the file has no
+// transport key at all, so it can start the server unassisted. An existing
+// block, of any shape, is left alone — this only fills a gap.
+func (d *Document) EnsureDefaultTransport() bool {
+	if mapValue(d.mapping(), "transport") != nil {
+		return false
+	}
+	block := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	setMapValue(block, "stdio", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"})
+	setMapValue(d.mapping(), "transport", block)
+	return true
+}
+
 // systemsKey keeps the spelling the file already uses and falls back to the
 // one the other tools write.
 func (d *Document) systemsKey() string {

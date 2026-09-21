@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 func run(t *testing.T, tty bool, args ...string) (int, string, string) {
@@ -181,5 +183,23 @@ func TestInitConfigCheckRejectsABrokenFile(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "auth type missing") {
 		t.Errorf("stderr should carry the loader's complaint, got: %s", errOut)
+	}
+}
+
+// A file written by init config alone must be able to start the server —
+// without this, the guided setup ends on a file main.go refuses to run.
+func TestInitConfigWritesADefaultTransportBlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("config.Load rejected the written file: %v", err)
+	}
+	if !cfg.Transport.Stdio {
+		t.Error("a file written by init config alone must have stdio transport enabled")
 	}
 }

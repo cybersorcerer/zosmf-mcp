@@ -33,10 +33,12 @@ fill in and `[...]` marks something optional; neither is typed literally.
    Then write it: `zosmf-mcp init config --name <NAME> --host <URL> --user
    <USERID> [--csi A,B] [--zones A,B]` — one flag per answer, the flag name
    is the field's `id` from step 1's JSON. Include every field the user
-   answered, not only these four.
+   answered, not only these four. A bad flag value fails this command
+   itself, naming the flag — fix it and run the same command again.
    Check: `zosmf-mcp init config --check` prints "... is valid" and exits 0.
-   A non-zero exit names the flag that is wrong in its message — fix only
-   that flag's value and run the write command again.
+   A non-zero exit here names the setting it rejected, not a flag — match
+   it to the field from step 1 and correct the value with the write
+   command.
 
 2. Another LPAR? Repeat step 1 with its values. Same check.
 
@@ -61,8 +63,11 @@ fill in and `[...]` marks something optional; neither is typed literally.
    `--transport stdio` explicitly to the step 5 command instead of editing
    the file.
 
-5. Register with the client. See the table below.
-   Check: the client lists zosmf-mcp as connected.
+5. Register with the client — the command differs per agent, see the
+   table below.
+   Check: `claude mcp list` / `opencode mcp list` shows zosmf-mcp as
+   connected, or the n8n node's own connection test succeeds — the table
+   has the exact string for each client.
 
 6. Container, optional — see `docs/container-setup.md`; it already passes
    `--transport streamable-http` for you.

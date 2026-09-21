@@ -134,7 +134,45 @@ make apikey          # openssl rand -base64 32
 
 ---
 
-## 5. Prepare the SSH key
+## 5. SSH keys and where they live
+
+### Two different things
+
+`JUMP_KEY` and `SSH_KEY_DIR` are easy to mix up. They serve different
+containers and only one of them is a directory:
+
+| Variable | What it points at | Default | Inside the container | Needed for |
+| --- | --- | --- | --- | --- |
+| `JUMP_KEY` | a single **file** — the key for the tunnel hop | `./secrets/jump_key` | `/key`, in the tunnel container | the tunnel setup only |
+| `SSH_KEY_DIR` | a **directory** holding the key(s) for the ZOAU tools | `./secrets` | `/keys`, in the server container | the `zoau_*` tools only |
+
+Both may point at the same key if it is authorized on both hops.
+
+Relative paths are resolved against the directory you run `make` from, so the
+defaults land in the repository. Absolute paths work the same way, with both
+Docker and Apple container. The directory is outside the image: `secrets/` is
+in `.gitignore` and `.dockerignore`, so keys are never committed or baked in.
+
+With `make container-up-direct` the key directory is **optional** — it is
+mounted only if it exists, and a host that runs no ZOAU tools needs none.
+
+### The configuration file names the container's path
+
+`ssh_systems[].key_file` is read inside the container, so it must be the
+mounted path, not the one on your host:
+
+```yaml
+ssh_systems:
+  - name: "SYSA"
+    host: "zos1.example.com"
+    username: "ibmuser"
+    key_file: "/keys/id_rsa"     # not the path it has on your host
+```
+
+A host path here fails with `Permission denied` and no further explanation,
+because the file simply is not there.
+
+### Create the tunnel key
 
 Create a **dedicated** key for the tunnel. Do not reuse your everyday personal
 key — the container key sits unencrypted on the host and should be authorized
@@ -380,7 +418,10 @@ ZOSMF_SYSA_PASSWORD=…
 ```
 
 `SSH_KEY_DIR` is only needed for the ZOAU tools. The directory is mounted at
-`/keys` when it exists, and skipped when it does not.
+`/keys` when it exists and skipped when it does not, so a host that runs no
+ZOAU tools needs no keys at all — see [section 5](#5-ssh-keys-and-where-they-live)
+for how the paths map, and remember that `key_file` in the configuration is
+the path *inside* the container.
 
 ### Start it
 
@@ -458,6 +499,16 @@ the `transport` block — only sensible if port 8081 is demonstrably unreachable
 Traffic is bypassing the tunnel. Check that `ZOSMF_PROXY` is set inside the
 container and points at the tunnel. On Apple container: did the tunnel IP change
 after a restart? Run `make container-down` then `make container-up`.
+
+**`zoau_*` tools fail with `Permission denied`**
+The key is not where the container looks. Either `SSH_KEY_DIR` does not point
+at the directory holding it, or `key_file` in the configuration still names a
+path on the host instead of `/keys/<name>` — see
+[section 5](#5-ssh-keys-and-where-they-live). Check what the container sees:
+
+```bash
+container exec zosmf-mcp ls -l /keys     # or: docker compose exec zosmf-mcp ls -l /keys
+```
 
 **The tunnel container keeps restarting**
 Almost always the key. On Linux it must be owned by root with mode 600.

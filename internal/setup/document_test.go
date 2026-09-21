@@ -84,8 +84,12 @@ func TestUpsertMatchesNameCaseInsensitively(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, _ := doc.Bytes()
-	if n := strings.Count(string(out), "- name:"); n != 1 {
+	text := string(out)
+	if n := strings.Count(text, "- name:"); n != 1 {
 		t.Errorf("got %d systems, want 1:\n%s", n, out)
+	}
+	if !strings.Contains(text, "# do not touch, ticket 123") {
+		t.Errorf("result lost the comment on user after re-setting it:\n%s", text)
 	}
 }
 

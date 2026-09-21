@@ -131,11 +131,28 @@ func setMapValue(m *yaml.Node, key string, value *yaml.Node) {
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		if m.Content[i].Value == key {
 			// Keep the key node, and with it any comment attached to it.
+			// An inline trailing comment sits on the value node, not the
+			// key node, so it has to be carried onto the replacement too.
+			carryComments(m.Content[i+1], value)
 			m.Content[i+1] = value
 			return
 		}
 	}
 	m.Content = append(m.Content, scalar(key), value)
+}
+
+// carryComments copies a replaced node's comments onto its replacement,
+// unless the replacement already carries its own.
+func carryComments(old, replacement *yaml.Node) {
+	if replacement.HeadComment == "" {
+		replacement.HeadComment = old.HeadComment
+	}
+	if replacement.LineComment == "" {
+		replacement.LineComment = old.LineComment
+	}
+	if replacement.FootComment == "" {
+		replacement.FootComment = old.FootComment
+	}
 }
 
 func scalar(s string) *yaml.Node {
@@ -161,12 +178,24 @@ func valueNode(v any) (*yaml.Node, error) {
 	}
 }
 
-// sameValue compares rendered values, which is enough to decide whether a
-// write would change anything.
+// sameValue reports whether two nodes hold the same value. Comments are not
+// part of the value: a freshly built replacement never carries one of its
+// own, so comparing them would always call a re-set of an unchanged value
+// "different" once the existing node has a comment on it — which is exactly
+// the write setMapValue must recognize as a no-op and leave alone.
 func sameValue(a, b *yaml.Node) bool {
-	ra, err1 := render(a)
-	rb, err2 := render(b)
-	return err1 == nil && err2 == nil && bytes.Equal(ra, rb)
+	if a.Kind != b.Kind || a.Tag != b.Tag || a.Value != b.Value {
+		return false
+	}
+	if len(a.Content) != len(b.Content) {
+		return false
+	}
+	for i := range a.Content {
+		if !sameValue(a.Content[i], b.Content[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 func render(n *yaml.Node) ([]byte, error) {

@@ -16,7 +16,7 @@ REMOTE_USER ?=
 REMOTE_DIR  ?= ~/.local/bin
 REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
 
-.PHONY: all build build-all build-local clean test vet fmt lint check-identifiers run install deploy apikey docker-build docker-up docker-up-direct docker-down docker-logs container-build container-up container-up-direct container-down container-logs launch-agent launch-agent-remove
+.PHONY: all build build-all build-local clean test vet fmt lint check-identifiers run install deploy apikey docker-build docker-up docker-up-direct docker-down docker-logs container-build container-up container-up-direct container-down container-logs launch-agent launch-agent-remove install-skill
 
 all: fmt vet check-identifiers test build-local
 
@@ -177,6 +177,14 @@ launch-agent:
 launch-agent-remove:
 	@./scripts/install-launch-agent.sh --uninstall
 
+# Copies the setup instructions into an agent's own directory. Nothing is
+# installed anywhere without this being run on purpose.
+AGENT ?= claude
+SCOPE ?= project
+
+install-skill:
+	@./scripts/install-skill.sh $(AGENT) $(SCOPE)
+
 help:
 	@echo "Targets:"
 	@echo "  all       - fmt, vet, test, build (default)"
@@ -193,6 +201,8 @@ help:
 	@echo "              REMOTE_HOST/REMOTE_USER are read from .env; override on the command line if needed"
 	@echo "  tidy      - Run go mod tidy"
 	@echo "  apikey    - Generate a bearer token for the HTTP transports"
+	@echo "  install-skill - Install the guided-setup instructions for an agent"
+	@echo "              AGENT=claude|opencode|pi (default claude), SCOPE=project|user (default project)"
 	@echo ""
 	@echo "Containers (see docs/container-setup.md):"
 	@echo "  docker-build/-up/-down/-logs      - Docker with Compose, server plus jump host tunnel"

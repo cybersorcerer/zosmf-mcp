@@ -37,7 +37,13 @@ func BindFlags(fs *flag.FlagSet, fields []Field) *Values {
 			v.registerList(field.ID, &out)
 			continue
 		}
-		s := fs.String(field.ID, field.Default, usage)
+		// The flag's own default is "", not field.Default: Values.Has must
+		// mean "the user answered this flag", so a rerun that omits a flag
+		// leaves the existing file value alone instead of overwriting it
+		// with the catalog default (e.g. rejectUnauthorized flipping back
+		// to true). The wizard applies field.Default itself; --questions
+		// still publishes it for documentation.
+		s := fs.String(field.ID, "", usage)
 		v.registerScalar(field.ID, s)
 	}
 	return v

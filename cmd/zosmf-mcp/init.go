@@ -50,7 +50,7 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "%v\nfix the configuration first: zosmf-mcp init config --check --file %s\n", err, path)
+		_, _ = fmt.Fprintf(stderr, "%v\nwrite the configuration first: zosmf-mcp init config --file %s\n", err, path)
 		return 1
 	}
 	raw, err := os.ReadFile(path)
@@ -129,6 +129,8 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 	_, _ = fmt.Fprintf(stdout, "wrote %s with %d variable(s), mode 600\n", *envFile, len(vars))
 	_, _ = fmt.Fprintln(stdout, "values are not printed here — read them from the file if you need them")
+	_, _ = fmt.Fprintf(stdout, "make it reach the server: shell — `set -a; . %s; set +a` before starting it;\n", *envFile)
+	_, _ = fmt.Fprintln(stdout, "stdio client — pass each variable with its own env flag, e.g. `claude mcp add --env NAME=value ...`")
 	return 0
 }
 

@@ -67,6 +67,8 @@ Register with an MCP client, for example Claude Code — `claude mcp list` shoul
 claude mcp add zosmf-mcp -- zosmf-mcp --config <path init config printed>
 ```
 
+Make the password reach the server: in a shell, `set -a; . ./.env; set +a` before starting it; for the `claude mcp add` above, pass it instead with `--env NAME=value` (repeatable), since the client — not your shell — starts the process.
+
 More systems, other clients, and containers: [section 3](#3-configuration) and [section 5](#5-registering-the-mcp-server) below — the wizard automates the same configuration file those sections describe editing by hand. Prefer an agent to run this for you? `make install-skill` installs the same procedure as a skill for Claude Code, opencode, or pi.
 
 ---
@@ -487,9 +489,7 @@ Claude Code (the `claude` CLI tool) reads MCP server configurations from `~/.cla
 **Register globally** (applies to all projects):
 
 ```bash
-claude mcp add zosmf-mcp \
-  /Users/<user>/.local/bin/zosmf-mcp \
-  -- --config /Users/<user>/.smpe-zosmf.yaml
+claude mcp add zosmf-mcp -- /Users/<user>/.local/bin/zosmf-mcp --config /Users/<user>/.smpe-zosmf.yaml
 ```
 
 Or manually in `~/.claude/mcp.json`:

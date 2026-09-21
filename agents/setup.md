@@ -51,42 +51,53 @@ fill in and `[...]` marks something optional; neither is typed literally.
    Check: the file it wrote exists and is mode 600 (`stat -f %Lp .env` on
    macOS/BSD, `stat -c %a .env` on Linux, must print `600`).
 
-4. Transport: `init config` already added `stdio: true` to `<CFG>` if the
+4. Prove the password actually reaches the server before wiring up a
+   client: `set -a; . ./.env; set +a; timeout 2 zosmf-mcp --config <CFG>
+   --transport stdio 2>&1 | tee /tmp/zosmf-mcp-start.log`.
+   Check: the log has one `password from system-env` or `password from
+   file` line per system — never `password from none`. `from none`: the
+   variable step 3 wrote is not reaching the process — confirm it was
+   exported (`set -a`) before this command ran; for a stdio client, pass
+   the variable with the client's own env mechanism instead (see step 6).
+
+5. Transport: `init config` already added `stdio: true` to `<CFG>` if the
    file had no transport block yet, so a client that runs the binary itself
    (Claude Code, Claude Desktop, VS Code, Cursor, opencode) needs nothing
-   extra in step 5. `streamable-http` (a container, n8n) is never written to
+   extra in step 6. `streamable-http` (a container, n8n) is never written to
    the file — name it explicitly with `--transport streamable-http` on that
-   invocation, in step 6.
+   invocation, in step 7.
    Check: `grep -q 'stdio: true' <CFG>` exits 0, or the command you run in
-   step 6 names `--transport streamable-http` explicitly. Neither: `<CFG>`
+   step 7 names `--transport streamable-http` explicitly. Neither: `<CFG>`
    already carries a different transport block from an earlier setup — add
-   `--transport stdio` explicitly to the step 5 command instead of editing
+   `--transport stdio` explicitly to the step 6 command instead of editing
    the file.
 
-5. Register with the client — the command differs per agent, see the
-   table below.
+6. Register with the client — the command differs per agent, see the
+   table below. A stdio client that does not inherit a sourced shell
+   environment needs the `.env` variables passed through its own `env:`
+   mechanism (the table below shows `--env` for Claude Code).
    Check: `claude mcp list` / `opencode mcp list` shows zosmf-mcp as
    connected, or the n8n node's own connection test succeeds — the table
    has the exact string for each client.
 
-6. Container, optional — see `docs/container-setup.md`; it already passes
+7. Container, optional — see `docs/container-setup.md`; it already passes
    `--transport streamable-http` for you.
    Check: `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/mcp`
    prints `401` (no Authorization header sent yet — this confirms the
    server answers and the API key is enforced, not that you are in).
 
-7. Closing probe: have the client make one real zosmf-mcp tool call, for
+8. Closing probe: have the client make one real zosmf-mcp tool call, for
    example listing jobs on the system just configured.
    Check: the answer carries data — a job list, a dataset list, whatever
    the tool returns — not an error. An error here is a configuration
    problem, not a setup-procedure problem: read what it names and go back
    to step 1 or step 3, never around this file.
 
-## Step 5 — registering with a client
+## Step 6 — registering with a client
 
 | Client | Command / configuration | Check |
 | --- | --- | --- |
-| Claude Code | `claude mcp add zosmf-mcp -- <path-to-zosmf-mcp> --config <CFG>` | `claude mcp list` shows `zosmf-mcp` as `✔ Connected` |
+| Claude Code | `claude mcp add zosmf-mcp --env ZOSMF_<SYSTEM>_PASSWORD=<value> -- <path-to-zosmf-mcp> --config <CFG>` (repeat `--env` per variable from step 3; omit it if the shell that starts Claude Code already sourced `.env`) | `claude mcp list` shows `zosmf-mcp` as `✔ Connected` |
 | opencode | `opencode mcp add zosmf-mcp -- <path-to-zosmf-mcp> --config <CFG>` | `opencode mcp list` shows `zosmf-mcp` as `connected` |
 | pi | pi has no built-in MCP client by design. If the `pi-mcp-adapter` extension is installed, it reads the same `.mcp.json` the Claude Code row writes — otherwise use pi to run this procedure for a client that does have one. | not applicable, or `/mcp` (adapter installed) shows zosmf-mcp connected |
 | n8n | Run the server with `--transport streamable-http` (the container already does). In n8n, add an **MCP Client Tool** node: transport `Streamable HTTP`, URL `http://<host>:8081/mcp`. | the node's connection test succeeds |

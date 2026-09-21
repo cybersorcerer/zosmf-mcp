@@ -27,6 +27,7 @@ servers:
 
 func TestSystemEnvPasswordWins(t *testing.T) {
 	unsetEnv(t, "ZOSMF_PASSWORD")
+	unsetEnv(t, "ZOSMF_PROD_PASSWORD")
 	t.Setenv("ZOSMF_MAINT_PASSWORD", "from-system-var")
 
 	cfg := loadTestConfig(t, yamlTwoSystems)
@@ -47,6 +48,7 @@ func TestSystemEnvPasswordWins(t *testing.T) {
 
 func TestGlobalEnvPasswordStillApplies(t *testing.T) {
 	unsetEnv(t, "ZOSMF_MAINT_PASSWORD")
+	unsetEnv(t, "ZOSMF_PROD_PASSWORD")
 	t.Setenv("ZOSMF_PASSWORD", "from-global-var")
 
 	cfg := loadTestConfig(t, yamlTwoSystems)

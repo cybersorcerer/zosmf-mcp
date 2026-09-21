@@ -35,3 +35,6 @@ docs/superpowers
 
 # SDD scratch workspace (subagent-driven-development)
 .superpowers/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

@@ -63,6 +63,62 @@ func TestWriteEnvFileTightensPermissionsOnAnExistingFile(t *testing.T) {
 	}
 }
 
+func TestWriteEnvFileLeavesNoTemporaryFileBehindAfterSuccess(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte("EXISTING=keep\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteEnvFile(path, map[string]string{"ZOSMF_MAINT_PASSWORD": "new"}); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != filepath.Base(path) {
+			t.Errorf("temporary file left behind: %q in %s", e.Name(), dir)
+		}
+	}
+}
+
+func TestWriteEnvFileLeavesTheOriginalUnchangedWhenTheWriteFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores the permission bits this test relies on")
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	original := []byte("EXISTING=keep\nZOSMF_MAINT_PASSWORD=old\n")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Without write permission on the directory, the temporary file cannot
+	// be created, so the write must fail before it ever touches path.
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+	})
+
+	if err := WriteEnvFile(path, map[string]string{"ZOSMF_MAINT_PASSWORD": "new"}); err == nil {
+		t.Fatal("expected an error when the directory is not writable")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(original) {
+		t.Errorf("the original file was changed on a failed write:\n%s", data)
+	}
+}
+
 func TestGenerateAPIKeyIsLongAndUnique(t *testing.T) {
 	a, err := GenerateAPIKey()
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -99,13 +100,59 @@ func WriteEnvFile(path string, vars map[string]string) error {
 	for _, key := range order {
 		_, _ = fmt.Fprintf(&b, "%s=%s\n", key, existing[key])
 	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
-		return err
+	return writeFileAtomically(path, []byte(b.String()))
+}
+
+// writeFileAtomically writes data to path without ever exposing the merged
+// content — which may hold secrets — at a looser mode than 0600, even
+// briefly. A plain os.WriteFile onto an existing file only applies its mode
+// argument when the file is created; an existing file keeps its old mode
+// while the new content lands in it, so a 0644 file would hold the secrets,
+// world-readable, for the whole write. Instead, a temporary file is created
+// at 0600 from its first byte, written, and renamed over path — the rename
+// is atomic, so path either still holds its old content or already holds
+// the new content at 0600, never something in between, and a crash mid-write
+// never truncates the original.
+//
+// The temporary file is created in the same directory as path: renaming
+// across filesystems is not atomic, and os.TempDir() is often a different
+// one than path's directory.
+func writeFileAtomically(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".env-*")
+	if err != nil {
+		return fmt.Errorf("creating a temporary file in %s: %w", dir, err)
 	}
-	// os.WriteFile only applies the given mode when it creates the file; an
-	// existing file (hand-created with looser permissions, say) keeps its
-	// old mode otherwise. This file holds secrets, so tighten it explicitly.
-	return os.Chmod(path, 0o600)
+	tmpPath := tmp.Name()
+	renamed := false
+	defer func() {
+		if !renamed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	// os.CreateTemp already makes the file 0600 on Unix, but that is a
+	// platform note, not a guarantee — make it explicit in the code.
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("setting permissions on %s: %w", tmpPath, err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing %s: %w", tmpPath, err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("syncing %s: %w", tmpPath, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("closing %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("replacing %s: %w", path, err)
+	}
+	renamed = true
+	return nil
 }
 
 // GenerateAPIKey produces a bearer token of the same shape as `make apikey`.

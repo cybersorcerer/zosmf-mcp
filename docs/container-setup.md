@@ -58,7 +58,9 @@ encrypted traffic.
 **On the jump host:** a running sshd and an authorized public key. Nothing else.
 
 **On the container host:** Docker with the Compose plugin, or Apple container
-1.2+ on macOS 26 (Apple Silicon).
+1.2+ on macOS 26 (Apple Silicon). Exercised with Apple container 1.2 on
+macOS 26 and 1.4.1 on macOS 27; the latter needs the kernel step in
+[section 7](#7-path-b-apple-container).
 
 **Network:** before anything else, confirm the jump host can reach z/OSMF:
 
@@ -280,6 +282,25 @@ Apple container has no Compose equivalent. The two containers are started
 individually, and there is **no name resolution between containers** without a
 registered DNS domain — so the tunnel's IP is resolved at runtime.
 
+### One-time: install the default kernel
+
+A fresh Apple container install has no kernel configured and asks for one the
+first time a container starts. Over SSH or from a script nobody answers that
+prompt, and the start fails with:
+
+```
+Install the recommended default kernel from […kata-static…tar.zst]? [Y/n]:
+No default kernel configured.
+Please use the `container system kernel set --recommended` command
+```
+
+Do it once, up front:
+
+```bash
+container system kernel set --recommended
+container system status            # status running
+```
+
 ### One-time: drop the Rosetta requirement
 
 Apple's BuildKit builder runs in a VM that by default wires in Rosetta so it can
@@ -312,8 +333,11 @@ The file is merged with the defaults; all other settings stay as they were.
 make container-build   # container build --platform linux/arm64 -t zosmf-mcp:latest .
 make container-up      # tunnel + server, including IP resolution
 make container-logs    # container logs -f zosmf-mcp
-make container-down    # stop and remove both containers
+make container-down    # stop and remove what is running
 ```
+
+`container-down` serves both setups: it stops the server and the tunnel
+individually, so it stays quiet on a host that never had a tunnel.
 
 ### The same steps without make
 
@@ -375,6 +399,15 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8081/mcp \
   -H 'Content-Type: application/json' -d '{}'
 # Expected: 401
 ```
+
+> This call sends **no** token on purpose, so `401` is the result that proves
+> the server is protected. Without `-o /dev/null -w '%{http_code}'` the same
+> answer prints as its body text, `unauthorized` — that is a pass, not a
+> failure. The server's log says which of the two it was:
+> `rejected POST /mcp: no bearer token` means no `Authorization` header
+> arrived at all, `wrong bearer token` means the key did not match.
+> Container logs are in UTC, which is worth remembering when matching them
+> against the time on your machine.
 
 Full round trip with a real tool call:
 

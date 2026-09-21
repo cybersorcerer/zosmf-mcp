@@ -304,10 +304,51 @@ written by hand.
   its content.
 - `CHANGELOG.md`: under Unreleased, then released as 0.7.0.
 
-## 8. Open question to settle during implementation
+## 8. Where opencode and pi look for instructions
 
-Where exactly opencode and pi look for instructions, and in which format.
-This is not guesswork material: the first implementation step is to find out
-from their documentation and record the answer here. Acceptance criterion for
-that step is a wrapper file for each that the respective agent actually
-discovers — verified by running it, not by reading about it.
+Checked against opencode 1.18.31 and pi (`@earendil-works/pi-coding-agent`)
+0.85.1, the versions installed on the machine this was written on.
+
+| Agent | Project path | User path | File / front matter | Invocation | Source |
+| --- | --- | --- | --- | --- | --- |
+| opencode | `.opencode/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | `SKILL.md`; YAML front matter `name` (required, must equal the folder name) and `description` (required); `license`, `compatibility`, `metadata` optional, everything else ignored | Automatic only. The agent calls its built-in `skill` tool when a loaded skill's `description` matches the task; gated by the `skill` permission key. No slash command exists for skills specifically. | <https://opencode.ai/docs/skills/> |
+| pi | `.pi/skills/<name>/SKILL.md` (only once the project directory is trusted) | `~/.pi/agent/skills/<name>/SKILL.md` | `SKILL.md`; YAML front matter `name` and `description` required, `name` does *not* need to match the folder | Both. Descriptions sit in the system prompt at all times (progressive disclosure loads the body on demand), and a user can force it with `/skill:<name>`. | `docs/skills.md` shipped inside the installed package: <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md> |
+
+For a wrapper named `zosmf-mcp-setup`, Task 10 hands the installer these four
+paths: `.opencode/skills/zosmf-mcp-setup/SKILL.md`,
+`~/.config/opencode/skills/zosmf-mcp-setup/SKILL.md`,
+`.pi/skills/zosmf-mcp-setup/SKILL.md`, and
+`~/.pi/agent/skills/zosmf-mcp-setup/SKILL.md`.
+
+**opencode.** Verified by running: a probe skill placed at
+`.opencode/skill/zzz-task9-probe/SKILL.md` in this repository (the singular
+form — opencode's own built-in `customize-opencode` skill documents both
+`skill` and `skills` as accepted directory names) was picked up by
+`opencode debug skill`, a non-interactive subcommand that lists every loaded
+skill and its source path without starting a session or contacting a model.
+The user-scope path was not exercised the same way — writing into
+`~/.config/opencode` was off limits for this task — so it rests on the
+documentation alone, which two independent sources agree on: the shipped
+built-in skill and the public docs page above. `name` must equal the
+directory name exactly, unlike pi; get this wrong and the skill loads with a
+different id than the front matter claims, or opencode may reject it.
+Skill discovery also walks up from the working directory to the git
+worktree root and additionally reads `.claude/skills/` and `.agents/skills/`
+at both scopes — real, but not the location this plan writes to, so it is
+noted and not used.
+
+**pi.** Verified by running: a probe skill placed at
+`.pi/skills/zzz-task9-probe/SKILL.md` in this repository was picked up by
+`pi --mode rpc --approve --no-session --offline`, sending a single local
+`get_commands` JSON-RPC request over stdin. That command answers from
+already-loaded state — no prompt is sent and no model is called, so it cost
+nothing against the account's quota — and it echoed the probe back as
+`"source":"skill"`, `"scope":"project"`, pointing at the exact file. The same
+response also confirmed the sibling `~/.agents/skills/<name>/SKILL.md`
+location (pre-existing skills on this machine, not written for this task)
+loading with `"scope":"user"`. The specific documented user path,
+`~/.pi/agent/skills/`, was not exercised — writing into `~/.pi` was off
+limits — so it rests on the shipped `docs/skills.md` alone. `--approve`
+trusts a project's local files for that run only, matching what an
+installer or setup skill would need to do non-interactively; it is not
+saved to `~/.pi/agent/trust.json`.

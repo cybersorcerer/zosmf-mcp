@@ -29,13 +29,107 @@ func runInit(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 }
 
-// runInitEnv will drive the interactive/agent flow for exporting the
-// per-system password environment variables. Not implemented yet — that is
-// a later task; this stub only keeps `zosmf-mcp init env` from being an
-// undefined dispatch target.
+// runInitEnv works out which secrets the configuration at --file needs and
+// writes them to --env-file. It never prints a secret: not the values asked
+// for, not a generated key, not an error message.
 func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
-	_, _ = fmt.Fprintln(stderr, "zosmf-mcp init env is not implemented yet")
-	return 2
+	fs := flag.NewFlagSet("init env", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	file := fs.String("file", "", "configuration file to read the required variables from")
+	envFile := fs.String("env-file", ".env", "environment file to write")
+	questions := fs.Bool("questions", false, "print the required variables as JSON and exit")
+	genKey := fs.Bool("generate-api-key", false, "generate MCP_API_KEY instead of asking for it")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	path, err := resolveConfigPath(*file)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "%v\nfix the configuration first: zosmf-mcp init config --check --file %s\n", err, path)
+		return 1
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	needed := setup.RequiredEnvVars(cfg, raw)
+
+	// --generate-api-key is an explicit request for a key. RequiredEnvVars
+	// only asks for MCP_API_KEY when an HTTP transport is already enabled in
+	// the file, which would otherwise make the flag a no-op for a config
+	// that has not turned HTTP on yet.
+	if *genKey {
+		hasKey := false
+		for _, name := range needed {
+			if name == "MCP_API_KEY" {
+				hasKey = true
+				break
+			}
+		}
+		if !hasKey {
+			needed = append(needed, "MCP_API_KEY")
+		}
+	}
+
+	if *questions {
+		fields := make([]setup.Field, 0, len(needed))
+		for _, name := range needed {
+			fields = append(fields, setup.Field{
+				ID: name, YAMLKey: "", Label: name, Group: "env",
+				Kind: setup.KindString, Cardinality: setup.One, Required: true,
+				Help: "Secret. Written to the environment file, never to the configuration.",
+			})
+		}
+		data, err := setup.CatalogJSON("init env", fields)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		_, _ = fmt.Fprintln(stdout, string(data))
+		return 0
+	}
+
+	vars := map[string]string{}
+	for _, name := range needed {
+		if name == "MCP_API_KEY" && *genKey {
+			key, err := setup.GenerateAPIKey()
+			if err != nil {
+				_, _ = fmt.Fprintln(stderr, err)
+				return 1
+			}
+			vars[name] = key
+			continue
+		}
+		if value := os.Getenv(name); value != "" {
+			vars[name] = value
+			continue
+		}
+		if !isTTY {
+			_, _ = fmt.Fprintf(stderr, "%s is not set and there is no terminal to ask on.\n", name)
+			_, _ = fmt.Fprintf(stderr, "export it and run again, or use --generate-api-key for MCP_API_KEY.\n")
+			return 2
+		}
+		value, err := setup.AskSecret(name, os.Stdin, stdout)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		vars[name] = value
+	}
+
+	if err := setup.WriteEnvFile(*envFile, vars); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "wrote %s with %d variable(s), mode 600\n", *envFile, len(vars))
+	_, _ = fmt.Fprintln(stdout, "values are not printed here — read them from the file if you need them")
+	return 0
 }
 
 func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {

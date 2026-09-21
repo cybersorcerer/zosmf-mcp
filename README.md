@@ -52,6 +52,25 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 
 ---
 
+## Getting started
+
+```bash
+git clone https://github.com/cybersorcerer/zosmf-mcp.git && cd zosmf-mcp
+make install && export PATH="$HOME/.local/bin:$PATH"
+zosmf-mcp init config   # one system, interactive — writes the config file
+zosmf-mcp init env      # that system's password — writes .env, mode 600
+```
+
+Register with an MCP client, for example Claude Code — `claude mcp list` should then show `zosmf-mcp` as `✔ Connected`:
+
+```bash
+claude mcp add zosmf-mcp -- zosmf-mcp --config <path init config printed>
+```
+
+More systems, other clients, and containers: [section 3](#3-configuration) and [section 5](#5-registering-the-mcp-server) below — the wizard automates the same configuration file those sections describe editing by hand. Prefer an agent to run this for you? `make install-skill` installs the same procedure as a skill for Claude Code, opencode, or pi.
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
@@ -212,7 +231,7 @@ In the config:
 password: "${ZOSMF_SYSA_PASSWORD}"
 ```
 
-If `auth.password` is not set for a system and no `${ENV_VAR}` placeholder is present, the server falls back to the `ZOSMF_PASSWORD` environment variable as a global default.
+A system's password is resolved in this order: an explicit `${ENV_VAR}` (or literal value) in `auth.password`; otherwise `ZOSMF_<SYSTEM>_PASSWORD`, derived from the system's `name` — nothing to add to the file for this one; otherwise the global `ZOSMF_PASSWORD` fallback. The startup log names which of the three each system used, never the value itself.
 
 ### SSH Systems (for ZOAU tools)
 

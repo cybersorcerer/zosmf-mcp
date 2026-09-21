@@ -435,6 +435,8 @@ tunnel, jump host, z/OSMF.
 
 ## 9. Direct access (no jump host)
 
+[`agents/setup.md`](../agents/setup.md) covers this same ground as one step of the guided setup procedure — its step 6 is this section.
+
 When the container host can reach z/OSMF itself, there is nothing to tunnel.
 One container, no SOCKS proxy, and the same image as above.
 

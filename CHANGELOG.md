@@ -8,7 +8,11 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`zosmf-mcp init config` and `zosmf-mcp init env`.** An interactive wizard, or flags for scripting, that write the shared configuration file and its `.env` secrets: one system's connection details, its ZOAU/SSH settings as one all-or-nothing group, and the `MCP_API_KEY` or password variables the file ends up needing. `--questions` prints the field catalog as JSON for an agent to drive the wizard from; `init config` also has `--check` and `--print` to validate or preview a file without writing it, and `init env` has `--generate-api-key` to mint `MCP_API_KEY` instead of asking for it. Neither command hangs when there is no terminal and no flags — it names what's missing and exits. A file `init config` writes with no transport block at all gets `transport: stdio: true`, so it can start the server unmodified.
+- **Per-system password lookup by convention.** A password not given in the file is read from `ZOSMF_<SYSTEM>_PASSWORD` — derived from the system's `name`, nothing to add to the file for this one — before falling back to the existing global `ZOSMF_PASSWORD`. The startup log names which of the three sources each system used, never the value.
+- **`agents/setup.md`**, a setup procedure meant to be followed identically by Claude Code, opencode, pi, or a human at a terminal. `make install-skill [AGENT=claude|opencode|pi] [SCOPE=project|user]` installs it, and a matching wrapper, wherever that agent looks for skills.
 
 ## [0.6.0] — 2026-09-21
 

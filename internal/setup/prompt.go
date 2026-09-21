@@ -1,11 +1,74 @@
 package setup
 
 import (
-	"errors"
+	"bufio"
+	"fmt"
 	"io"
+	"strings"
 )
 
-// AskAll walks the catalog and asks for each field. Task 6 implements it.
+// AskAll walks the catalog once, asking for every field. An empty answer
+// leaves an optional field unset; a required field is asked again.
 func AskAll(fields []Field, v *Values, in io.Reader, out io.Writer) error {
-	return errors.New("the interactive wizard is not implemented yet — pass the fields as flags")
+	r := bufio.NewReader(in)
+	for _, f := range fields {
+		for {
+			prompt(out, f)
+			line, err := r.ReadString('\n')
+			if err != nil && line == "" {
+				if f.Required {
+					return fmt.Errorf("input ended before %s was answered", f.ID)
+				}
+				break
+			}
+			answer := strings.TrimSpace(line)
+			if answer == "" {
+				if f.Required {
+					_, _ = fmt.Fprintf(out, "  %s is required.\n", f.ID)
+					continue
+				}
+				if f.Default != "" {
+					v.Set(f.ID, []string{f.Default})
+				}
+				break
+			}
+			if f.Cardinality == Many {
+				var vals []string
+				for _, part := range strings.Split(answer, ",") {
+					if part = strings.TrimSpace(part); part != "" {
+						vals = append(vals, part)
+					}
+				}
+				v.Set(f.ID, vals)
+			} else {
+				v.Set(f.ID, []string{answer})
+			}
+			break
+		}
+	}
+
+	if !v.Has("csi") || !v.Has("zones") {
+		_, _ = fmt.Fprintln(out, "\nNote: without csi and zones every SMP/E tool call has to name them,")
+		_, _ = fmt.Fprintln(out, "or it fails with \"no csi_dataset provided\" / \"no zone provided\".")
+	}
+	_, _ = fmt.Fprintln(out, "\nThe password is not stored in this file. Run `zosmf-mcp init env` next.")
+	return nil
+}
+
+func prompt(out io.Writer, f Field) {
+	marker := ""
+	if f.Required {
+		marker = " (required)"
+	}
+	_, _ = fmt.Fprintf(out, "\n%s%s\n  %s\n", f.Label, marker, f.Help)
+	if f.Cardinality == Many {
+		_, _ = fmt.Fprintln(out, "  several values, comma separated")
+	}
+	if f.Example != nil {
+		_, _ = fmt.Fprintf(out, "  example: %v\n", f.Example)
+	}
+	if f.Default != "" {
+		_, _ = fmt.Fprintf(out, "  default: %s\n", f.Default)
+	}
+	_, _ = fmt.Fprint(out, "> ")
 }

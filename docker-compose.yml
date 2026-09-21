@@ -23,8 +23,11 @@ services:
   zosmf-mcp:
     build:
       context: .
+      # Baked into the binary and reported to clients as serverInfo.version.
+      # `make docker-build` passes the real ones from git describe.
       args:
-        VERSION: docker
+        VERSION: ${VERSION:-docker}
+        COMMIT: ${COMMIT:-unknown}
     depends_on:
       # required: false lets the server start when the tunnel profile is off.
       tunnel:

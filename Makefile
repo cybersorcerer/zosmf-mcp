@@ -79,7 +79,7 @@ apikey:
 	@openssl rand -base64 32
 
 docker-build:
-	docker compose build
+	VERSION=$(VERSION) COMMIT=$(COMMIT) docker compose build
 
 # With the jump host tunnel — for a host that cannot reach z/OSMF itself.
 docker-up: docker-build
@@ -101,7 +101,9 @@ docker-logs:
 CONTAINER_IMAGE ?= zosmf-mcp:latest
 
 container-build:
-	container build --platform linux/arm64 -t $(CONTAINER_IMAGE) .
+	container build --platform linux/arm64 \
+	  --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) \
+	  -t $(CONTAINER_IMAGE) .
 
 container-up: container-build
 	@test -f .env || { echo ".env is missing — run: cp .env.example .env and fill it in"; exit 1; }

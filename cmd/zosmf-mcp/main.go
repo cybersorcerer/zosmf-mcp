@@ -38,6 +38,14 @@ func versionInfo(version, commit string) string {
 }
 
 func main() {
+	// `init` is a separate command with its own flags; it must not reach the
+	// server's flag set.
+	if len(os.Args) > 1 && os.Args[1] == "init" {
+		fi, _ := os.Stdin.Stat()
+		isTTY := fi != nil && fi.Mode()&os.ModeCharDevice != 0
+		os.Exit(runInit(os.Args[2:], os.Stdout, os.Stderr, isTTY))
+	}
+
 	configPath := flag.String("config", "", "Path to configuration file (default: search .smpe-zosmf.yaml in cwd and ~/.config/smpe_ls/)")
 	transport := flag.String("transport", "auto", "Transport type: stdio, http, or auto (uses config)")
 	listen := flag.String("listen", "", "HTTP listen address (overrides config)")

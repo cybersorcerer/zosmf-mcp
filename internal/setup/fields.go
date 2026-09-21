@@ -3,7 +3,10 @@
 // flags and the JSON question list, so the three cannot drift apart.
 package setup
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type Kind string
 
@@ -112,4 +115,28 @@ func CatalogJSON(command string, fields []Field) ([]byte, error) {
 		Command string  `json:"command"`
 		Fields  []Field `json:"fields"`
 	}{command, fields}, "", "  ")
+}
+
+// EntriesFor turns the answers into the keys to write, skipping the ones
+// that were not answered and the name, which identifies the entry.
+func EntriesFor(fields []Field, v *Values) []Entry {
+	var entries []Entry
+	for _, f := range fields {
+		if f.ID == "name" || !v.Has(f.ID) {
+			continue
+		}
+		switch {
+		case f.Cardinality == Many:
+			entries = append(entries, Entry{Key: f.YAMLKey, Value: v.Many(f.ID)})
+		case f.Kind == KindBool:
+			entries = append(entries, Entry{Key: f.YAMLKey, Value: v.One(f.ID) == "true"})
+		case f.Kind == KindInt:
+			var n int
+			_, _ = fmt.Sscanf(v.One(f.ID), "%d", &n)
+			entries = append(entries, Entry{Key: f.YAMLKey, Value: n})
+		default:
+			entries = append(entries, Entry{Key: f.YAMLKey, Value: v.One(f.ID)})
+		}
+	}
+	return entries
 }

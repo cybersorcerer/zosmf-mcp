@@ -2,6 +2,7 @@ package setup
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,18 @@ func TestConfigFieldsAreComplete(t *testing.T) {
 	for _, required := range []string{"name", "host", "user", "csi", "zones"} {
 		if !seen[required] {
 			t.Errorf("catalog is missing %q", required)
+		}
+	}
+}
+
+// A password never belongs in the configuration file — see section 4 of the
+// design doc. This is the invariant that keeps a future field from quietly
+// breaking that: nothing in the catalog `init config` writes may be named
+// after one.
+func TestConfigFieldsNameNoPassword(t *testing.T) {
+	for _, f := range ConfigFields() {
+		if strings.Contains(strings.ToLower(f.ID), "password") || strings.Contains(strings.ToLower(f.YAMLKey), "password") {
+			t.Errorf("field %q writes a password into the configuration file", f.ID)
 		}
 	}
 }

@@ -33,13 +33,37 @@ servers:
 	}
 }
 
+// envValue reads one KEY=value line from a written env file, the same way
+// WriteEnvFile parses one back in. Cutting the *whole file* on a prefix, as
+// this test used to, folds the rest of the file — every other line — into
+// what it then calls "the value", so a later substring check against that
+// string can never realistically match anything on stdout: the check was
+// unfalsifiable, not passing.
+func envValue(t *testing.T, path, key string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		k, v, found := strings.Cut(line, "=")
+		if found && k == key {
+			return v
+		}
+	}
+	return ""
+}
+
 func TestInitEnvWritesAKeyWithoutPrintingIt(t *testing.T) {
 	// Without a password already in the environment, runInitEnv would stop
 	// before it ever reaches the write path — the config below needs
 	// ZOSMF_MAINT_PASSWORD, and this test runs with no TTY to ask on. Set it
 	// so the test actually exercises WriteEnvFile and the key generation it
-	// means to check.
-	t.Setenv("ZOSMF_MAINT_PASSWORD", "x")
+	// means to check. The value is distinctive, not "x": a one-character
+	// sentinel is too likely to appear incidentally (in the generated key,
+	// in a path, anywhere) for its absence to mean anything.
+	const password = "S3cr3t-Watermelon-77Q"
+	t.Setenv("ZOSMF_MAINT_PASSWORD", password)
 
 	dir := t.TempDir()
 	conf := filepath.Join(dir, "conf.yaml")
@@ -58,16 +82,23 @@ servers:
 		t.Fatalf("exit %d, stderr: %s", code, errOut)
 	}
 
-	data, err := os.ReadFile(envFile)
-	if err != nil {
-		t.Fatal(err)
+	key := envValue(t, envFile, "MCP_API_KEY")
+	if key == "" {
+		data, _ := os.ReadFile(envFile)
+		t.Fatalf(".env has no MCP_API_KEY:\n%s", data)
 	}
-	if !strings.Contains(string(data), "MCP_API_KEY=") {
-		t.Errorf(".env has no API key:\n%s", data)
+	if got := envValue(t, envFile, "ZOSMF_MAINT_PASSWORD"); got != password {
+		t.Fatalf(".env carries %q for ZOSMF_MAINT_PASSWORD, want %q", got, password)
 	}
-	key := strings.TrimPrefix(strings.TrimSpace(string(data)), "MCP_API_KEY=")
-	if key != "" && strings.Contains(out, key) {
-		t.Error("the generated key was printed to stdout")
+
+	// Neither secret may appear anywhere on either stream.
+	for _, secret := range []string{key, password} {
+		if strings.Contains(out, secret) {
+			t.Errorf("a secret was printed to stdout:\n%s", out)
+		}
+		if strings.Contains(errOut, secret) {
+			t.Errorf("a secret was printed to stderr:\n%s", errOut)
+		}
 	}
 
 	info, err := os.Stat(envFile)

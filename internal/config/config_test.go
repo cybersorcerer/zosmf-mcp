@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+// unsetEnv removes a variable for the duration of the test. Load reads the
+// real environment, so a variable that happens to be exported in the shell
+// running `make test` would otherwise decide the outcome. t.Setenv registers
+// the restore, os.Unsetenv makes os.LookupEnv report the variable as absent.
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	t.Setenv(key, "")
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("unsetting %s: %v", key, err)
+	}
+}
+
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.yaml")
@@ -262,6 +274,7 @@ servers:
 }
 
 func TestProxyAbsentMeansInactive(t *testing.T) {
+	unsetEnv(t, "ZOSMF_PROXY")
 	cfg := loadTestConfig(t, `
 servers:
   - name: SYS1
@@ -368,6 +381,7 @@ ssh_systems:
 }
 
 func TestHTTPTransportRequiresAPIKey(t *testing.T) {
+	unsetEnv(t, "MCP_API_KEY")
 	cfg := loadTestConfig(t, `
 transport:
   streamable_http:
@@ -388,6 +402,7 @@ servers:
 }
 
 func TestHTTPTransportAllowInsecureSkipsCheck(t *testing.T) {
+	unsetEnv(t, "MCP_API_KEY")
 	cfg := loadTestConfig(t, `
 transport:
   streamable_http:
@@ -441,6 +456,7 @@ servers:
 }
 
 func TestProxyEnabledWithoutURLFails(t *testing.T) {
+	unsetEnv(t, "ZOSMF_PROXY")
 	_, err := loadTestConfigErr(t, `
 proxy:
   enabled: true
@@ -543,6 +559,7 @@ ssh_systems:
 // literal text, which surfaced much later as an unexplained 401 from z/OSMF.
 // Failing at load time names the variable instead.
 func TestLoadFailsOnUnresolvedEnvVars(t *testing.T) {
+	unsetEnv(t, "ZOSMF_SYS1_PASSWORD")
 	_, err := loadTestConfigErr(t, `
 servers:
   - name: SYS1
@@ -559,6 +576,8 @@ servers:
 }
 
 func TestLoadReportsAllUnresolvedEnvVars(t *testing.T) {
+	unsetEnv(t, "SYS1_HOST")
+	unsetEnv(t, "SYS1_PASSWORD")
 	_, err := loadTestConfigErr(t, `
 servers:
   - name: SYS1
@@ -638,6 +657,7 @@ servers:
 // requirement must follow the transport that actually runs, not the file's
 // enabled flag, or the server comes up unauthenticated on a published port.
 func TestValidateHTTPAuthCoversForcedTransport(t *testing.T) {
+	unsetEnv(t, "MCP_API_KEY")
 	cfg := loadTestConfig(t, `
 transport:
   stdio: true

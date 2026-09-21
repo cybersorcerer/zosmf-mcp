@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/config"
@@ -22,6 +23,14 @@ var (
 	commit  = "unknown"
 )
 
+// versionInfo formats what --version prints, in the same layout as the other
+// tools of this suite. git describe prefixes the tag with "v"; the printed
+// version does not carry it.
+func versionInfo(version, commit string) string {
+	return fmt.Sprintf("%s %s\nCommit: %s\nCopyright (c) 2026 Sir Tobi aka Cybersorcerer\n",
+		mcp.ServerName, strings.TrimPrefix(version, "v"), commit)
+}
+
 func main() {
 	configPath := flag.String("config", "", "Path to configuration file (default: search .smpe-zosmf.yaml in cwd and ~/.config/smpe_ls/)")
 	transport := flag.String("transport", "auto", "Transport type: stdio, http, or auto (uses config)")
@@ -30,7 +39,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("%s (commit: %s)\nCopyright 2026 Ronald Funk (Cybersorcerer)\n", version, commit)
+		fmt.Print(versionInfo(version, commit))
 		os.Exit(0)
 	}
 

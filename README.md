@@ -1453,6 +1453,16 @@ If any are missing, generate an alert.
 - **SMP/E**: If `csi_dataset` and `zone` are not specified explicitly, the default values from the system configuration are used.
 - **Passwords**: Never hardcode passwords in the configuration file. Always use environment variables (`${VAR}`).
 
+## Contributing and security
+
+Pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to
+build, test and add a tool. Release history is in [CHANGELOG.md](CHANGELOG.md).
+
+Report a vulnerability privately through GitHub's
+[private vulnerability reporting](https://github.com/cybersorcerer/zosmf-mcp/security/advisories/new),
+not as a public issue. [SECURITY.md](SECURITY.md) describes what counts as
+one and which deployment risks are documented behavior.
+
 ## License
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.

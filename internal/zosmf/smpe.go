@@ -109,10 +109,10 @@ func (c *Client) pollStatusURL(statusURL string) ([]byte, error) {
 			return nil, err
 		}
 
-		switch {
-		case statusCode == 200:
+		switch statusCode {
+		case 200:
 			return body, nil
-		case statusCode == 202:
+		case 202:
 			// Still processing, continue polling
 			continue
 		default:

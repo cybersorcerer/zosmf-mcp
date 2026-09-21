@@ -37,7 +37,7 @@ func (c *Client) ListUSSFiles(path string) ([]USSFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list USS files failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
@@ -108,7 +108,7 @@ func (c *Client) ReadUSSFile(path, tag string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read USS file failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
@@ -139,7 +139,7 @@ func (c *Client) WriteUSSFile(path, content, tag string) error {
 	if err != nil {
 		return fmt.Errorf("write USS file failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {
@@ -199,7 +199,7 @@ func (c *Client) DeleteUSSFile(path string, recursive bool) error {
 	if err != nil {
 		return fmt.Errorf("delete USS file failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := readLimited(resp.Body)
 	if err != nil {

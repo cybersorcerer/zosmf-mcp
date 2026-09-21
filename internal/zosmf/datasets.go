@@ -64,7 +64,7 @@ func (c *Client) ListDatasets(dslevel, volser, start string) ([]Dataset, error) 
 	if err != nil {
 		return nil, fmt.Errorf("request to list datasets failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {
@@ -97,7 +97,7 @@ func (c *Client) ListMembers(dataset string) ([]DatasetMember, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request to list members failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *Client) ReadDatasetEx(dsname, encoding, search string, insensitive bool
 	if err != nil {
 		return nil, fmt.Errorf("read dataset failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {
@@ -237,7 +237,7 @@ func (c *Client) WriteDataset(dsname, content, sessionRef, encoding string, rele
 	if err != nil {
 		return fmt.Errorf("write dataset failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {
@@ -336,7 +336,7 @@ func (c *Client) AcquireDatasetEnq(dsname, enqType, encoding string) (content, s
 	if err != nil {
 		return "", "", fmt.Errorf("acquire ENQ failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {
@@ -373,7 +373,7 @@ func (c *Client) ReleaseDatasetEnq(dsname, sessionRef string) error {
 	if err != nil {
 		return fmt.Errorf("release ENQ failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := readLimited(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {

@@ -47,6 +47,14 @@ report "login@host" \
 	"$(echo "$files" | xargs grep -InE "$user_at_host" 2>/dev/null |
 		grep -vE '@([a-zA-Z0-9.-]+\.)?example\.(com|org|net)\b')"
 
+# Home directories name the person who ran the command. They reached the repo
+# through pasted shell transcripts in planning documents. `youruser` and
+# `user` are the placeholders the documentation uses.
+home_path='(/Users/|/home/|C:\\\\Users\\\\)[A-Za-z][A-Za-z0-9._-]+'
+report "Home directory path" \
+	"$(echo "$files" | xargs grep -InE "$home_path" 2>/dev/null |
+		grep -vE '(/Users/|/home/|Users\\\\)(youruser|user|username|ibmuser|runner|me)\b')"
+
 # A private key must never be committed, whatever it belongs to.
 report "Private key" \
 	"$(echo "$files" | xargs grep -Iln -- '-----BEGIN .*PRIVATE KEY' 2>/dev/null)"

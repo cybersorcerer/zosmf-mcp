@@ -19,7 +19,7 @@ func TestInitializeAdvertisesResources(t *testing.T) {
 	})
 	msg := &JSONRPCMessage{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "initialize", Params: params}
 
-	resp := s.HandleMessage(nil, msg)
+	resp := s.HandleMessage(context.Background(), msg)
 	if resp.Error != nil {
 		t.Fatalf("initialize failed: %v", resp.Error)
 	}
@@ -48,7 +48,7 @@ func TestInitializeAcceptsOlderProtocolVersion(t *testing.T) {
 	})
 	msg := &JSONRPCMessage{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "initialize", Params: params}
 
-	resp := s.HandleMessage(nil, msg)
+	resp := s.HandleMessage(context.Background(), msg)
 	if resp.Error != nil {
 		t.Fatalf("initialize with older protocol version failed: %v", resp.Error)
 	}

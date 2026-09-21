@@ -213,7 +213,7 @@ func (c *Client) Get(path string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request to %s failed: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {
@@ -249,7 +249,7 @@ func (c *Client) Delete(path string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request to %s failed: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := readLimited(resp.Body)
 	if err != nil {
@@ -280,7 +280,7 @@ func (c *Client) GetWithStatus(fullURL string) (int, []byte, error) {
 	if err != nil {
 		return 0, nil, fmt.Errorf("request to %s failed: %w", fullURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := readLimited(resp.Body)
 	if err != nil {
@@ -306,7 +306,7 @@ func (c *Client) doWithBodyAndStatus(method, path string, body any) (int, []byte
 	if err != nil {
 		return 0, nil, fmt.Errorf("request to %s failed: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := readLimited(resp.Body)
 	if err != nil {
@@ -336,7 +336,7 @@ func (c *Client) doWithBody(method, path string, body any) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request to %s failed: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := readLimited(resp.Body)
 	if err != nil {

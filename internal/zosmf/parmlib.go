@@ -115,7 +115,7 @@ func (c *Client) putRaw(path string, body []byte, contentType string) ([]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("request to %s failed: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := readLimited(resp.Body)
 	if err != nil {

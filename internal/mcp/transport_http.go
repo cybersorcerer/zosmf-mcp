@@ -125,7 +125,7 @@ func (t *HTTPTransport) handlePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	if len(body) == 0 {
 		http.Error(w, "Empty body", http.StatusBadRequest)
@@ -233,7 +233,7 @@ func (t *HTTPTransport) handleBatchPost(ctx context.Context, w http.ResponseWrit
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(responses)
+	_ = json.NewEncoder(w).Encode(responses)
 }
 
 func (t *HTTPTransport) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +284,7 @@ func (t *HTTPTransport) handleGet(w http.ResponseWriter, r *http.Request) {
 				t.logger.Printf("failed to marshal SSE message: %v", err)
 				continue
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
 		}
 	}
@@ -326,5 +326,5 @@ func (t *HTTPTransport) createSession() *session {
 
 func writeJSON(w http.ResponseWriter, msg *JSONRPCMessage) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(msg)
+	_ = json.NewEncoder(w).Encode(msg)
 }

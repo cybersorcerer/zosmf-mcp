@@ -224,9 +224,10 @@ type parmlibFailureItem struct {
 
 func writeParmlibMemberResult(sb *strings.Builder, indent, member, dataset, validationResult, warning string, failures []parmlibFailureItem) {
 	mark := "✓"
-	if validationResult == "failed" {
+	switch validationResult {
+	case "failed":
 		mark = "✗"
-	} else if validationResult == "N/A" {
+	case "N/A":
 		mark = "-"
 	}
 

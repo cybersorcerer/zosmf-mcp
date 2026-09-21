@@ -167,7 +167,7 @@ func (c *Client) SubmitJobJCL(jcl string) (*Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("submit job failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := readLimited(resp.Body)
 	if err != nil {

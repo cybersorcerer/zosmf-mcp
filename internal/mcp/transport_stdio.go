@@ -115,7 +115,7 @@ func (t *StdioTransport) writeMessage(msg *JSONRPCMessage) {
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	fmt.Fprintf(t.writer, "%s\n", data)
+	_, _ = fmt.Fprintf(t.writer, "%s\n", data)
 }
 
 func (t *StdioTransport) writeBatch(msgs []*JSONRPCMessage) {
@@ -127,5 +127,5 @@ func (t *StdioTransport) writeBatch(msgs []*JSONRPCMessage) {
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	fmt.Fprintf(t.writer, "%s\n", data)
+	_, _ = fmt.Fprintf(t.writer, "%s\n", data)
 }

@@ -22,7 +22,9 @@ different files.
 - A setup that produces the same configuration whoever — or whatever — runs it.
 - Usable by a human at a terminal, by Claude Code, and by agents running
   local models (opencode, pi) that cannot be trusted to author YAML.
-- Never lose what other tools put in the shared configuration file.
+- Never lose what other tools put in the shared configuration file — their
+  keys, values and comments. Exact layout (blank lines, comment column
+  alignment) may be normalised by the YAML encoder.
 - Never write a password into a configuration file.
 
 ## Non-goals
@@ -165,8 +167,10 @@ would delete both.
 `init config` therefore edits on the node level: load into a `yaml.Node`
 tree, find the entry in the `servers:` sequence whose name matches
 (case-insensitively, because the server uppercases names), and set only the
-keys we own. Anything else stays untouched, including keys that do not exist
-yet today. A system that is not present is appended. A new file gets
+keys we own. Every other key, value and comment is preserved, including keys
+that do not exist yet today — but exact layout is not: the YAML encoder may
+normalise a blank line between entries or the column a trailing comment
+starts at. A system that is not present is appended. A new file gets
 `servers:`, the spelling the other tools use.
 
 - Before the first write, a copy is left next to the file as `<file>.bak`.
@@ -270,9 +274,11 @@ The catalog, the writer and the environment file are ordinary Go code and are
 tested as such. Priority is on the writer, because that is where damage to
 someone else's file would happen.
 
-- **Round trip:** a file with comments, `home`, `defaultServer` and an
-  unknown key goes in; after an upsert everything except our keys is
-  byte-identical. Golden files.
+- **Round trip:** a file with comments, `home`, `defaultServer`, an unknown
+  key, a blank line between entries and an aligned inline comment goes in;
+  after an upsert every key, value and comment we do not own survives —
+  layout (blank lines, comment column alignment) may be normalised by the
+  YAML encoder and is not asserted on. Golden files pin the exact result.
 - **Upsert:** new system appended; existing system updated, not duplicated;
   name matching ignores case.
 - **Idempotence:** the same invocation twice leaves the file unchanged the

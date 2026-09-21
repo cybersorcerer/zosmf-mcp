@@ -85,6 +85,36 @@ func TestInitConfigPrintWritesNothing(t *testing.T) {
 	}
 }
 
+func TestInitConfigRejectsANonNumericPort(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443",
+		"--user", "IBMUSER", "--port", "abc")
+	if code == 0 {
+		t.Fatalf("expected a non-zero exit, stderr: %s", errOut)
+	}
+	if !strings.Contains(errOut, "--port") {
+		t.Errorf("stderr %q does not name the bad flag", errOut)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("a non-numeric port should not have written the file")
+	}
+}
+
+func TestInitConfigCreatesTheParentDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "dir", "conf.yaml")
+
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected the file to have been created: %v", err)
+	}
+}
+
 func TestInitConfigCheckRejectsABrokenFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "conf.yaml")
 	if err := os.WriteFile(path, []byte("servers:\n  - name: SYS1\n    host: https://z.example.com\n    auth:\n      cert_file: /x.pem\n"), 0o600); err != nil {

@@ -6,6 +6,7 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 type Kind string
@@ -118,8 +119,10 @@ func CatalogJSON(command string, fields []Field) ([]byte, error) {
 }
 
 // EntriesFor turns the answers into the keys to write, skipping the ones
-// that were not answered and the name, which identifies the entry.
-func EntriesFor(fields []Field, v *Values) []Entry {
+// that were not answered and the name, which identifies the entry. An
+// int field that does not parse is reported rather than silently written
+// as zero.
+func EntriesFor(fields []Field, v *Values) ([]Entry, error) {
 	var entries []Entry
 	for _, f := range fields {
 		if f.ID == "name" || !v.Has(f.ID) {
@@ -131,12 +134,15 @@ func EntriesFor(fields []Field, v *Values) []Entry {
 		case f.Kind == KindBool:
 			entries = append(entries, Entry{Key: f.YAMLKey, Value: v.One(f.ID) == "true"})
 		case f.Kind == KindInt:
-			var n int
-			_, _ = fmt.Sscanf(v.One(f.ID), "%d", &n)
+			raw := v.One(f.ID)
+			n, err := strconv.Atoi(raw)
+			if err != nil {
+				return nil, fmt.Errorf("--%s: %q is not a number", f.ID, raw)
+			}
 			entries = append(entries, Entry{Key: f.YAMLKey, Value: n})
 		default:
 			entries = append(entries, Entry{Key: f.YAMLKey, Value: v.One(f.ID)})
 		}
 	}
-	return entries
+	return entries, nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 	"github.com/cybersorcerer/zosmf-mcp/internal/setup"
@@ -103,12 +104,17 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 2
 	}
 
+	entries, err := setup.EntriesFor(fields, values)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 2
+	}
+
 	doc, err := setup.LoadDocument(path)
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
-	entries := setup.EntriesFor(fields, values)
 	if _, err := doc.UpsertSystem(values.One("name"), entries); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
@@ -124,6 +130,13 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 0
 	}
 
+	// The directory may not exist yet — most likely the first run for this
+	// user. 0700 because this holds configuration for a system that grants
+	// z/OS access.
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
 	if err := doc.Save(path); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
@@ -151,5 +164,5 @@ func resolveConfigPath(fileFlag string) (string, error) {
 	if home == "" {
 		return "", fmt.Errorf("no configuration found and no home directory to put one in — pass --file")
 	}
-	return home + "/.config/smpe_ls/" + config.DefaultConfigName, nil
+	return filepath.Join(home, ".config", "smpe_ls", config.DefaultConfigName), nil
 }

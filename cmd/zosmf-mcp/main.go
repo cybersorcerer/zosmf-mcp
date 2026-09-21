@@ -93,6 +93,7 @@ func main() {
 		}
 		clients.Register(sys.Name, client)
 		logger.Printf("registered system: %s (%s)", sys.Name, sys.Host)
+		logger.Printf("system %s: password from %s", sys.Name, sys.PasswordSource)
 		if sys.Auth.Type == "" {
 			logger.Printf("WARNING: system %s has no user configured — tool calls will fail until 'user:' is added", sys.Name)
 		}

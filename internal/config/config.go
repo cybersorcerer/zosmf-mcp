@@ -67,6 +67,11 @@ type SystemConfig struct {
 	TSOCodepage   string       `yaml:"tso_codepage"`
 	Proxy         *ProxyConfig `yaml:"proxy"`
 
+	// PasswordSource records where the password came from: "file",
+	// "system-env", "global-env" or "none". Set by normalize, logged at
+	// startup, never serialised.
+	PasswordSource string `yaml:"-"`
+
 	// smpe_ls-compatible aliases
 	User               string   `yaml:"user"`
 	RejectUnauthorized *bool    `yaml:"rejectUnauthorized"`
@@ -198,9 +203,22 @@ func (c *Config) normalize() {
 			s.Auth.Username = s.User
 		}
 
-		// password from env if not in config
-		if s.Auth.Password == "" && envPassword != "" {
-			s.Auth.Password = envPassword
+		// Password sources, in order: the file, a per-system variable, the
+		// global variable. The per-system name derives from the system name,
+		// so nothing has to be kept in sync between file and environment.
+		switch {
+		case s.Auth.Password != "":
+			s.PasswordSource = "file"
+		default:
+			if v := os.Getenv(PasswordEnvVar(s.Name)); v != "" {
+				s.Auth.Password = v
+				s.PasswordSource = "system-env"
+			} else if envPassword != "" {
+				s.Auth.Password = envPassword
+				s.PasswordSource = "global-env"
+			} else {
+				s.PasswordSource = "none"
+			}
 		}
 
 		// default auth type to basic if username+password are set

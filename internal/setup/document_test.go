@@ -46,6 +46,7 @@ func TestUpsertKeepsForeignContent(t *testing.T) {
 		"# Shared by zosmf-mcp",
 		`home: "/u/ibmuser"`,
 		"# nvpdf reads this",
+		"# operator note: keep this list short, smpe_ls scans all of it",
 		"defaultServer: MAINT",
 		"NEW.SMPE.GLOBAL.CSI",
 	} {

@@ -4,6 +4,7 @@ servers:
     host: https://zos1.example.com:443
     user: IBMUSER
     home: "/u/ibmuser"          # nvpdf reads this
+    # operator note: keep this list short, smpe_ls scans all of it
     csi:
       - OLD.SMPE.GLOBAL.CSI
 

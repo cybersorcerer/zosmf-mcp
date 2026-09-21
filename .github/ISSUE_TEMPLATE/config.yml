@@ -3,6 +3,6 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/cybersorcerer/zosmf-mcp/security/advisories/new
     about: Report privately, never as a public issue.
-  - name: Question or idea
-    url: https://github.com/cybersorcerer/zosmf-mcp/discussions
-    about: For anything that is not a bug report or a concrete proposal.
+  - name: How to build, test and contribute
+    url: https://github.com/cybersorcerer/zosmf-mcp/blob/main/CONTRIBUTING.md
+    about: Read this before opening a pull request.

@@ -53,7 +53,15 @@ func sshBaseArgs(cfg config.SSHSystemConfig) []string {
 		args = append(args, "-i", cfg.KeyFile)
 	}
 	if cfg.ProxyJump != nil && cfg.ProxyJump.Active() {
-		args = append(args, "-J", cfg.ProxyJump.Host)
+		// -J spawns a child ssh that inherits none of the options above. On a
+		// host without a default identity — a container — the jump hop then
+		// falls back to password auth. ProxyCommand carries them explicitly.
+		jump := []string{"ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"}
+		if cfg.KeyFile != "" {
+			jump = append(jump, "-i", ShellQuote(cfg.KeyFile))
+		}
+		jump = append(jump, "-W", "%h:%p", ShellQuote(cfg.ProxyJump.Host))
+		args = append(args, "-o", "ProxyCommand="+strings.Join(jump, " "))
 	}
 	return args
 }

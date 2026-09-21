@@ -16,16 +16,56 @@ func hasFlagValue(args []string, flag, value string) bool {
 	return false
 }
 
+// proxyCommand returns the value of the -o ProxyCommand=... option.
+func proxyCommand(args []string) string {
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "-o" {
+			if cmd, ok := strings.CutPrefix(args[i+1], "ProxyCommand="); ok {
+				return cmd
+			}
+		}
+	}
+	return ""
+}
+
+// The jump hop is a child ssh that inherits nothing from the parent command
+// line, so the key and BatchMode have to be repeated inside ProxyCommand.
 func TestSSHBaseArgsIncludesJumpWhenActive(t *testing.T) {
 	args := sshBaseArgs(config.SSHSystemConfig{
 		Name:      "SYS1",
 		Host:      "zos1.example.com",
 		Port:      22,
 		Username:  "ibmuser",
+		KeyFile:   "/keys/zos1",
 		ProxyJump: &config.SSHProxyJumpConfig{Enabled: true, Host: "jump@jumphost.example.com"},
 	})
-	if !hasFlagValue(args, "-J", "jump@jumphost.example.com") {
-		t.Errorf("expected -J jump@jumphost.example.com in %v", args)
+	cmd := proxyCommand(args)
+	if cmd == "" {
+		t.Fatalf("expected a -o ProxyCommand=... in %v", args)
+	}
+	for _, want := range []string{
+		"-W %h:%p",
+		ShellQuote("jump@jumphost.example.com"),
+		"-i " + ShellQuote("/keys/zos1"),
+		"BatchMode=yes",
+	} {
+		if !strings.Contains(cmd, want) {
+			t.Errorf("expected %q in ProxyCommand %q", want, cmd)
+		}
+	}
+}
+
+func TestSSHBaseArgsJumpWithoutKeyFile(t *testing.T) {
+	args := sshBaseArgs(config.SSHSystemConfig{
+		Name: "SYS1", Host: "zos1.example.com", Port: 22, Username: "ibmuser",
+		ProxyJump: &config.SSHProxyJumpConfig{Enabled: true, Host: "jump@jumphost.example.com"},
+	})
+	cmd := proxyCommand(args)
+	if cmd == "" {
+		t.Fatalf("expected a -o ProxyCommand=... in %v", args)
+	}
+	if strings.Contains(cmd, "-i ") {
+		t.Errorf("expected no -i in ProxyCommand %q", cmd)
 	}
 }
 
@@ -43,8 +83,8 @@ func TestSSHBaseArgsOmitsJumpWhenInactive(t *testing.T) {
 				Name: "SYS1", Host: "zos1.example.com", Port: 22,
 				Username: "ibmuser", ProxyJump: tc.jump,
 			})
-			if strings.Contains(strings.Join(args, " "), "-J") {
-				t.Errorf("expected no -J in %v", args)
+			if proxyCommand(args) != "" {
+				t.Errorf("expected no ProxyCommand in %v", args)
 			}
 		})
 	}

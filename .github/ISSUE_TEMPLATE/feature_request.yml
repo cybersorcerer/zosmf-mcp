@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a tool, a resource or a configuration option
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The task on z/OS, not the implementation you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed tool or option
+      description: |
+        For a tool: its name, parameters, and the z/OSMF API or ZOAU command
+        behind it. For an option: where it lives in the configuration.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: destructive
+    attributes:
+      label: Can it change or destroy state on the system?
+      options:
+        - "No — read only"
+        - "Yes — it writes, deletes or cancels"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today
+      description: Whether an existing tool gets you part of the way there.

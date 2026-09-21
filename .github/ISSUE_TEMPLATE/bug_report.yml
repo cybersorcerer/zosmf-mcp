@@ -1,0 +1,64 @@
+name: Bug report
+description: Something does not behave as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste credentials, real host names, user IDs, dataset names or
+        unredacted z/OSMF responses. A vulnerability goes to
+        [Security → Report a vulnerability](../security/advisories/new)
+        instead of a public issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: |
+        The tool call or JSON-RPC request, and the relevant part of your
+        configuration with values redacted.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server output
+      description: The server's stderr around the failure, redacted.
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `zosmf-mcp --version`.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - stdio
+        - http
+        - streamable-http
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and architecture, z/OS release, and whether it runs in a container.
+    validations:
+      required: true

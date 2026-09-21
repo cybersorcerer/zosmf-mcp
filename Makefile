@@ -156,9 +156,14 @@ container-up-direct: container-build
 	  $(CONTAINER_IMAGE) --transport streamable-http >/dev/null; \
 	echo "MCP server listening on http://localhost:8081/mcp"
 
+# Each container is handled on its own: the direct setup has no tunnel, and
+# naming a container that does not exist makes `container` exit non-zero for
+# the whole call, which make then reports as an ignored error.
 container-down:
-	-@container stop zosmf-mcp zosmf-tunnel 2>/dev/null
-	-@container rm zosmf-mcp zosmf-tunnel 2>/dev/null
+	@for c in zosmf-mcp zosmf-tunnel; do \
+	  container stop $$c >/dev/null 2>&1 || true; \
+	  container rm $$c >/dev/null 2>&1 || true; \
+	done
 	@echo "stopped"
 
 container-logs:

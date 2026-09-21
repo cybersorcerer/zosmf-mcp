@@ -39,6 +39,17 @@ func LoadDocument(path string) (*Document, error) {
 	if root.Kind == 0 {
 		return &Document{root: newMappingDoc()}, nil
 	}
+	// yaml.Unmarshal silently keeps only the first of several `---`
+	// separated documents; editing that copy and writing it back would
+	// discard the rest of the file without ever saying so. A second Decode
+	// on the same bytes tells us whether there was more to lose.
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	var first yaml.Node
+	_ = dec.Decode(&first)
+	var second yaml.Node
+	if dec.Decode(&second) == nil {
+		return nil, fmt.Errorf("%s has more than one YAML document (a %q separator) — only the first would be read and the rest lost; split the file or edit it by hand", path, "---")
+	}
 	return &Document{root: &root}, nil
 }
 
@@ -52,7 +63,11 @@ func newMappingDoc() *yaml.Node {
 }
 
 func (d *Document) UpsertSystem(name string, entries []Entry) (bool, error) {
-	return d.upsert(d.systemsKey(), name, entries)
+	key, err := d.systemsKey()
+	if err != nil {
+		return false, err
+	}
+	return d.upsert(key, name, entries)
 }
 
 func (d *Document) UpsertSSHSystem(name string, entries []Entry) (bool, error) {
@@ -62,34 +77,70 @@ func (d *Document) UpsertSSHSystem(name string, entries []Entry) (bool, error) {
 // EnsureDefaultTransport adds transport: {stdio: true} when the file has no
 // transport key at all, so it can start the server unassisted. An existing
 // block, of any shape, is left alone — this only fills a gap.
-func (d *Document) EnsureDefaultTransport() bool {
-	if mapValue(d.mapping(), "transport") != nil {
-		return false
+func (d *Document) EnsureDefaultTransport() (bool, error) {
+	m, err := d.mapping()
+	if err != nil {
+		return false, err
+	}
+	if mapValue(m, "transport") != nil {
+		return false, nil
 	}
 	block := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 	setMapValue(block, "stdio", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"})
-	setMapValue(d.mapping(), "transport", block)
-	return true
+	setMapValue(m, "transport", block)
+	return true, nil
 }
 
 // systemsKey keeps the spelling the file already uses and falls back to the
 // one the other tools write.
-func (d *Document) systemsKey() string {
-	if mapValue(d.mapping(), "systems") != nil {
-		return "systems"
+func (d *Document) systemsKey() (string, error) {
+	m, err := d.mapping()
+	if err != nil {
+		return "", err
 	}
-	return "servers"
+	if mapValue(m, "systems") != nil {
+		return "systems", nil
+	}
+	return "servers", nil
 }
 
-func (d *Document) mapping() *yaml.Node {
-	return d.root.Content[0]
+// mapping returns the document's top-level node, erroring when it is not a
+// mapping — a file whose root is, say, a bare scalar has nowhere to hang a
+// `servers:` key, and upsert()'s node-append onto a non-mapping node is
+// silently discarded by the encoder rather than raising anything.
+func (d *Document) mapping() (*yaml.Node, error) {
+	if len(d.root.Content) == 0 {
+		return nil, fmt.Errorf("the configuration is empty — edit it by hand, or point --file at a different one")
+	}
+	m := d.root.Content[0]
+	if m.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("the configuration's top level is %s, not a mapping — edit the file by hand, or point --file at a different one", describeKind(m.Kind))
+	}
+	return m, nil
+}
+
+func describeKind(k yaml.Kind) string {
+	switch k {
+	case yaml.ScalarNode:
+		return "a single value"
+	case yaml.SequenceNode:
+		return "a list"
+	case yaml.AliasNode:
+		return "an alias"
+	default:
+		return "not a mapping"
+	}
 }
 
 func (d *Document) upsert(sectionKey, name string, entries []Entry) (bool, error) {
-	section := mapValue(d.mapping(), sectionKey)
+	m, err := d.mapping()
+	if err != nil {
+		return false, err
+	}
+	section := mapValue(m, sectionKey)
 	if section == nil {
 		section = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-		setMapValue(d.mapping(), sectionKey, section)
+		setMapValue(m, sectionKey, section)
 	}
 	if section.Kind != yaml.SequenceNode {
 		return false, fmt.Errorf("%s in the configuration is not a list", sectionKey)

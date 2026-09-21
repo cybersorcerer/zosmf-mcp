@@ -150,7 +150,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 
 	if *questions {
-		data, err := setup.CatalogJSON("init config", fields)
+		data, err := setup.CatalogJSON("init config", append(append([]setup.Field{}, fields...), sshFields...))
 		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
@@ -174,21 +174,12 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 0
 	}
 
-	sshFieldSet := make(map[string]bool, len(sshFields))
-	for _, f := range sshFields {
-		sshFieldSet[f.ID] = true
-	}
-
 	anyFlag := false
-	sshFlagGiven := false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "file", "questions", "print", "check":
 		default:
 			anyFlag = true
-		}
-		if sshFieldSet[f.Name] {
-			sshFlagGiven = true
 		}
 	})
 
@@ -199,7 +190,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 			_, _ = fmt.Fprintln(stderr, "  zosmf-mcp init config --name MAINT --host https://zos.example.com:443 --user IBMUSER")
 			return 2
 		}
-		if err := setup.AskAll(fields, values, os.Stdin, stdout); err != nil {
+		if err := setup.AskAll(fields, sshFields, values, os.Stdin, stdout); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -212,8 +203,17 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 
 	// The ZOAU fields are required as a group: a user who wants no ZOAU
 	// tools must be able to run without any of them, so this only fires
-	// once the group has been engaged by at least one of its own flags.
-	if sshFlagGiven {
+	// once the group has been engaged — by a flag or by the wizard's
+	// answers. One predicate, checked after AskAll has had its chance to
+	// set values, covers both: fs.Visit alone would miss a wizard "yes".
+	zoauEngaged := false
+	for _, f := range sshFields {
+		if values.Has(f.ID) {
+			zoauEngaged = true
+			break
+		}
+	}
+	if zoauEngaged {
 		if err := setup.Validate(sshFields, values); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 2
@@ -236,7 +236,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 1
 	}
 
-	if values.Has("zoau-path") {
+	if zoauEngaged {
 		sshEntries, err := setup.EntriesFor(sshFields, values)
 		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
@@ -253,7 +253,10 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	// with the common default rather than leaving a wizard-written
 	// configuration unable to run without an extra flag; any existing
 	// transport block, of any shape, is left untouched.
-	doc.EnsureDefaultTransport()
+	if _, err := doc.EnsureDefaultTransport(); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
 
 	if *print {
 		out, err := doc.Bytes()

@@ -7,10 +7,38 @@ import (
 	"strings"
 )
 
-// AskAll walks the catalog once, asking for every field. An empty answer
-// leaves an optional field unset; a required field is asked again.
-func AskAll(fields []Field, v *Values, in io.Reader, out io.Writer) error {
+// AskAll walks the system catalog once, asking for every field, then offers
+// the ZOAU group as a single yes/no gate before asking those questions too
+// — a user who wants no ZOAU tools should not have to answer, or even see,
+// questions about them.
+func AskAll(fields, zoauFields []Field, v *Values, in io.Reader, out io.Writer) error {
 	r := bufio.NewReader(in)
+	if err := askFields(fields, v, r, out); err != nil {
+		return err
+	}
+
+	if !v.Has("csi") || !v.Has("zones") {
+		_, _ = fmt.Fprintln(out, "\nNote: without csi and zones every SMP/E tool call has to name them,")
+		_, _ = fmt.Fprintln(out, "or it fails with \"no csi_dataset provided\" / \"no zone provided\".")
+	}
+
+	_, _ = fmt.Fprintln(out, "\nConfigure the ZOAU tools for this system? They run over SSH, not z/OSMF.")
+	_, _ = fmt.Fprint(out, "y/N> ")
+	line, _ := r.ReadString('\n')
+	if strings.EqualFold(strings.TrimSpace(line), "y") {
+		if err := askFields(zoauFields, v, r, out); err != nil {
+			return err
+		}
+	}
+
+	_, _ = fmt.Fprintln(out, "\nThe password is not stored in this file. Run `zosmf-mcp init env` next.")
+	return nil
+}
+
+// askFields asks for every field in one group. An empty answer leaves an
+// optional field unset (falling back to its default, if any); a required
+// field is asked again.
+func askFields(fields []Field, v *Values, r *bufio.Reader, out io.Writer) error {
 	for _, f := range fields {
 		for {
 			prompt(out, f)
@@ -46,12 +74,6 @@ func AskAll(fields []Field, v *Values, in io.Reader, out io.Writer) error {
 			break
 		}
 	}
-
-	if !v.Has("csi") || !v.Has("zones") {
-		_, _ = fmt.Fprintln(out, "\nNote: without csi and zones every SMP/E tool call has to name them,")
-		_, _ = fmt.Fprintln(out, "or it fails with \"no csi_dataset provided\" / \"no zone provided\".")
-	}
-	_, _ = fmt.Fprintln(out, "\nThe password is not stored in this file. Run `zosmf-mcp init env` next.")
 	return nil
 }
 

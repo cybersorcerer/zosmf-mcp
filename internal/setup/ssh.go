@@ -2,13 +2,18 @@ package setup
 
 import "strings"
 
+// requiredTogether is appended to the help text of every required ZOAU
+// field: the group is all-or-nothing (see runInitConfig), and an agent
+// reading --questions has only the help text to learn that from.
+const requiredTogether = " Part of the ZOAU group: once any of its fields is set, all of its required fields are."
+
 // SSHFields is the catalog for the ZOAU tools, which reach z/OS over SSH
 // rather than through z/OSMF.
 func SSHFields() []Field {
 	return []Field{
 		{
 			ID: "ssh-host", YAMLKey: "host", Label: "SSH host",
-			Help: "The LPAR's SSH address. Usually the host part of the z/OSMF URL.",
+			Help: "The LPAR's SSH address. Usually the host part of the z/OSMF URL." + requiredTogether,
 			Kind: KindString, Cardinality: One, Required: true,
 			Example: "zos.example.com", Group: "zoau",
 		},
@@ -19,19 +24,19 @@ func SSHFields() []Field {
 		},
 		{
 			ID: "ssh-user", YAMLKey: "username", Label: "SSH user",
-			Help: "The z/OS user the ZOAU commands run as.",
+			Help: "The z/OS user the ZOAU commands run as." + requiredTogether,
 			Kind: KindString, Cardinality: One, Required: true,
 			Example: "ibmuser", Group: "zoau",
 		},
 		{
 			ID: "ssh-key-file", YAMLKey: "key_file", Label: "SSH private key",
-			Help: "Only key authentication is supported. In a container this is the path inside it, e.g. /keys/id_rsa.",
+			Help: "Only key authentication is supported. In a container this is the path inside it, e.g. /keys/id_rsa." + requiredTogether,
 			Kind: KindString, Cardinality: One, Required: true,
-			Example: "~/.ssh/id_rsa", Group: "zoau",
+			Example: "/home/ibmuser/.ssh/id_rsa", Group: "zoau",
 		},
 		{
 			ID: "zoau-path", YAMLKey: "", Label: "ZOAU installation path",
-			Help: "ZOAU_HOME, PATH and LIBPATH are derived from it.",
+			Help: "ZOAU_HOME, PATH and LIBPATH are derived from it." + requiredTogether,
 			Kind: KindString, Cardinality: One, Required: true,
 			Example: "/usr/lpp/IBM/zoautil", Group: "zoau",
 		},

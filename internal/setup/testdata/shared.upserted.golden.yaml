@@ -1,0 +1,10 @@
+# Shared by zosmf-mcp, smpe_ls, vscode-smpe and nvpdf.
+servers:
+  - name: MAINT
+    host: https://zos1.example.com:443
+    user: IBMUSER # do not touch, ticket 123
+    home: "/u/ibmuser" # nvpdf reads this
+    # operator note: keep this list short, smpe_ls scans all of it
+    csi:
+      - NEW.SMPE.GLOBAL.CSI
+defaultServer: MAINT

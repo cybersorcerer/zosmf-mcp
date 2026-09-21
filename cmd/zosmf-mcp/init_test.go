@@ -203,3 +203,91 @@ func TestInitConfigWritesADefaultTransportBlock(t *testing.T) {
 		t.Error("a file written by init config alone must have stdio transport enabled")
 	}
 }
+
+// A flag the user does not pass on a rerun must not reset the value that
+// invocation already wrote — the bug this guards was BindFlags handing
+// every unset flag the catalog default, so a rerun that only added --csi
+// silently flipped rejectUnauthorized back to true on a self-signed test
+// LPAR, in a file three other tools also read.
+func TestInitConfigRerunWithoutAFlagKeepsTheExistingValue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER",
+		"--reject-unauthorized", "false")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+
+	code, _, errOut = run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER",
+		"--csi", "A.CSI")
+	if code != 0 {
+		t.Fatalf("rerun: exit %d, stderr: %s", code, errOut)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "rejectUnauthorized: false") {
+		t.Errorf("rerun without --reject-unauthorized reset it to the catalog default:\n%s", data)
+	}
+}
+
+// Same shape, the ZOAU group's own field with a catalog default: a rerun
+// that re-engages the group without repeating --ssh-port must not reset a
+// configured non-default port.
+func TestInitConfigRerunWithoutSSHPortKeepsTheExistingValue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER",
+		"--ssh-host", "zos.example.com", "--ssh-port", "2222", "--ssh-user", "ibmuser",
+		"--ssh-key-file", "/keys/id_rsa", "--zoau-path", "/usr/lpp/IBM/zoautil")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+
+	code, _, errOut = run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER",
+		"--ssh-host", "zos.example.com", "--ssh-user", "ibmuser",
+		"--ssh-key-file", "/keys/id_rsa", "--zoau-path", "/usr/lpp/IBM/zoautil")
+	if code != 0 {
+		t.Fatalf("rerun: exit %d, stderr: %s", code, errOut)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "port: 2222") {
+		t.Errorf("rerun without --ssh-port reset it to the catalog default 22:\n%s", data)
+	}
+}
+
+// An agent following agents/setup.md step 1 reads --questions to learn
+// what it can ask for. The ZOAU group has to be in there, or it can never
+// be configured non-interactively by anything that only reads this list.
+func TestInitConfigQuestionsIncludesTheZOAUGroup(t *testing.T) {
+	code, out, errOut := run(t, false, "config", "--questions")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+	var doc struct {
+		Fields []struct {
+			ID    string `json:"id"`
+			Group string `json:"group"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	zoau := 0
+	for _, f := range doc.Fields {
+		if f.Group == "zoau" {
+			zoau++
+		}
+	}
+	if zoau == 0 {
+		t.Errorf("--questions carries no zoau group fields:\n%s", out)
+	}
+}

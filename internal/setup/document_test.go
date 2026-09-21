@@ -21,7 +21,11 @@ func fixture(t *testing.T) string {
 }
 
 // The file belongs to four tools. Updating our keys must not disturb theirs,
-// their comments, or keys we have never heard of.
+// their comments, or keys we have never heard of — compared as bytes
+// against a golden file, not by spot-checking a handful of substrings: the
+// fixture carries a blank line between its two top-level entries and an
+// aligned inline comment, both of which a substring check would not notice
+// going missing.
 func TestUpsertKeepsForeignContent(t *testing.T) {
 	path := fixture(t)
 	doc, err := LoadDocument(path)
@@ -41,21 +45,12 @@ func TestUpsertKeepsForeignContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(out)
-	for _, want := range []string{
-		"# Shared by zosmf-mcp",
-		`home: "/u/ibmuser"`,
-		"# nvpdf reads this",
-		"# operator note: keep this list short, smpe_ls scans all of it",
-		"defaultServer: MAINT",
-		"NEW.SMPE.GLOBAL.CSI",
-	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("result lost %q:\n%s", want, text)
-		}
+	want, err := os.ReadFile("testdata/shared.upserted.golden.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(text, "OLD.SMPE.GLOBAL.CSI") {
-		t.Errorf("old value survived:\n%s", text)
+	if string(out) != string(want) {
+		t.Errorf("result does not match the golden file:\nwant:\n%s\ngot:\n%s", want, out)
 	}
 }
 
@@ -132,7 +127,11 @@ func TestLoadDocumentOfMissingFileStartsEmpty(t *testing.T) {
 func TestEnsureDefaultTransportAddsWhenAbsent(t *testing.T) {
 	path := fixture(t)
 	doc, _ := LoadDocument(path)
-	if changed := doc.EnsureDefaultTransport(); !changed {
+	changed, err := doc.EnsureDefaultTransport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
 		t.Error("expected a change: the fixture carries no transport key")
 	}
 	out, _ := doc.Bytes()
@@ -153,7 +152,11 @@ func TestEnsureDefaultTransportLeavesExistingAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if changed := doc.EnsureDefaultTransport(); changed {
+	changed, err := doc.EnsureDefaultTransport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
 		t.Error("an existing transport block must not be reported as changed")
 	}
 	out, _ := doc.Bytes()
@@ -165,10 +168,18 @@ func TestEnsureDefaultTransportLeavesExistingAlone(t *testing.T) {
 func TestEnsureDefaultTransportIsIdempotent(t *testing.T) {
 	path := fixture(t)
 	doc, _ := LoadDocument(path)
-	if !doc.EnsureDefaultTransport() {
+	first, err := doc.EnsureDefaultTransport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first {
 		t.Fatal("first call should add the block")
 	}
-	if doc.EnsureDefaultTransport() {
+	second, err := doc.EnsureDefaultTransport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second {
 		t.Error("second call should report no change")
 	}
 	out, _ := doc.Bytes()
@@ -188,5 +199,42 @@ func TestSaveLeavesABackup(t *testing.T) {
 	}
 	if _, err := os.Stat(path + ".bak"); err != nil {
 		t.Errorf("no backup next to the file: %v", err)
+	}
+}
+
+// A file whose top level is not a mapping — a bare scalar, here — has
+// nowhere for UpsertSystem to put a servers: key. Before this guard,
+// upsert() appended onto the scalar node's Content anyway: the encoder
+// ignores that on a scalar, so the write silently did nothing while still
+// reporting changed=true and no error.
+func TestUpsertOnNonMappingRootFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scalar.yaml")
+	if err := os.WriteFile(path, []byte("just a string\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := LoadDocument(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, err := doc.UpsertSystem("MAINT", []Entry{{Key: "user", Value: "IBMUSER"}})
+	if err == nil {
+		t.Fatal("expected an error, the top level is not a mapping")
+	}
+	if changed {
+		t.Error("a failed upsert must not report a change")
+	}
+}
+
+// yaml.Unmarshal keeps only the first of several `---` separated
+// documents; loading such a file and writing it back would silently drop
+// everything after the first one.
+func TestLoadDocumentRejectsMultipleDocuments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "multi.yaml")
+	src := "servers:\n  - name: MAINT\n    user: IBMUSER\n---\nother: doc\n"
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadDocument(path); err == nil {
+		t.Fatal("expected an error for a file with more than one YAML document")
 	}
 }

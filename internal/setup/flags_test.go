@@ -56,21 +56,24 @@ func TestValidateNamesTheMissingFlag(t *testing.T) {
 
 // Flags are generated from the catalog, and this test is what keeps that
 // true: a field added to one and not the other is a field an agent is told
-// about but cannot pass.
+// about but cannot pass. The flag set is built the way runInitConfig builds
+// its own — config fields and the ZOAU group together — so a field that
+// only exists in one of the two catalogs is still caught here.
 func TestEveryCatalogFieldHasAFlag(t *testing.T) {
+	all := append(append([]Field{}, ConfigFields()...), SSHFields()...)
 	fs := flag.NewFlagSet("init config", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	BindFlags(fs, ConfigFields())
+	BindFlags(fs, all)
 
-	for _, f := range ConfigFields() {
+	for _, f := range all {
 		if fs.Lookup(f.ID) == nil {
 			t.Errorf("catalog field %q has no flag", f.ID)
 		}
 	}
 	count := 0
 	fs.VisitAll(func(*flag.Flag) { count++ })
-	if count != len(ConfigFields()) {
-		t.Errorf("%d flags for %d fields — one side has an extra", count, len(ConfigFields()))
+	if count != len(all) {
+		t.Errorf("%d flags for %d fields — one side has an extra", count, len(all))
 	}
 }
 

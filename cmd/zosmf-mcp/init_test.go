@@ -136,6 +136,40 @@ func TestInitConfigWritesSSHSystemWhenZOAUPathGiven(t *testing.T) {
 	}
 }
 
+func TestInitConfigRejectsZOAUPathWithoutTheRestOfTheGroup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER",
+		"--zoau-path", "/usr/lpp/IBM/zoautil")
+	if code == 0 {
+		t.Fatalf("expected a non-zero exit, stderr: %s", errOut)
+	}
+	for _, want := range []string{"--ssh-host", "--ssh-user", "--ssh-key-file"} {
+		if !strings.Contains(errOut, want) {
+			t.Errorf("stderr %q does not name missing flag %q", errOut, want)
+		}
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("an incomplete ZOAU invocation should not have written the file")
+	}
+}
+
+func TestInitConfigWithoutZOAUFlagsWritesNoSSHSystems(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "ssh_systems:") {
+		t.Errorf("no ZOAU flags were given but ssh_systems was written:\n%s", data)
+	}
+}
+
 func TestInitConfigCheckRejectsABrokenFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "conf.yaml")
 	if err := os.WriteFile(path, []byte("servers:\n  - name: SYS1\n    host: https://z.example.com\n    auth:\n      cert_file: /x.pem\n"), 0o600); err != nil {

@@ -172,12 +172,21 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 0
 	}
 
+	sshFieldSet := make(map[string]bool, len(sshFields))
+	for _, f := range sshFields {
+		sshFieldSet[f.ID] = true
+	}
+
 	anyFlag := false
+	sshFlagGiven := false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "file", "questions", "print", "check":
 		default:
 			anyFlag = true
+		}
+		if sshFieldSet[f.Name] {
+			sshFlagGiven = true
 		}
 	})
 
@@ -197,6 +206,16 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	if err := setup.Validate(fields, values); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 2
+	}
+
+	// The ZOAU fields are required as a group: a user who wants no ZOAU
+	// tools must be able to run without any of them, so this only fires
+	// once the group has been engaged by at least one of its own flags.
+	if sshFlagGiven {
+		if err := setup.Validate(sshFields, values); err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 2
+		}
 	}
 
 	entries, err := setup.EntriesFor(fields, values)

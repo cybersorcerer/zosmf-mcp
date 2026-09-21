@@ -125,7 +125,7 @@ func CatalogJSON(command string, fields []Field) ([]byte, error) {
 func EntriesFor(fields []Field, v *Values) ([]Entry, error) {
 	var entries []Entry
 	for _, f := range fields {
-		if f.ID == "name" || !v.Has(f.ID) {
+		if f.ID == "name" || f.YAMLKey == "" || !v.Has(f.ID) {
 			continue
 		}
 		switch {

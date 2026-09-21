@@ -115,6 +115,27 @@ func TestInitConfigCreatesTheParentDirectory(t *testing.T) {
 	}
 }
 
+func TestInitConfigWritesSSHSystemWhenZOAUPathGiven(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAINT", "--host", "https://zos.example.com:443", "--user", "IBMUSER",
+		"--ssh-host", "zos.example.com", "--ssh-user", "ibmuser",
+		"--ssh-key-file", "/keys/id_rsa", "--zoau-path", "/usr/lpp/IBM/zoautil")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+	data, _ := os.ReadFile(path)
+	text := string(data)
+	for _, want := range []string{"ssh_systems:", "key_file: /keys/id_rsa", "ZOAU_HOME:", "LIBPATH:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("file lacks %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "zoau-path:") {
+		t.Errorf("the helper answer leaked into the file:\n%s", text)
+	}
+}
+
 func TestInitConfigCheckRejectsABrokenFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "conf.yaml")
 	if err := os.WriteFile(path, []byte("servers:\n  - name: SYS1\n    host: https://z.example.com\n    auth:\n      cert_file: /x.pem\n"), 0o600); err != nil {

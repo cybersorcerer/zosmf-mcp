@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -173,6 +174,17 @@ func valueNode(v any) (*yaml.Node, error) {
 			seq.Content = append(seq.Content, scalar(s))
 		}
 		return seq, nil
+	case map[string]string:
+		m := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			m.Content = append(m.Content, scalar(k), scalar(t[k]))
+		}
+		return m, nil
 	default:
 		return nil, fmt.Errorf("unsupported value type %T", v)
 	}

@@ -141,7 +141,8 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	check := fs.Bool("check", false, "load the file through the server's config loader and report problems")
 
 	fields := setup.ConfigFields()
-	values := setup.BindFlags(fs, fields)
+	sshFields := setup.SSHFields()
+	values := setup.BindFlags(fs, append(append([]setup.Field{}, fields...), sshFields...))
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -212,6 +213,19 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	if _, err := doc.UpsertSystem(values.One("name"), entries); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
+	}
+
+	if values.Has("zoau-path") {
+		sshEntries, err := setup.EntriesFor(sshFields, values)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 2
+		}
+		sshEntries = append(sshEntries, setup.ZOAUEnvironment(values.One("zoau-path"))...)
+		if _, err := doc.UpsertSSHSystem(values.One("name"), sshEntries); err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
 	}
 
 	if *print {

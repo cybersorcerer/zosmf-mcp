@@ -34,6 +34,9 @@ func main() {
 		os.Exit(0)
 	}
 
+	// What clients read from serverInfo.version in the initialize response.
+	mcp.ServerVersion = version
+
 	logger := log.New(os.Stderr, "[zosmf-mcp] ", log.LstdFlags|log.Lmsgprefix)
 
 	resolvedConfig := *configPath

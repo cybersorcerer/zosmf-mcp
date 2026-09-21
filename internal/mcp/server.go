@@ -17,10 +17,13 @@ const (
 	stateReady
 )
 
-const (
-	ServerName    = "zosmf-mcp"
-	ServerVersion = "0.3.0"
-)
+const ServerName = "zosmf-mcp"
+
+// ServerVersion is what a client reads from serverInfo.version in the
+// initialize response. main sets it to the version baked into the binary;
+// it stays "dev" for a build without ldflags. It was a constant once, which
+// meant every release after 0.3.0 announced 0.3.0 to its clients.
+var ServerVersion = "dev"
 
 // ResourceProvider is the narrow view the server needs of a resource
 // registry. Defined here so internal/mcp does not import the resources

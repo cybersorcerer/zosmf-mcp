@@ -16,7 +16,7 @@ REMOTE_USER ?=
 REMOTE_DIR  ?= ~/.local/bin
 REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
 
-.PHONY: all build build-all build-local clean test vet fmt lint check-identifiers run install deploy apikey docker-build docker-up docker-down docker-logs container-build container-up container-down container-logs
+.PHONY: all build build-all build-local clean test vet fmt lint check-identifiers run install deploy apikey docker-build docker-up docker-up-direct docker-down docker-logs container-build container-up container-up-direct container-down container-logs launch-agent launch-agent-remove
 
 all: fmt vet check-identifiers test build-local
 
@@ -81,11 +81,16 @@ apikey:
 docker-build:
 	docker compose build
 
+# With the jump host tunnel — for a host that cannot reach z/OSMF itself.
 docker-up: docker-build
+	docker compose --profile tunnel up -d
+
+# Without it — for a host that can.
+docker-up-direct: docker-build
 	docker compose up -d
 
 docker-down:
-	docker compose down
+	docker compose --profile tunnel down
 
 docker-logs:
 	docker compose logs -f
@@ -127,6 +132,28 @@ container-up: container-build
 	  $(CONTAINER_IMAGE) --transport streamable-http >/dev/null; \
 	echo "MCP server listening on http://localhost:8081/mcp"
 
+# On a host that reaches z/OSMF itself there is nothing to tunnel: one
+# container, no SOCKS proxy. ZOSMF_PROXY is filtered out of the environment
+# so a .env kept for the tunnel setup cannot send traffic nowhere.
+container-up-direct: container-build
+	@test -f .env || { echo ".env is missing — run: cp .env.example .env and fill it in"; exit 1; }
+	@set -a; . ./.env; set +a; \
+	test -n "$$MCP_API_KEY" || { echo "MCP_API_KEY is not set — generate one with: make apikey"; exit 1; }; \
+	ENVFILE=$$(mktemp -t zosmf-mcp-env); chmod 600 "$$ENVFILE"; \
+	trap 'rm -f "$$ENVFILE"' EXIT INT TERM; \
+	sed -E 's/^[[:space:]]*export[[:space:]]+//' .env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' \
+	  | grep -v '^ZOSMF_PROXY=' > "$$ENVFILE"; \
+	KEYS="$${SSH_KEY_DIR:-./secrets}"; KEYMOUNT=""; \
+	[ -d "$$KEYS" ] && KEYMOUNT="-v $$KEYS:/keys"; \
+	container run -d --name zosmf-mcp \
+	  -v "$${ZOSMF_CONFIG:-./.smpe-zosmf.yaml}:/config/.smpe-zosmf.yaml" \
+	  $$KEYMOUNT \
+	  --env-file "$$ENVFILE" \
+	  -e MCP_API_KEY="$$MCP_API_KEY" \
+	  -p 8081:8081 \
+	  $(CONTAINER_IMAGE) --transport streamable-http >/dev/null; \
+	echo "MCP server listening on http://localhost:8081/mcp"
+
 container-down:
 	-@container stop zosmf-mcp zosmf-tunnel 2>/dev/null
 	-@container rm zosmf-mcp zosmf-tunnel 2>/dev/null
@@ -134,6 +161,14 @@ container-down:
 
 container-logs:
 	container logs -f zosmf-mcp
+
+# Autostart at login (macOS). Apple container has no restart policy, so the
+# container is brought up by a LaunchAgent instead.
+launch-agent:
+	@./scripts/install-launch-agent.sh
+
+launch-agent-remove:
+	@./scripts/install-launch-agent.sh --uninstall
 
 help:
 	@echo "Targets:"
@@ -153,5 +188,8 @@ help:
 	@echo "  apikey    - Generate a bearer token for the HTTP transports"
 	@echo ""
 	@echo "Containers (see docs/container-setup.md):"
-	@echo "  docker-build/-up/-down/-logs      - Docker with Compose"
-	@echo "  container-build/-up/-down/-logs   - Apple container (macOS, Apple Silicon)"
+	@echo "  docker-build/-up/-down/-logs      - Docker with Compose, server plus jump host tunnel"
+	@echo "  docker-up-direct                  - Docker, server only (host reaches z/OSMF itself)"
+	@echo "  container-build/-up/-down/-logs   - Apple container, server plus jump host tunnel"
+	@echo "  container-up-direct               - Apple container, server only"
+	@echo "  launch-agent / launch-agent-remove - Start the container at login (macOS)"

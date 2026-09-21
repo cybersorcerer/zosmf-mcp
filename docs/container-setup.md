@@ -1,12 +1,16 @@
 # Running zosmf-mcp in a container
 
-How to run zosmf-mcp in a container when the machine hosting it **cannot reach
-the z/OSMF systems directly** — only through an intermediate host you can SSH
-into.
+Two situations, and they need different setups:
 
-Two paths are covered: **Docker/Podman with Compose** (Linux, Windows, macOS)
-and **Apple container** (macOS on Apple Silicon). Both were exercised against a
-live z/OSMF.
+- **The host reaches z/OSMF itself.** One container, nothing else. Skip to
+  [section 9](#9-direct-access-no-jump-host) — the tunnel described below
+  does not apply to you.
+- **The host cannot reach z/OSMF** and only gets there through an
+  intermediate host you can SSH into. That is what sections 1 to 8 cover.
+
+Both work with **Docker/Podman and Compose** (Linux, Windows, macOS) and with
+**Apple container** (macOS on Apple Silicon). Every path here was exercised
+against a live z/OSMF.
 
 ---
 
@@ -161,16 +165,16 @@ Not needed on macOS, where the filesystem layer remaps ownership.
 
 ```bash
 make docker-build     # docker compose build
-make docker-up        # docker compose up -d
+make docker-up        # docker compose --profile tunnel up -d
 make docker-logs      # docker compose logs -f
-make docker-down      # docker compose down
+make docker-down      # docker compose --profile tunnel down
 ```
 
 Or without make:
 
 ```bash
 docker compose build
-docker compose up -d
+docker compose --profile tunnel up -d
 docker compose logs -f zosmf-mcp
 ```
 
@@ -179,6 +183,7 @@ docker compose logs -f zosmf-mcp
 ```yaml
 services:
   tunnel:
+    profiles: ["tunnel"]
     image: alpine/openssh
     user: "0:0"
     entrypoint: ["/usr/bin/ssh"]
@@ -200,7 +205,9 @@ services:
       args:
         VERSION: docker
     depends_on:
-      - tunnel
+      tunnel:
+        condition: service_started
+        required: false
     command: ["--transport", "streamable-http"]
     ports:
       - "8081:8081"
@@ -210,13 +217,18 @@ services:
     env_file:
       - .env
     environment:
-      ZOSMF_PROXY: socks5://tunnel:1080
+      ZOSMF_PROXY: ${ZOSMF_PROXY-socks5://tunnel:1080}
     restart: unless-stopped
 ```
 
 The service name `tunnel` resolves via DNS inside the Compose network, which is
 why it appears directly in `ZOSMF_PROXY`. `env_file` passes **every** variable
 through, including the per-system passwords.
+
+The tunnel sits behind a **profile**, so `docker compose up` alone starts the
+server by itself — see [section 9](#9-direct-access-no-jump-host). `make
+docker-up` adds `--profile tunnel`, and `required: false` on the dependency is
+what lets the server start when the profile is off.
 
 `depends_on` only waits for the tunnel container to *start*, not for the SSH
 connection to come up. The tunnel is typically ready in well under a second, so
@@ -350,7 +362,73 @@ tunnel, jump host, z/OSMF.
 
 ---
 
-## 9. Connecting a client
+## 9. Direct access (no jump host)
+
+When the container host can reach z/OSMF itself, there is nothing to tunnel.
+One container, no SOCKS proxy, and the same image as above.
+
+### `.env`
+
+Only three things matter. `JUMP_HOST`, `JUMP_KEY` and `ZOSMF_PROXY` are not
+used — leave them out, or set `ZOSMF_PROXY=` empty if the file is shared with
+a tunnelled setup elsewhere.
+
+```bash
+ZOSMF_CONFIG=/home/youruser/.config/smpe_ls/.smpe-zosmf.yaml
+MCP_API_KEY=<output of: make apikey>
+ZOSMF_SYSA_PASSWORD=…
+```
+
+`SSH_KEY_DIR` is only needed for the ZOAU tools. The directory is mounted at
+`/keys` when it exists, and skipped when it does not.
+
+### Start it
+
+```bash
+make docker-up-direct      # Docker: compose without the tunnel profile
+make container-up-direct   # Apple container: one `container run`
+```
+
+Both publish `8081` and force `--transport streamable-http`, because nothing
+is attached to stdin inside a container.
+
+Verify as in [section 8](#8-verifying-the-setup) — an unauthenticated POST
+must answer `401`, and a tool call must return real data.
+
+### Autostart at login (macOS)
+
+Docker restarts containers on its own through `restart: unless-stopped`.
+Apple container has no restart policy, so a LaunchAgent does the job:
+
+```bash
+make launch-agent          # install and start it
+make launch-agent-remove   # remove it again
+```
+
+The agent runs `scripts/container-autostart.sh` as the logged-in user. That
+script starts the `container` apiserver first — after a reboot it is neither
+running nor registered with launchd — then starts the existing container, or
+creates one through `make container-up-direct` if there is none.
+
+```bash
+launchctl list | grep zosmf-mcp        # 0 in the second column means it ran
+tail -f ~/Library/Logs/zosmf-mcp.log   # what the agent did
+launchctl kickstart gui/$(id -u)/com.github.cybersorcerer.zosmf-mcp
+```
+
+It runs at **login**, not at boot: a Mac that reboots unattended serves
+nothing until someone signs in. Enable automatic login, or keep the machine
+logged in, if that matters.
+
+A changed configuration or a new image needs
+
+```bash
+make container-down && make container-up-direct
+```
+
+— restarting the agent only starts the container that already exists.
+
+## 10. Connecting a client
 
 Endpoint: `http://<container-host>:8081/mcp`
 Header: `Authorization: Bearer <MCP_API_KEY>`
@@ -364,7 +442,7 @@ in front — the server itself does not speak HTTPS.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 **`unresolved environment variables in …: ZOSMF_SYSA_PASSWORD`**
 The configuration references a variable that never reached the container. Check

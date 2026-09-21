@@ -1,5 +1,9 @@
 services:
+  # Only started when the "tunnel" profile is active — a host that reaches
+  # z/OSMF itself has nothing to tunnel. `make docker-up` activates it,
+  # `make docker-up-direct` does not.
   tunnel:
+    profiles: ["tunnel"]
     image: alpine/openssh
     # Runs as root so a key owned by root:root with mode 600 is accepted.
     user: "0:0"
@@ -22,7 +26,10 @@ services:
       args:
         VERSION: docker
     depends_on:
-      - tunnel
+      # required: false lets the server start when the tunnel profile is off.
+      tunnel:
+        condition: service_started
+        required: false
     # The mounted config is a production file that usually selects the stdio
     # transport. Inside a container nothing is attached to stdin, so the
     # transport is overridden here rather than by editing that file.
@@ -38,5 +45,7 @@ services:
       - .env
     environment:
       # Never published — the SOCKS port stays inside the compose network.
-      ZOSMF_PROXY: socks5://tunnel:1080
+      # Set ZOSMF_PROXY= (empty) in .env for a host with direct access; an
+      # empty value leaves the proxy off.
+      ZOSMF_PROXY: ${ZOSMF_PROXY-socks5://tunnel:1080}
     restart: unless-stopped

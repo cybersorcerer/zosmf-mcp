@@ -25,3 +25,18 @@ func TestVersionInfoDropsTheTagPrefix(t *testing.T) {
 		}
 	}
 }
+
+// --version and serverInfo report the same string, so the tag prefix is
+// stripped in one place both of them use.
+func TestDisplayVersionStripsTheTagPrefix(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"v0.6.0", "0.6.0"},
+		{"v0.6.0-1-g9f942ac", "0.6.0-1-g9f942ac"},
+		{"dev", "dev"},
+		{"", ""},
+	} {
+		if got := displayVersion(tc.in); got != tc.want {
+			t.Errorf("displayVersion(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

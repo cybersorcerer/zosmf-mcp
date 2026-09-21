@@ -23,12 +23,18 @@ var (
 	commit  = "unknown"
 )
 
+// displayVersion drops the "v" that git describe puts in front of the tag.
+// Both --version and the version clients read from serverInfo go through it,
+// so the two never disagree.
+func displayVersion(version string) string {
+	return strings.TrimPrefix(version, "v")
+}
+
 // versionInfo formats what --version prints, in the same layout as the other
-// tools of this suite. git describe prefixes the tag with "v"; the printed
-// version does not carry it.
+// tools of this suite.
 func versionInfo(version, commit string) string {
 	return fmt.Sprintf("%s %s\nCommit: %s\nCopyright (c) 2026 Sir Tobi aka Cybersorcerer\n",
-		mcp.ServerName, strings.TrimPrefix(version, "v"), commit)
+		mcp.ServerName, displayVersion(version), commit)
 }
 
 func main() {
@@ -44,7 +50,7 @@ func main() {
 	}
 
 	// What clients read from serverInfo.version in the initialize response.
-	mcp.ServerVersion = version
+	mcp.ServerVersion = displayVersion(version)
 
 	logger := log.New(os.Stderr, "[zosmf-mcp] ", log.LstdFlags|log.Lmsgprefix)
 

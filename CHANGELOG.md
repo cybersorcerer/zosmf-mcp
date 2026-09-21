@@ -8,6 +8,12 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.6.0] — 2026-09-21
+
+The ZOAU tool names changed in this release — see **Changed** below.
+
 ### Added
 
 - **MCP resources.** Datasets, USS files, job spool files and the configured
@@ -33,7 +39,16 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 - Server-side dataset search through `?search=` in `zosmf_read_dataset`.
 - Config file discovery: `.smpe-zosmf.yaml` in the working directory, then
   `~/.config/smpe_ls/`, with the legacy name as a fallback.
-- `SECURITY.md`, `CONTRIBUTING.md` and a lint job in CI.
+- **Containers without a jump host.** `make docker-up-direct` and
+  `make container-up-direct` run the server alone on a host that reaches
+  z/OSMF itself; the tunnel service moved behind a Compose profile.
+- **Autostart on macOS.** `make launch-agent` installs a LaunchAgent that
+  starts the container at login, since Apple container has no restart policy.
+- `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, issue and pull request
+  templates, and a lint job in CI.
+- Tests for the paths that previously needed a live z/OS: SSH execution
+  against a stub `ssh`, the z/OSMF client against `httptest`, HTTP session
+  handling, and the ZOAU tool seam.
 
 ### Changed
 
@@ -42,6 +57,8 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 - A 401 from z/OSMF is marked `AUTH_FAILED(<system>)`, a missing credential
   `NO_CREDENTIALS(<system>)`, so a client can tell them apart.
 - Every response body read is bounded at 10 MB.
+- `--version` now prints the layout the rest of the suite uses: name and
+  version on one line, `Commit:` below it.
 
 ### Fixed
 
@@ -55,6 +72,15 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 - USS and dataset paths are percent-encoded in resource URIs.
 - Unresolved `${VAR}` references in the configuration abort startup and name
   the variable, instead of reaching z/OSMF as literal text.
+- `serverInfo.version` was a constant last updated at 0.3.0, so every release
+  since announced 0.3.0 to its clients. It now carries the build version, and
+  `--version` and `serverInfo` report the same string.
+- A containerised build reported `docker` as its version; the image now gets
+  the real one as a build argument.
+- `make container-down` no longer reports an ignored error on a host that has
+  no tunnel container.
+- 21 discarded write and `Close` errors, two untagged switches and a nil
+  context in a test, all found by the new lint job.
 
 ## [0.5.2] — 2026-05-01
 

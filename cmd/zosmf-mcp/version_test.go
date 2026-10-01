@@ -6,7 +6,7 @@ func TestVersionInfoLayout(t *testing.T) {
 	got := versionInfo("v0.6.0", "9aa0752")
 	want := "zosmf-mcp 0.6.0\n" +
 		"Commit: 9aa0752\n" +
-		"Copyright (c) 2026 Sir Tobi aka Cybersorcerer\n"
+		"Copyright (c) 2026 Ronny Funk (Cybersorcerer)\n"
 	if got != want {
 		t.Errorf("versionInfo() =\n%q\nwant\n%q", got, want)
 	}

@@ -133,4 +133,4 @@ one and which deployment risks are documented behavior.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
 
-Copyright 2026 Ronald Funk (Cybersorcerer)
+Copyright 2026 Ronny Funk (Cybersorcerer)

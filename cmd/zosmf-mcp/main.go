@@ -33,7 +33,7 @@ func displayVersion(version string) string {
 // versionInfo formats what --version prints, in the same layout as the other
 // tools of this suite.
 func versionInfo(version, commit string) string {
-	return fmt.Sprintf("%s %s\nCommit: %s\nCopyright (c) 2026 Sir Tobi aka Cybersorcerer\n",
+	return fmt.Sprintf("%s %s\nCommit: %s\nCopyright (c) 2026 Ronny Funk (Cybersorcerer)\n",
 		mcp.ServerName, displayVersion(version), commit)
 }
 

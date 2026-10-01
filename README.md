@@ -64,7 +64,7 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 git clone https://github.com/cybersorcerer/zosmf-mcp.git && cd zosmf-mcp
 make install && export PATH="$HOME/.local/bin:$PATH"
 zosmf-mcp init config   # interactive: systems, CSIs, zones — backs up the file first
-zosmf-mcp init env      # that system's password — writes .env, mode 600
+zosmf-mcp init env      # that system's password — writes .env next to the config, mode 600
 ```
 
 Register with an MCP client, for example Claude Code — `claude mcp list` should then show `zosmf-mcp` as `✔ Connected`:
@@ -73,7 +73,7 @@ Register with an MCP client, for example Claude Code — `claude mcp list` shoul
 claude mcp add zosmf-mcp -- zosmf-mcp --config <path init config printed>
 ```
 
-Make the password reach the server: in a shell, `set -a; . ./.env; set +a` before starting it; for the `claude mcp add` above, pass it instead with `--env NAME=value` (repeatable), since the client — not your shell — starts the process.
+Make the password reach the server: in a shell, `set -a; . <path init env printed>; set +a` before starting it; for the `claude mcp add` above, pass it instead with `--env NAME=value` (repeatable), since the client — not your shell — starts the process.
 
 More systems, other clients, and containers: [docs/configuration.md](docs/configuration.md) and [docs/clients.md](docs/clients.md) — the wizard automates the same configuration file those sections describe editing by hand. Prefer an agent to run this for you? `make install-skill` installs the same procedure as a skill for Claude Code, opencode, or pi.
 

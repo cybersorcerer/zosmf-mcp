@@ -134,3 +134,30 @@ servers:
 		t.Error("no env file should have been written")
 	}
 }
+
+// Without --env-file the secrets go next to the configuration, not into
+// whatever directory the command happens to run in — a repository, say.
+func TestInitEnvDefaultsToTheConfigDirectory(t *testing.T) {
+	dir := t.TempDir()
+	conf := filepath.Join(dir, "conf.yaml")
+	if err := os.WriteFile(conf, []byte("servers:\n  - name: MAINT\n    host: https://zos.example.com:443\n    user: IBMUSER\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+	t.Setenv("ZOSMF_MAINT_PASSWORD", "pw")
+
+	code, out, errOut := run(t, false, "env", "--file", conf)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, errOut)
+	}
+	want := filepath.Join(dir, ".env")
+	if _, err := os.Stat(want); err != nil {
+		t.Errorf("no %s: %v", want, err)
+	}
+	if _, err := os.Stat(".env"); !os.IsNotExist(err) {
+		t.Error(".env was written into the working directory")
+	}
+	if !strings.Contains(out, want) {
+		t.Errorf("output does not name the full path:\n%s", out)
+	}
+}

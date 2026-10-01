@@ -13,7 +13,8 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 - **`zosmf-mcp init config` and `zosmf-mcp init env`.** An interactive wizard
   — a menu over the file's systems, CSIs and zones entered one per line, a
   preview before each write — or flags for scripting, that write the shared configuration file and its
-  `.env` secrets: one system's connection details, its ZOAU/SSH settings as
+  `.env` secrets — kept next to the configuration file, not in the working
+  directory: one system's connection details, its ZOAU/SSH settings as
   one all-or-nothing group, and the `MCP_API_KEY` or password variables the
   file ends up needing. `--questions` prints the field catalog as JSON for an
   agent to drive the wizard from; `init config` also has `--check` and

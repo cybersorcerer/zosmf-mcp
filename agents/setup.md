@@ -48,11 +48,13 @@ fill in and `[...]` marks something optional; neither is typed literally.
    With no terminal to answer on, the command names the missing variable
    and says so instead of hanging — export it and run the same command
    again.
-   Check: the file it wrote exists and is mode 600 (`stat -f %Lp .env` on
-   macOS/BSD, `stat -c %a .env` on Linux, must print `600`).
+   `<ENV>` below is the file it names in its "wrote ..." line — `.env` next
+   to `<CFG>` unless `--env-file` said otherwise.
+   Check: `<ENV>` exists and is mode 600 (`stat -f %Lp <ENV>` on
+   macOS/BSD, `stat -c %a <ENV>` on Linux, must print `600`).
 
 4. Prove the password actually reaches the server before wiring up a
-   client: `set -a; . ./.env; set +a; timeout 2 zosmf-mcp --config <CFG>
+   client: `set -a; . <ENV>; set +a; timeout 2 zosmf-mcp --config <CFG>
    --transport stdio 2>&1 | tee /tmp/zosmf-mcp-start.log`.
    Check: the log has one `password from system-env` or `password from
    file` line per system — never `password from none`. `from none`: the
@@ -74,7 +76,7 @@ fill in and `[...]` marks something optional; neither is typed literally.
 
 6. Register with the client — the command differs per agent, see the
    table below. A stdio client that does not inherit a sourced shell
-   environment needs the `.env` variables passed through its own `env:`
+   environment needs the `<ENV>` variables passed through its own `env:`
    mechanism (the table below shows `--env` for Claude Code).
    Check: `claude mcp list` / `opencode mcp list` shows zosmf-mcp as
    connected, or the n8n node's own connection test succeeds — the table
@@ -111,7 +113,7 @@ replaces. To go back:
 
 | Client | Command / configuration | Check |
 | --- | --- | --- |
-| Claude Code | `claude mcp add zosmf-mcp --env ZOSMF_<SYSTEM>_PASSWORD=<value> -- <path-to-zosmf-mcp> --config <CFG>` (repeat `--env` per variable from step 3; omit it if the shell that starts Claude Code already sourced `.env`) | `claude mcp list` shows `zosmf-mcp` as `✔ Connected` |
+| Claude Code | `claude mcp add zosmf-mcp --env ZOSMF_<SYSTEM>_PASSWORD=<value> -- <path-to-zosmf-mcp> --config <CFG>` (repeat `--env` per variable from step 3; omit it if the shell that starts Claude Code already sourced `<ENV>`) | `claude mcp list` shows `zosmf-mcp` as `✔ Connected` |
 | opencode | `opencode mcp add zosmf-mcp -- <path-to-zosmf-mcp> --config <CFG>` | `opencode mcp list` shows `zosmf-mcp` as `connected` |
 | pi | pi has no built-in MCP client by design. If the `pi-mcp-adapter` extension is installed, it reads the same `.mcp.json` the Claude Code row writes — otherwise use pi to run this procedure for a client that does have one. | not applicable, or `/mcp` (adapter installed) shows zosmf-mcp connected |
 | n8n | Run the server with `--transport streamable-http` (the container already does). In n8n, add an **MCP Client Tool** node: transport `Streamable HTTP`, URL `http://<host>:8081/mcp`. | the node's connection test succeeds |

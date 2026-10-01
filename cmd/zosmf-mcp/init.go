@@ -39,7 +39,7 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	fs := flag.NewFlagSet("init env", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	file := fs.String("file", "", "configuration file to read the required variables from")
-	envFile := fs.String("env-file", ".env", "environment file to write")
+	envFile := fs.String("env-file", "", "environment file to write (default: .env next to the configuration file)")
 	questions := fs.Bool("questions", false, "print the required variables as JSON and exit")
 	genKey := fs.Bool("generate-api-key", false, "generate MCP_API_KEY instead of asking for it")
 	if err := fs.Parse(args); err != nil {
@@ -50,6 +50,9 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
+	}
+	if *envFile == "" {
+		*envFile = envPathFor(path)
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
@@ -193,7 +196,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 			_, _ = fmt.Fprintln(stderr, "  zosmf-mcp init config --name MAINT --host https://zos.example.com:443 --user IBMUSER")
 			return 2
 		}
-		if err := setup.RunWizard(path, ".env", *print, os.Stdin, stdout); err != nil {
+		if err := setup.RunWizard(path, envPathFor(path), *print, os.Stdin, stdout); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -302,7 +305,7 @@ func runInitRestore(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("init restore", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	file := fs.String("file", "", "configuration file whose backups to use")
-	envFile := fs.String("env-file", ".env", "environment file whose backups to use")
+	envFile := fs.String("env-file", "", "environment file whose backups to use (default: .env next to the configuration file)")
 	list := fs.Bool("list", false, "print the backups as JSON, newest first, and exit")
 	stamp := fs.String("backup", "", "timestamp of the backup to restore, as --list prints it")
 	target := fs.String("target", "", "config or env — needed only when both have a backup with that timestamp")
@@ -318,6 +321,9 @@ func runInitRestore(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
+	}
+	if *envFile == "" {
+		*envFile = envPathFor(path)
 	}
 	var all []targetBackup
 	for _, t := range []struct{ name, path string }{{"config", path}, {"env", *envFile}} {
@@ -372,6 +378,12 @@ func runInitRestore(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stdout, "the version it replaced is saved as %s\n", saved.Path)
 	}
 	return 0
+}
+
+// envPathFor keeps the secrets beside the configuration they belong to,
+// wherever the command is run from.
+func envPathFor(configPath string) string {
+	return filepath.Join(filepath.Dir(configPath), ".env")
 }
 
 // resolveConfigPath honours --file, then the server's own search order, and

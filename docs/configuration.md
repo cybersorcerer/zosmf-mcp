@@ -93,18 +93,20 @@ zosmf-mcp init restore --list                       # JSON, newest first
 zosmf-mcp init restore --backup 20261001-140530     # add --target config|env if both match
 ```
 
-A restore replaces the whole file and backs up the version it replaces first, so it can itself be undone. `--file` and `--env-file` select the files as in `init config` and `init env`.
+A restore replaces the whole file and backs up the version it replaces first, so it can itself be undone. `--file` and `--env-file` select the files as in `init config` and `init env`; without `--env-file` it is `.env` next to the configuration.
 
 ## Passing Passwords Securely
 
 Never store passwords in plain text in the configuration file. Use environment variables instead:
+
+`zosmf-mcp init env` writes these to `.env` next to the configuration file (for example `~/.config/smpe_ls/.env`), mode 600; `--env-file` picks another place. By hand:
 
 ```bash
 # .env file (do NOT commit to git!)
 export ZOSMF_SYSA_PASSWORD="my_password"
 
 # Load before starting:
-source .env
+source ~/.config/smpe_ls/.env
 ```
 
 In the config:

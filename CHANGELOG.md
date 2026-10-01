@@ -10,8 +10,9 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ### Added
 
-- **`zosmf-mcp init config` and `zosmf-mcp init env`.** An interactive wizard,
-  or flags for scripting, that write the shared configuration file and its
+- **`zosmf-mcp init config` and `zosmf-mcp init env`.** An interactive wizard
+  — a menu over the file's systems, CSIs and zones entered one per line, a
+  preview before each write — or flags for scripting, that write the shared configuration file and its
   `.env` secrets: one system's connection details, its ZOAU/SSH settings as
   one all-or-nothing group, and the `MCP_API_KEY` or password variables the
   file ends up needing. `--questions` prints the field catalog as JSON for an
@@ -22,6 +23,10 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
   what's missing and exits. A file `init config` writes with no transport
   block at all gets `transport: stdio: true`, so it can start the server
   unmodified.
+- **Backups and `zosmf-mcp init restore`.** Every write by `init config` or
+  `init env` first copies the file into `.zosmf-mcp-backups/` next to it,
+  keeping the newest 10. `init restore --list` and `--backup <timestamp>` put
+  one back; the wizard offers the same as `[r]`.
 - **Per-system password lookup by convention.** A password not given in the
   file is read from `ZOSMF_<SYSTEM>_PASSWORD` — derived from the system's
   `name`, nothing to add to the file for this one — before falling back to the

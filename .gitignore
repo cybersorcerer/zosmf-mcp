@@ -13,6 +13,7 @@ dist/
 .smpe-zosmf.yaml
 secrets/
 .env
+.zosmf-mcp-backups/
 # IDE
 .idea/
 *.swp

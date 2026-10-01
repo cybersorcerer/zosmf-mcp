@@ -2,6 +2,7 @@ bin/
 dist/
 .git/
 .env
+.zosmf-mcp-backups/
 secrets/
 docs/
 *.md

@@ -82,6 +82,19 @@ This means you can use the simpler `servers:` key with `user:` and `rejectUnauth
 | `tso_codepage`    | No       | TSO code page, default: `1047`                                    |
 | `home`            | No       | USS home directory, used by vscpdf/nvpdf                          |
 
+## Backups and Restore
+
+`zosmf-mcp init config` and `zosmf-mcp init env` copy the file they are about to replace into `.zosmf-mcp-backups/` next to it — for example `~/.config/smpe_ls/.zosmf-mcp-backups/.smpe-zosmf.yaml.20261001-140530`. The newest 10 copies per file are kept, all mode 600. The interactive wizard also backs up the file when it starts.
+
+To put one back, use `[r]` in the wizard, or:
+
+```bash
+zosmf-mcp init restore --list                       # JSON, newest first
+zosmf-mcp init restore --backup 20261001-140530     # add --target config|env if both match
+```
+
+A restore replaces the whole file and backs up the version it replaces first, so it can itself be undone. `--file` and `--env-file` select the files as in `init config` and `init env`.
+
 ## Passing Passwords Securely
 
 Never store passwords in plain text in the configuration file. Use environment variables instead:

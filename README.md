@@ -63,7 +63,7 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 ```bash
 git clone https://github.com/cybersorcerer/zosmf-mcp.git && cd zosmf-mcp
 make install && export PATH="$HOME/.local/bin:$PATH"
-zosmf-mcp init config   # one system, interactive — writes the config file
+zosmf-mcp init config   # interactive: systems, CSIs, zones — backs up the file first
 zosmf-mcp init env      # that system's password — writes .env, mode 600
 ```
 

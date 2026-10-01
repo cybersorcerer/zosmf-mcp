@@ -93,6 +93,20 @@ fill in and `[...]` marks something optional; neither is typed literally.
    problem, not a setup-procedure problem: read what it names and go back
    to step 1 or step 3, never around this file.
 
+## Undoing a change
+
+Every write by `init config` and `init env` first saves the file it
+replaces. To go back:
+
+1. `zosmf-mcp init restore --list`
+   Show the user the list — target, timestamp, file — and let them pick.
+   Never pick a backup yourself.
+2. `zosmf-mcp init restore --backup <timestamp>` — add `--target config` or
+   `--target env` when the command says both match.
+   Check: `zosmf-mcp init config --check` prints "... is valid". The output
+   of step 2 names where the replaced version went; a wrong pick is undone
+   the same way.
+
 ## Step 6 — registering with a client
 
 | Client | Command / configuration | Check |

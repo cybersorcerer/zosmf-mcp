@@ -354,9 +354,10 @@ func (w *wizard) askScalar(f Field, v *Values) error {
 		if err != nil {
 			return err
 		}
+		if answer == "" {
+			answer = current
+		}
 		switch {
-		case answer == "" && current != "":
-			v.Set(f.ID, []string{current})
 		case answer == "" && f.Required:
 			w.printf("  %s is required.\n", f.Label)
 			continue

@@ -192,3 +192,18 @@ func TestWizardAsksAgainForAHostWithoutScheme(t *testing.T) {
 		t.Errorf("the corrected answer did not land:\n%s", out)
 	}
 }
+
+// Enter keeps the current value — but not a host the client cannot call.
+func TestWizardDoesNotKeepAnExistingHostWithoutScheme(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.yaml")
+	_ = os.WriteFile(path, []byte("servers:\n  - name: MAIN\n    host: 192.0.2.10\n    user: U\n"), 0o600)
+	out := runWizard(t, path, true, lines(
+		"1",
+		"", "https://192.0.2.10:443", // Enter on the broken host is refused
+		"", "", "", "", "", "", "", "", "", "",
+		"d",
+	))
+	if !strings.Contains(out, "host: https://192.0.2.10:443") {
+		t.Errorf("the broken host was kept:\n%s", out)
+	}
+}

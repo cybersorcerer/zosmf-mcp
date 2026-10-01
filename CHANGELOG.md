@@ -34,9 +34,10 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
   existing global `ZOSMF_PASSWORD`. The startup log names which of the three
   sources each system used, never the value.
 - **`agents/setup.md`**, a setup procedure meant to be followed identically by
-  Claude Code, opencode, pi, or a human at a terminal. `make install-skill
-  [AGENT=claude|opencode|pi] [SCOPE=project|user]` installs it, and a matching
-  wrapper, wherever that agent looks for skills.
+  Claude Code, opencode, pi, or a human at a terminal. It is built into the
+  binary: `zosmf-mcp init skill --agent claude|opencode|pi [--scope
+  user|project]` installs it, and a matching wrapper, wherever that agent
+  looks for skills — no repository needed.
 
 ## [0.6.0] — 2026-09-21
 

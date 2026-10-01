@@ -182,8 +182,8 @@ launch-agent-remove:
 AGENT ?= claude
 SCOPE ?= project
 
-install-skill:
-	@./scripts/install-skill.sh $(AGENT) $(SCOPE)
+install-skill: build
+	@$(BINARY_DIR)/$(BINARY) init skill --agent $(AGENT) --scope $(SCOPE)
 
 help:
 	@echo "Targets:"

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cybersorcerer/zosmf-mcp/agents"
 	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 	"github.com/cybersorcerer/zosmf-mcp/internal/setup"
 )
@@ -16,7 +17,7 @@ import (
 // calling os.Exit so the tests can drive it in process.
 func runInit(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(stderr, "usage: zosmf-mcp init <config|env|restore> [flags]")
+		_, _ = fmt.Fprintln(stderr, "usage: zosmf-mcp init <config|env|restore|skill> [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -26,8 +27,10 @@ func runInit(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return runInitEnv(args[1:], stdout, stderr, isTTY)
 	case "restore":
 		return runInitRestore(args[1:], stdout, stderr)
+	case "skill":
+		return runInitSkill(args[1:], stdout, stderr)
 	default:
-		_, _ = fmt.Fprintf(stderr, "unknown init subcommand %q — use config, env or restore\n", args[0])
+		_, _ = fmt.Fprintf(stderr, "unknown init subcommand %q — use config, env, restore or skill\n", args[0])
 		return 2
 	}
 }
@@ -377,6 +380,61 @@ func runInitRestore(args []string, stdout, stderr io.Writer) int {
 	if saved != nil {
 		_, _ = fmt.Fprintf(stdout, "the version it replaced is saved as %s\n", saved.Path)
 	}
+	return 0
+}
+
+// skillDirs is where each agent looks for skills, per scope. A project
+// scope is relative to the directory the command runs in.
+var skillDirs = map[string]map[string]string{
+	"claude":   {"project": ".claude/skills", "user": ".claude/skills"},
+	"opencode": {"project": ".opencode/skills", "user": ".config/opencode/skills"},
+	"pi":       {"project": ".pi/skills", "user": ".pi/agent/skills"},
+}
+
+// runInitSkill copies the setup procedure, and the agent's wrapper for it,
+// out of the binary into that agent's skill directory.
+func runInitSkill(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("init skill", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	agent := fs.String("agent", "claude", "claude, opencode or pi")
+	scope := fs.String("scope", "user", "user (all projects) or project (the current directory)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	base, ok := skillDirs[*agent][*scope]
+	if !ok {
+		_, _ = fmt.Fprintf(stderr, "unknown --agent %q or --scope %q — use claude, opencode or pi, and user or project\n", *agent, *scope)
+		return 2
+	}
+	if *scope == "user" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		base = filepath.Join(home, base)
+	}
+	dir := filepath.Join(base, "zosmf-mcp-setup")
+
+	// The wrapper and setup.md go together: the wrapper refers to the file
+	// next to it, and one without the other leaves an agent pointing at
+	// nothing.
+	files := map[string]string{"SKILL.md": *agent + "/SKILL.md", "setup.md": "setup.md"}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	for name, src := range files {
+		data, err := agents.Files.ReadFile(src)
+		if err == nil {
+			err = os.WriteFile(filepath.Join(dir, name), data, 0o644)
+		}
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
+	_, _ = fmt.Fprintf(stdout, "installed the zosmf-mcp setup skill for %s (%s):\n  %s\n", *agent, *scope, dir)
 	return 0
 }
 

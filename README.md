@@ -60,9 +60,11 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 
 ## Getting started
 
+Download the binary for your platform from the [latest release](https://github.com/cybersorcerer/zosmf-mcp/releases/latest) — `darwin-arm64`, `darwin-amd64`, `linux-amd64`, `linux-s390x` or `windows.exe` — or [build from source](#build-from-source):
+
 ```bash
-git clone https://github.com/cybersorcerer/zosmf-mcp.git && cd zosmf-mcp
-make install && export PATH="$HOME/.local/bin:$PATH"
+curl -fsSLo zosmf-mcp https://github.com/cybersorcerer/zosmf-mcp/releases/latest/download/zosmf-mcp-darwin-arm64
+install -d ~/.local/bin && install -m 755 zosmf-mcp ~/.local/bin/ && export PATH="$HOME/.local/bin:$PATH"
 zosmf-mcp init config   # interactive: systems, CSIs, zones — backs up the file first
 zosmf-mcp init env      # that system's password — writes .env next to the config, mode 600
 ```
@@ -75,7 +77,7 @@ claude mcp add zosmf-mcp -- zosmf-mcp --config <path init config printed>
 
 Make the password reach the server: in a shell, `set -a; . <path init env printed>; set +a` before starting it; for the `claude mcp add` above, pass it instead with `--env NAME=value` (repeatable), since the client — not your shell — starts the process.
 
-More systems, other clients, and containers: [docs/configuration.md](docs/configuration.md) and [docs/clients.md](docs/clients.md) — the wizard automates the same configuration file those sections describe editing by hand. Prefer an agent to run this for you? `make install-skill` installs the same procedure as a skill for Claude Code, opencode, or pi.
+More systems, other clients, and containers: [docs/configuration.md](docs/configuration.md) and [docs/clients.md](docs/clients.md) — the wizard automates the same configuration file those sections describe editing by hand. Prefer an agent to run this for you? `zosmf-mcp init skill --agent claude|opencode|pi` installs the same procedure as a skill (`--scope project` for the current directory only).
 
 
 ## Installation

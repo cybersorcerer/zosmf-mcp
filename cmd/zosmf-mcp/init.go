@@ -193,10 +193,11 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 			_, _ = fmt.Fprintln(stderr, "  zosmf-mcp init config --name MAINT --host https://zos.example.com:443 --user IBMUSER")
 			return 2
 		}
-		if err := setup.AskAll(fields, sshFields, values, os.Stdin, stdout); err != nil {
+		if err := setup.RunWizard(path, ".env", *print, os.Stdin, stdout); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
+		return 0
 	}
 
 	if err := setup.Validate(fields, values); err != nil {
@@ -206,9 +207,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 
 	// The ZOAU fields are required as a group: a user who wants no ZOAU
 	// tools must be able to run without any of them, so this only fires
-	// once the group has been engaged — by a flag or by the wizard's
-	// answers. One predicate, checked after AskAll has had its chance to
-	// set values, covers both: fs.Visit alone would miss a wizard "yes".
+	// once the group has been engaged by a flag.
 	zoauEngaged := false
 	for _, f := range sshFields {
 		if values.Has(f.ID) {

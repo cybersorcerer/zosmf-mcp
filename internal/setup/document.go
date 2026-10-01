@@ -32,6 +32,10 @@ func LoadDocument(path string) (*Document, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
+	return parseDocument(data, path)
+}
+
+func parseDocument(data []byte, path string) (*Document, error) {
 	var root yaml.Node
 	if err := yaml.Unmarshal(data, &root); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
@@ -60,6 +64,102 @@ func newMappingDoc() *yaml.Node {
 			Kind: yaml.MappingNode, Tag: "!!map",
 		}},
 	}
+}
+
+// SystemSummary is one system as the wizard's menu lists it.
+type SystemSummary struct {
+	Name, Host string
+}
+
+// Systems lists the z/OSMF systems in file order.
+func (d *Document) Systems() []SystemSummary {
+	m, err := d.mapping()
+	if err != nil {
+		return nil
+	}
+	key, _ := d.systemsKey()
+	section := mapValue(m, key)
+	if section == nil || section.Kind != yaml.SequenceNode {
+		return nil
+	}
+	var out []SystemSummary
+	for _, item := range section.Content {
+		if n := mapValue(item, "name"); n != nil {
+			s := SystemSummary{Name: n.Value}
+			if h := mapValue(item, "host"); h != nil {
+				s.Host = h.Value
+			}
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// entry finds a named system in one section, or nil.
+func (d *Document) entry(sectionKey, name string) *yaml.Node {
+	m, err := d.mapping()
+	if err != nil {
+		return nil
+	}
+	section := mapValue(m, sectionKey)
+	if section == nil || section.Kind != yaml.SequenceNode {
+		return nil
+	}
+	return findByName(section, name)
+}
+
+// readValues fills v with what an entry already holds for the given
+// fields, so the wizard can offer it as the answer to keep.
+func readValues(entry *yaml.Node, fields []Field, v *Values) {
+	for _, f := range fields {
+		n := mapValue(entry, f.YAMLKey)
+		if f.YAMLKey == "" || n == nil {
+			continue
+		}
+		switch n.Kind {
+		case yaml.ScalarNode:
+			v.Set(f.ID, []string{n.Value})
+		case yaml.SequenceNode:
+			var vals []string
+			for _, item := range n.Content {
+				vals = append(vals, item.Value)
+			}
+			v.Set(f.ID, vals)
+		}
+	}
+}
+
+// SystemValues returns the answers an existing system already holds, its
+// ZOAU settings included.
+func (d *Document) SystemValues(name string, fields, sshFields []Field) *Values {
+	v := NewValues()
+	key, _ := d.systemsKey()
+	if e := d.entry(key, name); e != nil {
+		readValues(e, fields, v)
+	}
+	if e := d.entry("ssh_systems", name); e != nil {
+		readValues(e, sshFields, v)
+		if home := mapValue(mapValue(e, "environment"), "ZOAU_HOME"); home != nil {
+			v.Set("zoau-path", []string{home.Value})
+		}
+	}
+	return v
+}
+
+// Preview renders one system, and its ZOAU entry if it has one, as they
+// stand in the file.
+func (d *Document) Preview(name string) ([]byte, error) {
+	m := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	key, err := d.systemsKey()
+	if err != nil {
+		return nil, err
+	}
+	for _, k := range []string{key, "ssh_systems"} {
+		if e := d.entry(k, name); e != nil {
+			setMapValue(m, k, &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{e}})
+		}
+	}
+	return render(m)
 }
 
 func (d *Document) UpsertSystem(name string, entries []Entry) (bool, error) {

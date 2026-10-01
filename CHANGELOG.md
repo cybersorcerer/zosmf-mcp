@@ -8,6 +8,8 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-10-01
+
 ### Added
 
 - **`zosmf-mcp init config` and `zosmf-mcp init env`.** An interactive wizard

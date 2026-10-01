@@ -10,8 +10,8 @@ Everything the server reads from its configuration file and the environment. `zo
 
 | Command | What it does | Flags |
 | --- | --- | --- |
-| `init config` | Adds or updates a system in the configuration file. Without field flags and on a terminal it runs the wizard (below). | `--file` (default: the file the server would find, else `~/.config/smpe_ls/.smpe-zosmf.yaml`), `--print` (show the result, write nothing), `--check` (validate the file and exit), `--questions` (field list as JSON); one flag per field: `--name`, `--host`, `--user`, `--csi A,B`, `--zones A,B`, … and the ZOAU group `--ssh-host`, `--ssh-user`, `--ssh-key-file`, `--zoau-path`, `--ssh-port` |
-| `init env` | Writes the passwords (and `MCP_API_KEY`) the configuration needs to `.env` next to it, mode 600. A variable already set in the environment is taken from there, otherwise it is asked for. Values are never printed. | `--file`, `--env-file`, `--questions`, `--generate-api-key` |
+| `init config` | Adds or updates a system in the configuration file. Without field flags and on a terminal it runs the wizard (below). | `--file` (default: the file the server would find, else `~/.config/smpe_ls/.smpe-zosmf.yaml`), `--show` (systems already in the file, as JSON, no secrets), `--print` (show the system as it would be written, write nothing), `--check` (validate the file, report each system's password source), `--questions` (field list as JSON); one flag per field: `--name`, `--host`, `--user`, `--csi A,B`, `--zones A,B`, … and the ZOAU group `--ssh-host`, `--ssh-user`, `--ssh-key-file`, `--zoau-path`, `--ssh-port` |
+| `init env` | Writes the passwords (and `MCP_API_KEY`) the configuration needs to `.env` next to it, mode 600. Variables the file already has are kept; one set in the environment is taken from there, otherwise it is asked for. `--questions` lists only what is missing. Values are never printed. | `--file`, `--env-file`, `--questions`, `--generate-api-key` |
 | `init restore` | Lists or restores the backups every write leaves behind — see [Backups and Restore](#backups-and-restore). | `--file`, `--env-file`, `--list`, `--backup <timestamp>`, `--target config\|env` |
 | `init skill` | Installs the setup procedure as a skill for an AI agent, from the binary itself. | `--agent claude\|opencode\|pi`, `--scope user\|project` (default `user`; `project` = current directory) |
 
@@ -112,14 +112,11 @@ A restore replaces the whole file and backs up the version it replaces first, so
 
 Never store passwords in plain text in the configuration file. Use environment variables instead:
 
-`zosmf-mcp init env` writes these to `.env` next to the configuration file (for example `~/.config/smpe_ls/.env`), mode 600; `--env-file` picks another place. By hand:
+`zosmf-mcp init env` writes these to `.env` next to the configuration file (for example `~/.config/smpe_ls/.env`), mode 600. **The server reads that file itself at startup** — nothing to source, nothing to pass to an MCP client. A variable already set in the process environment wins over the file. A `.env` that group or others can read is ignored, with a startup warning naming the `chmod 600` that fixes it. `KEY=value` lines, `export ` prefixes and quoted values are understood. By hand:
 
 ```bash
-# .env file (do NOT commit to git!)
-export ZOSMF_SYSA_PASSWORD="my_password"
-
-# Load before starting:
-source ~/.config/smpe_ls/.env
+# ~/.config/smpe_ls/.env — chmod 600, never commit it
+ZOSMF_SYSA_PASSWORD=my_password
 ```
 
 In the config:
@@ -127,7 +124,7 @@ In the config:
 password: "${ZOSMF_SYSA_PASSWORD}"
 ```
 
-A system's password is resolved in this order: an explicit `${ENV_VAR}` (or literal value) in `auth.password`; otherwise `ZOSMF_<SYSTEM>_PASSWORD`, derived from the system's `name` — nothing to add to the file for this one; otherwise the global `ZOSMF_PASSWORD` fallback. The startup log names which of the three each system used, never the value itself.
+A system's password is resolved in this order: an explicit `${ENV_VAR}` (or literal value) in `auth.password`; otherwise `ZOSMF_<SYSTEM>_PASSWORD`, derived from the system's `name` — nothing to add to the file for this one; otherwise the global `ZOSMF_PASSWORD` fallback. Each variable is looked up in the process environment first, then in the `.env` file. The startup log and `zosmf-mcp init config --check` name the source each system used — `file`, `system-env`, `global-env`, `env-file` or `none` — never the value itself.
 
 ## SSH Systems (for ZOAU tools)
 

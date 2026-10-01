@@ -8,6 +8,32 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ## [Unreleased]
 
+### Added
+
+- **The server reads the `.env` beside its configuration** at startup, so
+  no MCP client has to be given a password. The process environment still
+  wins; a `.env` others can read is ignored with a warning.
+- **`init config --show`** prints the systems already in the file as JSON,
+  keyed by the flag names, without secrets.
+- **`init config --check` names each system's password source**, so a
+  setup can prove the password arrives without starting the server.
+
+### Changed
+
+- **`init config --print` shows only the system being written**, not the
+  whole shared file. `init config` says whether it added or updated it.
+- **`agents/setup.md` rewritten** for local models: one question at a
+  time, exact wording, a preview before every write, passwords entered by
+  the user in their own terminal, never in the chat.
+
+### Fixed
+
+- **A z/OSMF host without `https://`** was written and passed `--check`,
+  then failed every call. `init config` now rejects it, `--check` fails on
+  it, and the server warns at startup.
+- **`init env` asked again for every password** already in `.env`; it now
+  keeps them, and `--questions` lists only what is missing.
+
 ## [1.0.0] — 2026-10-01
 
 ### Added

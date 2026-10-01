@@ -167,7 +167,7 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "wrote %s with %d variable(s), mode 600\n", *envFile, len(vars))
-	_, _ = fmt.Fprintln(stdout, "values are not printed here — read them from the file if you need them")
+	_, _ = fmt.Fprintln(stdout, "values are not printed")
 	if *envFile == config.EnvFilePath(path) {
 		_, _ = fmt.Fprintln(stdout, "zosmf-mcp reads this file at startup — nothing to source, nothing to pass to a client")
 	} else {

@@ -75,7 +75,7 @@ Register with an MCP client, for example Claude Code — `claude mcp list` shoul
 claude mcp add zosmf-mcp -- zosmf-mcp --config <path init config printed>
 ```
 
-Make the password reach the server: in a shell, `set -a; . <path init env printed>; set +a` before starting it; for the `claude mcp add` above, pass it instead with `--env NAME=value` (repeatable), since the client — not your shell — starts the process.
+The server reads the `.env` next to its configuration at startup, so no client needs the password. `zosmf-mcp init config --check` shows where each system's password comes from.
 
 All `init` commands and the wizard: [Setup Commands](docs/configuration.md#setup-commands). More systems, other clients, and containers: [docs/configuration.md](docs/configuration.md) and [docs/clients.md](docs/clients.md) — the wizard automates the same configuration file those sections describe editing by hand. Prefer an agent to run this for you? `zosmf-mcp init skill --agent claude|opencode|pi` installs the same procedure as a skill (`--scope project` for the current directory only).
 

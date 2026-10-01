@@ -180,6 +180,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	questions := fs.Bool("questions", false, "print the field catalog as JSON and exit")
 	print := fs.Bool("print", false, "render the result to stdout without writing")
 	check := fs.Bool("check", false, "load the file through the server's config loader and report problems")
+	show := fs.Bool("show", false, "print the systems already in the file as JSON and exit")
 
 	fields := setup.ConfigFields()
 	sshFields := setup.SSHFields()
@@ -202,6 +203,43 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
+	}
+
+	if *show {
+		doc, err := setup.LoadDocument(path)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		type shownSystem struct {
+			Name   string         `json:"name"`
+			Values map[string]any `json:"values"`
+		}
+		systems := []shownSystem{}
+		for _, s := range doc.Systems() {
+			v := doc.SystemValues(s.Name, fields, sshFields)
+			values := map[string]any{}
+			for _, f := range append(append([]setup.Field{}, fields...), sshFields...) {
+				switch {
+				case f.ID == "name" || !v.Has(f.ID):
+				case f.Cardinality == setup.Many:
+					values[f.ID] = v.Many(f.ID)
+				default:
+					values[f.ID] = v.One(f.ID)
+				}
+			}
+			systems = append(systems, shownSystem{Name: s.Name, Values: values})
+		}
+		data, err := json.MarshalIndent(struct {
+			File    string        `json:"file"`
+			Systems []shownSystem `json:"systems"`
+		}{path, systems}, "", "  ")
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		_, _ = fmt.Fprintln(stdout, string(data))
+		return 0
 	}
 
 	if *check {
@@ -230,7 +268,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	anyFlag := false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
-		case "file", "questions", "print", "check":
+		case "file", "questions", "print", "check", "show":
 		default:
 			anyFlag = true
 		}
@@ -283,6 +321,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
+	existed := doc.HasSystem(values.One("name"))
 	if _, err := doc.UpsertSystem(values.One("name"), entries); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
@@ -333,6 +372,11 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "wrote %s\n", path)
+	if existed {
+		_, _ = fmt.Fprintf(stdout, "updated system %s\n", values.One("name"))
+	} else {
+		_, _ = fmt.Fprintf(stdout, "added system %s\n", values.One("name"))
+	}
 	if backup != nil {
 		_, _ = fmt.Fprintf(stdout, "previous version saved as %s\n", backup.Path)
 	}

@@ -335,3 +335,70 @@ func TestInitConfigCheckReportsThePasswordSource(t *testing.T) {
 		t.Error("the password value was printed")
 	}
 }
+
+// --show lets an agent see what is already there before it asks anything,
+// keyed by the same ids the write flags use, and never with a secret.
+func TestInitConfigShow(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	_ = os.WriteFile(path, []byte(`servers:
+  - name: MAIN
+    host: https://zos:443
+    user: U
+    csi: [A.CSI, B.CSI]
+    auth:
+      password: s3cret
+ssh_systems:
+  - name: MAIN
+    host: zos
+    username: u
+    key_file: /k
+    environment:
+      ZOAU_HOME: /usr/lpp/IBM/zoautil
+`), 0o600)
+	code, out, errOut := run(t, false, "config", "--file", path, "--show")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %s", code, errOut)
+	}
+	var got struct {
+		File    string `json:"file"`
+		Systems []struct {
+			Name   string         `json:"name"`
+			Values map[string]any `json:"values"`
+		} `json:"systems"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, out)
+	}
+	if got.File != path || len(got.Systems) != 1 || got.Systems[0].Name != "MAIN" {
+		t.Fatalf("got %+v", got)
+	}
+	v := got.Systems[0].Values
+	if v["host"] != "https://zos:443" || v["zoau-path"] != "/usr/lpp/IBM/zoautil" {
+		t.Errorf("values = %v", v)
+	}
+	if csi, ok := v["csi"].([]any); !ok || len(csi) != 2 {
+		t.Errorf("csi = %v, want a list of two", v["csi"])
+	}
+	if strings.Contains(out, "s3cret") {
+		t.Error("--show printed a password")
+	}
+}
+
+func TestInitConfigShowWithoutAFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, out, _ := run(t, false, "config", "--file", path, "--show")
+	if code != 0 || !strings.Contains(out, `"systems": []`) {
+		t.Errorf("exit %d; want an empty system list:\n%s", code, out)
+	}
+}
+
+func TestInitConfigSaysAddedOrUpdated(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	args := []string{"config", "--file", path, "--name", "MAIN", "--host", "https://zos:443", "--user", "U"}
+	if _, out, _ := run(t, false, args...); !strings.Contains(out, "added system MAIN") {
+		t.Errorf("first write: %s", out)
+	}
+	if _, out, _ := run(t, false, args...); !strings.Contains(out, "updated system MAIN") {
+		t.Errorf("second write: %s", out)
+	}
+}

@@ -95,6 +95,13 @@ func (d *Document) Systems() []SystemSummary {
 	return out
 }
 
+// HasSystem reports whether the file already has a z/OSMF system of that
+// name, compared without regard to case.
+func (d *Document) HasSystem(name string) bool {
+	key, _ := d.systemsKey()
+	return d.entry(key, name) != nil
+}
+
 // entry finds a named system in one section, or nil.
 func (d *Document) entry(sectionKey, name string) *yaml.Node {
 	m, err := d.mapping()

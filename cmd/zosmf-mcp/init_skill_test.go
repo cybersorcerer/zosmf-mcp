@@ -31,7 +31,7 @@ func TestInitSkillInstallsFromTheBinary(t *testing.T) {
 			t.Errorf("%s/%s: no wrapper in %s: %v", c.agent, c.scope, c.dir, err)
 		}
 		procedure, err := os.ReadFile(filepath.Join(c.dir, "setup.md"))
-		if err != nil || !strings.Contains(string(procedure), "init restore") {
+		if err != nil || !strings.Contains(string(procedure), "init config --check") {
 			t.Errorf("%s/%s: no setup.md in %s: %v", c.agent, c.scope, c.dir, err)
 		}
 		if !strings.Contains(out, c.dir) {

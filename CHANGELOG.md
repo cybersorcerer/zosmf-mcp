@@ -22,15 +22,18 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 - **`init config --print` shows only the system being written**, not the
   whole shared file. `init config` says whether it added or updated it.
-- **`agents/setup.md` rewritten** for local models: one question at a
-  time, exact wording, a preview before every write, passwords entered by
-  the user in their own terminal, never in the chat.
+- **`agents/setup.md` rewritten** so it works with small local models: the
+  user runs the wizard and `init env` in their own terminal; the agent only
+  checks the result with `--show` and `--check` and connects the client. It
+  never types a setting and never sees a password.
 
 ### Fixed
 
 - **A z/OSMF host without `https://`** was written and passed `--check`,
   then failed every call. `init config` now rejects it, `--check` fails on
   it, and the server warns at startup.
+- **The wizard kept an existing host without `https://`** when Enter was
+  pressed; it now asks for a valid one.
 - **`init env` asked again for every password** already in `.env`; it now
   keeps them, and `--questions` lists only what is missing.
 

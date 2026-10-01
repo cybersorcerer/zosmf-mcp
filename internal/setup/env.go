@@ -57,6 +57,7 @@ func referencedVars(text string) []string {
 
 // WriteEnvFile merges the given variables into an existing file, keeping
 // everything else, and writes it back with mode 600 in plain KEY=value form.
+// The file it replaces is backed up first.
 func WriteEnvFile(path string, vars map[string]string) error {
 	existing := map[string]string{}
 	var order []string
@@ -99,6 +100,9 @@ func WriteEnvFile(path string, vars map[string]string) error {
 	var b strings.Builder
 	for _, key := range order {
 		_, _ = fmt.Fprintf(&b, "%s=%s\n", key, existing[key])
+	}
+	if _, err := BackupFile(path); err != nil {
+		return err
 	}
 	return writeFileAtomically(path, []byte(b.String()))
 }

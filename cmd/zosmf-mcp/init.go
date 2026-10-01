@@ -275,11 +275,15 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
-	if err := doc.Save(path); err != nil {
+	backup, err := doc.Save(path)
+	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "wrote %s\n", path)
+	if backup != nil {
+		_, _ = fmt.Fprintf(stdout, "previous version saved as %s\n", backup.Path)
+	}
 	_, _ = fmt.Fprintf(stdout, "next: zosmf-mcp init env --file %s\n", path)
 	return 0
 }

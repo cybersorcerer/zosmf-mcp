@@ -79,7 +79,7 @@ func TestWriteEnvFileLeavesNoTemporaryFileBehindAfterSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if e.Name() != filepath.Base(path) {
+		if e.Name() != filepath.Base(path) && e.Name() != BackupDirName {
 			t.Errorf("temporary file left behind: %q in %s", e.Name(), dir)
 		}
 	}
@@ -130,5 +130,22 @@ func TestGenerateAPIKeyIsLongAndUnique(t *testing.T) {
 	}
 	if a == b {
 		t.Error("two calls produced the same key")
+	}
+}
+
+func TestWriteEnvFileBacksUpTheReplacedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte("ZOSMF_MAINT_PASSWORD=old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteEnvFile(path, map[string]string{"ZOSMF_MAINT_PASSWORD": "new"}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := ListBackups(path)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("backups = %v, %v; want one", list, err)
+	}
+	if got, _ := os.ReadFile(list[0].Path); string(got) != "ZOSMF_MAINT_PASSWORD=old\n" {
+		t.Error("the backup does not hold the replaced file")
 	}
 }

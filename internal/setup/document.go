@@ -291,16 +291,16 @@ func (d *Document) Bytes() ([]byte, error) {
 	return render(d.root)
 }
 
-// Save writes a backup beside the file the first time it replaces it.
-func (d *Document) Save(path string) error {
+// Save backs up the file it replaces (see BackupFile) and returns that
+// backup, or nil when there was none to make.
+func (d *Document) Save(path string) (*Backup, error) {
 	out, err := d.Bytes()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if existing, err := os.ReadFile(path); err == nil {
-		if err := os.WriteFile(path+".bak", existing, 0o600); err != nil {
-			return fmt.Errorf("writing the backup: %w", err)
-		}
+	b, err := BackupFile(path)
+	if err != nil {
+		return nil, err
 	}
-	return os.WriteFile(path, out, 0o600)
+	return b, os.WriteFile(path, out, 0o600)
 }

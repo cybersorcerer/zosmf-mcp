@@ -37,7 +37,7 @@ func TestUpsertKeepsForeignContent(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := doc.Save(path); err != nil {
+	if _, err := doc.Save(path); err != nil {
 		t.Fatal(err)
 	}
 
@@ -194,11 +194,15 @@ func TestSaveLeavesABackup(t *testing.T) {
 	if _, err := doc.UpsertSystem("MAINT", []Entry{{Key: "user", Value: "OTHER"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := doc.Save(path); err != nil {
+	b, err := doc.Save(path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(path + ".bak"); err != nil {
-		t.Errorf("no backup next to the file: %v", err)
+	if b == nil {
+		t.Fatal("no backup of the replaced file")
+	}
+	if got, _ := os.ReadFile(b.Path); !strings.Contains(string(got), "IBMUSER") {
+		t.Errorf("backup does not hold the replaced content:\n%s", got)
 	}
 }
 

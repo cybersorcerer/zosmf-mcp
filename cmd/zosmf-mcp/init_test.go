@@ -402,3 +402,18 @@ func TestInitConfigSaysAddedOrUpdated(t *testing.T) {
 		t.Errorf("second write: %s", out)
 	}
 }
+
+// --print shows only the system being written: the rest of a shared file
+// is not the agent's business and may hold things it must not see.
+func TestInitConfigPrintShowsOnlyThatSystem(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	_ = os.WriteFile(path, []byte("servers:\n  - name: OTHER\n    host: https://other:443\n    user: U\n    auth:\n      password: s3cret\n"), 0o600)
+	code, out, errOut := run(t, false, "config", "--file", path, "--print",
+		"--name", "MAIN", "--host", "https://zos:443", "--user", "U")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %s", code, errOut)
+	}
+	if !strings.Contains(out, "name: MAIN") || strings.Contains(out, "OTHER") || strings.Contains(out, "s3cret") {
+		t.Errorf("want only MAIN:\n%s", out)
+	}
+}

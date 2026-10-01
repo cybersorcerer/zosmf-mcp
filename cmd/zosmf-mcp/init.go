@@ -178,7 +178,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	fs.SetOutput(stderr)
 	file := fs.String("file", "", "configuration file to create or update")
 	questions := fs.Bool("questions", false, "print the field catalog as JSON and exit")
-	print := fs.Bool("print", false, "render the result to stdout without writing")
+	print := fs.Bool("print", false, "show the system as it would be written, without writing")
 	check := fs.Bool("check", false, "load the file through the server's config loader and report problems")
 	show := fs.Bool("show", false, "print the systems already in the file as JSON and exit")
 
@@ -350,7 +350,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 
 	if *print {
-		out, err := doc.Bytes()
+		out, err := doc.Preview(values.One("name"))
 		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1

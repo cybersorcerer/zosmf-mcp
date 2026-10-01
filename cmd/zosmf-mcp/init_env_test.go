@@ -161,3 +161,61 @@ func TestInitEnvDefaultsToTheConfigDirectory(t *testing.T) {
 		t.Errorf("output does not name the full path:\n%s", out)
 	}
 }
+
+// twoSystems writes a config with MAIN and TEST and a .env next to it that
+// already holds TEST's password.
+func twoSystems(t *testing.T) (conf, env string) {
+	t.Helper()
+	dir := t.TempDir()
+	conf = filepath.Join(dir, "conf.yaml")
+	env = filepath.Join(dir, ".env")
+	_ = os.WriteFile(conf, []byte("servers:\n  - name: MAIN\n    host: https://zos:443\n    user: U\n  - name: TEST\n    host: https://zos2:443\n    user: U\n"), 0o600)
+	_ = os.WriteFile(env, []byte("ZOSMF_TEST_PASSWORD=kept\n"), 0o600)
+	t.Setenv("ZOSMF_MAIN_PASSWORD", "")
+	t.Setenv("ZOSMF_TEST_PASSWORD", "")
+	return conf, env
+}
+
+// Adding a second system must not ask again for the first one's password.
+func TestInitEnvQuestionsSkipsVariablesTheFileHas(t *testing.T) {
+	conf, _ := twoSystems(t)
+	code, out, errOut := run(t, false, "env", "--file", conf, "--questions")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %s", code, errOut)
+	}
+	if !strings.Contains(out, "ZOSMF_MAIN_PASSWORD") || strings.Contains(out, "ZOSMF_TEST_PASSWORD") {
+		t.Errorf("want only the missing MAIN password:\n%s", out)
+	}
+}
+
+func TestInitEnvKeepsWhatTheFileHas(t *testing.T) {
+	conf, env := twoSystems(t)
+	t.Setenv("ZOSMF_MAIN_PASSWORD", "new")
+	code, out, errOut := run(t, false, "env", "--file", conf)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %s", code, errOut)
+	}
+	if got := envValue(t, env, "ZOSMF_TEST_PASSWORD"); got != "kept" {
+		t.Errorf("TEST password = %q, want the one already in the file", got)
+	}
+	if got := envValue(t, env, "ZOSMF_MAIN_PASSWORD"); got != "new" {
+		t.Errorf("MAIN password = %q, want the exported one", got)
+	}
+	if !strings.Contains(out, "ZOSMF_TEST_PASSWORD") {
+		t.Errorf("output does not say which variable was kept:\n%s", out)
+	}
+}
+
+func TestInitEnvWithNothingMissing(t *testing.T) {
+	conf, env := twoSystems(t)
+	_ = os.WriteFile(env, []byte("ZOSMF_TEST_PASSWORD=kept\nZOSMF_MAIN_PASSWORD=also\n"), 0o600)
+
+	code, out, _ := run(t, false, "env", "--file", conf, "--questions")
+	if code != 0 || !strings.Contains(out, `"fields": []`) {
+		t.Errorf("exit %d; want an empty field list:\n%s", code, out)
+	}
+	code, out, errOut := run(t, false, "env", "--file", conf)
+	if code != 0 || !strings.Contains(out, "nothing to do") {
+		t.Errorf("exit %d, out %q, stderr %q; want success saying nothing to do", code, out, errOut)
+	}
+}

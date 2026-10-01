@@ -59,6 +59,39 @@ func referencedVars(text string) []string {
 // everything else, and writes it back with mode 600 in plain KEY=value form.
 // The file it replaces is backed up first.
 func WriteEnvFile(path string, vars map[string]string) error {
+	existing, order, err := readEnv(path)
+	if err != nil {
+		return err
+	}
+
+	var added []string
+	for key := range vars {
+		if _, known := existing[key]; !known {
+			added = append(added, key)
+		}
+		existing[key] = vars[key]
+	}
+	sort.Strings(added)
+	order = append(order, added...)
+
+	var b strings.Builder
+	for _, key := range order {
+		_, _ = fmt.Fprintf(&b, "%s=%s\n", key, existing[key])
+	}
+	if _, err := BackupFile(path); err != nil {
+		return err
+	}
+	return writeFileAtomically(path, []byte(b.String()))
+}
+
+// ReadEnvFile returns the variables an environment file sets; a missing
+// file sets none.
+func ReadEnvFile(path string) (map[string]string, error) {
+	vars, _, err := readEnv(path)
+	return vars, err
+}
+
+func readEnv(path string) (map[string]string, []string, error) {
 	existing := map[string]string{}
 	var order []string
 
@@ -81,30 +114,12 @@ func WriteEnvFile(path string, vars map[string]string) error {
 		}
 		_ = f.Close()
 		if err := scanner.Err(); err != nil {
-			return fmt.Errorf("reading %s: %w", path, err)
+			return nil, nil, fmt.Errorf("reading %s: %w", path, err)
 		}
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("reading %s: %w", path, err)
+		return nil, nil, fmt.Errorf("reading %s: %w", path, err)
 	}
-
-	var added []string
-	for key := range vars {
-		if _, known := existing[key]; !known {
-			added = append(added, key)
-		}
-		existing[key] = vars[key]
-	}
-	sort.Strings(added)
-	order = append(order, added...)
-
-	var b strings.Builder
-	for _, key := range order {
-		_, _ = fmt.Fprintf(&b, "%s=%s\n", key, existing[key])
-	}
-	if _, err := BackupFile(path); err != nil {
-		return err
-	}
-	return writeFileAtomically(path, []byte(b.String()))
+	return existing, order, nil
 }
 
 // writeFileAtomically writes data to path without ever exposing the merged

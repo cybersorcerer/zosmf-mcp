@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cybersorcerer/zosmf-mcp/agents"
 	"github.com/cybersorcerer/zosmf-mcp/internal/config"
@@ -86,9 +87,30 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		}
 	}
 
+	// A variable the file already holds is kept: adding a system must not
+	// ask again for every other system's password. One exported in the
+	// environment, or a key asked for with --generate-api-key, replaces it.
+	inFile, err := setup.ReadEnvFile(*envFile)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	var kept, todo []string
+	for _, name := range needed {
+		generate := name == "MCP_API_KEY" && *genKey
+		if inFile[name] != "" && !generate && os.Getenv(name) == "" {
+			kept = append(kept, name)
+		} else {
+			todo = append(todo, name)
+		}
+	}
+
 	if *questions {
-		fields := make([]setup.Field, 0, len(needed))
-		for _, name := range needed {
+		fields := make([]setup.Field, 0, len(todo))
+		for _, name := range todo {
+			if name == "MCP_API_KEY" && *genKey {
+				continue
+			}
 			fields = append(fields, setup.Field{
 				ID: name, YAMLKey: "", Label: name, Group: "env",
 				Kind: setup.KindString, Cardinality: setup.One, Required: true,
@@ -104,8 +126,16 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 0
 	}
 
+	if len(kept) > 0 {
+		_, _ = fmt.Fprintf(stdout, "kept from %s: %s\n", *envFile, strings.Join(kept, ", "))
+	}
+	if len(todo) == 0 {
+		_, _ = fmt.Fprintf(stdout, "%s already has every variable this configuration needs — nothing to do\n", *envFile)
+		return 0
+	}
+
 	vars := map[string]string{}
-	for _, name := range needed {
+	for _, name := range todo {
 		if name == "MCP_API_KEY" && *genKey {
 			key, err := setup.GenerateAPIKey()
 			if err != nil {

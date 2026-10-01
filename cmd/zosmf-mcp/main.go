@@ -111,6 +111,9 @@ func main() {
 		if sys.Auth.Type == "" {
 			logger.Printf("WARNING: system %s has no user configured — tool calls will fail until 'user:' is added", sys.Name)
 		}
+		if err := config.CheckHost(sys.Host); err != nil {
+			logger.Printf("WARNING: system %s: %v — tool calls will fail until it is fixed", sys.Name, err)
+		}
 	}
 
 	// Build SSH client registry if ssh_systems are configured

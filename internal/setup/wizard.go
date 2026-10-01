@@ -10,6 +10,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
 )
 
 var errInputEnded = errors.New("input ended before the setup was finished")
@@ -361,6 +363,9 @@ func (w *wizard) askScalar(f Field, v *Values) error {
 		case answer == "":
 		case f.Kind == KindInt && !isNumber(answer):
 			w.printf("  %q is not a number.\n", answer)
+			continue
+		case f.ID == "host" && config.CheckHost(answer) != nil:
+			w.printf("  %v\n", config.CheckHost(answer))
 			continue
 		default:
 			v.Set(f.ID, []string{answer})

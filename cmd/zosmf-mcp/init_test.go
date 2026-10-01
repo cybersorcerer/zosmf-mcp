@@ -291,3 +291,47 @@ func TestInitConfigQuestionsIncludesTheZOAUGroup(t *testing.T) {
 		t.Errorf("--questions carries no zoau group fields:\n%s", out)
 	}
 }
+
+// A host without a scheme cannot be called; it must not reach the file.
+func TestInitConfigRejectsAHostWithoutScheme(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	code, _, errOut := run(t, false, "config", "--file", path,
+		"--name", "MAIN", "--host", "192.0.2.10", "--user", "IBMUSER")
+	if code != 2 || !strings.Contains(errOut, "https://192.0.2.10") {
+		t.Errorf("exit %d, stderr %q; want 2 and the https:// form", code, errOut)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("the file was written anyway")
+	}
+}
+
+func TestInitConfigCheckNamesASystemWithoutScheme(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	_ = os.WriteFile(path, []byte("servers:\n  - name: MAIN\n    host: 192.0.2.10\n    port: 443\n    user: U\n"), 0o600)
+	code, _, errOut := run(t, false, "config", "--file", path, "--check")
+	if code != 1 || !strings.Contains(errOut, "MAIN") || !strings.Contains(errOut, "https://") {
+		t.Errorf("exit %d, stderr %q; want 1 naming MAIN and the https:// form", code, errOut)
+	}
+}
+
+// --check reports where each password would come from, so a setup can prove
+// it without starting the server.
+func TestInitConfigCheckReportsThePasswordSource(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	_ = os.WriteFile(path, []byte("servers:\n  - name: MAIN\n    host: https://zos:443\n    user: U\n  - name: TEST\n    host: https://zos2:443\n    user: U\n"), 0o600)
+	t.Setenv("ZOSMF_MAIN_PASSWORD", "pw")
+	t.Setenv("ZOSMF_TEST_PASSWORD", "")
+	t.Setenv("ZOSMF_PASSWORD", "")
+	code, out, errOut := run(t, false, "config", "--file", path, "--check")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %s", code, errOut)
+	}
+	for _, want := range []string{"system MAIN: password from system-env", "system TEST: password from none"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "pw\n") {
+		t.Error("the password value was printed")
+	}
+}

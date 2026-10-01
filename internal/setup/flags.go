@@ -1,6 +1,8 @@
 package setup
 
 import (
+	"github.com/cybersorcerer/zosmf-mcp/internal/config"
+
 	"flag"
 	"fmt"
 	"strings"
@@ -62,6 +64,13 @@ func Validate(fields []Field, v *Values) error {
 			msg = fmt.Sprintf("%s, e.g. %v", msg, f.Example)
 		}
 		problems = append(problems, msg)
+	}
+	for _, f := range fields {
+		if f.ID == "host" && v.Has("host") {
+			if err := config.CheckHost(v.One("host")); err != nil {
+				problems = append(problems, "--host: "+err.Error())
+			}
+		}
 	}
 	if len(problems) == 0 {
 		return nil

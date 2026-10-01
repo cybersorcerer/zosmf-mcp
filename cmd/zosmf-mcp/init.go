@@ -175,11 +175,25 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 
 	if *check {
-		if _, err := config.Load(path); err != nil {
+		cfg, err := config.Load(path)
+		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
+		bad := false
+		for _, sys := range cfg.Systems {
+			if err := config.CheckHost(sys.Host); err != nil {
+				_, _ = fmt.Fprintf(stderr, "system %s: %v\n", sys.Name, err)
+				bad = true
+			}
+		}
+		if bad {
+			return 1
+		}
 		_, _ = fmt.Fprintf(stdout, "%s is valid\n", path)
+		for _, sys := range cfg.Systems {
+			_, _ = fmt.Fprintf(stdout, "system %s: password from %s\n", sys.Name, sys.PasswordSource)
+		}
 		return 0
 	}
 

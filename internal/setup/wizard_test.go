@@ -180,3 +180,15 @@ func TestWizardRequiredFieldIsAskedAgain(t *testing.T) {
 		t.Errorf("an empty required answer was accepted:\n%s", out)
 	}
 }
+
+func TestWizardAsksAgainForAHostWithoutScheme(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.yaml")
+	answers := append([]string{"n", "MAINT", "192.0.2.10"}, newSystem[2:]...)
+	out := runWizard(t, path, true, lines(append(answers, "d")...))
+	if !strings.Contains(out, "https://192.0.2.10") {
+		t.Errorf("no hint at the https:// form:\n%s", out)
+	}
+	if !strings.Contains(out, "host: https://zos.example.com:443") {
+		t.Errorf("the corrected answer did not land:\n%s", out)
+	}
+}

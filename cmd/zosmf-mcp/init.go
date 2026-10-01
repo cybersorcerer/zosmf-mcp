@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ import (
 // calling os.Exit so the tests can drive it in process.
 func runInit(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(stderr, "usage: zosmf-mcp init <config|env> [flags]")
+		_, _ = fmt.Fprintln(stderr, "usage: zosmf-mcp init <config|env|restore> [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -23,8 +24,10 @@ func runInit(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return runInitConfig(args[1:], stdout, stderr, isTTY)
 	case "env":
 		return runInitEnv(args[1:], stdout, stderr, isTTY)
+	case "restore":
+		return runInitRestore(args[1:], stdout, stderr)
 	default:
-		_, _ = fmt.Fprintf(stderr, "unknown init subcommand %q — use config or env\n", args[0])
+		_, _ = fmt.Fprintf(stderr, "unknown init subcommand %q — use config, env or restore\n", args[0])
 		return 2
 	}
 }
@@ -285,6 +288,90 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		_, _ = fmt.Fprintf(stdout, "previous version saved as %s\n", backup.Path)
 	}
 	_, _ = fmt.Fprintf(stdout, "next: zosmf-mcp init env --file %s\n", path)
+	return 0
+}
+
+// targetBackup is a backup labelled with the --target that restores it.
+type targetBackup struct {
+	Target string `json:"target"`
+	setup.Backup
+}
+
+// runInitRestore lists the backups of the configuration and .env, or puts
+// one back. The version it replaces is backed up first.
+func runInitRestore(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("init restore", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	file := fs.String("file", "", "configuration file whose backups to use")
+	envFile := fs.String("env-file", ".env", "environment file whose backups to use")
+	list := fs.Bool("list", false, "print the backups as JSON, newest first, and exit")
+	stamp := fs.String("backup", "", "timestamp of the backup to restore, as --list prints it")
+	target := fs.String("target", "", "config or env — needed only when both have a backup with that timestamp")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if !*list && *stamp == "" {
+		_, _ = fmt.Fprintln(stderr, "usage: zosmf-mcp init restore --list | --backup <timestamp> [--target config|env]")
+		return 2
+	}
+
+	path, err := resolveConfigPath(*file)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	var all []targetBackup
+	for _, t := range []struct{ name, path string }{{"config", path}, {"env", *envFile}} {
+		backups, err := setup.ListBackups(t.path)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		for _, b := range backups {
+			all = append(all, targetBackup{Target: t.name, Backup: b})
+		}
+	}
+
+	if *list {
+		if all == nil {
+			all = []targetBackup{}
+		}
+		data, err := json.MarshalIndent(struct {
+			Backups []targetBackup `json:"backups"`
+		}{all}, "", "  ")
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		_, _ = fmt.Fprintln(stdout, string(data))
+		return 0
+	}
+
+	var matches []targetBackup
+	for _, b := range all {
+		if b.Stamp == *stamp && (*target == "" || *target == b.Target) {
+			matches = append(matches, b)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		_, _ = fmt.Fprintf(stderr, "no backup %s — see zosmf-mcp init restore --list\n", *stamp)
+		return 1
+	case 1:
+	default:
+		_, _ = fmt.Fprintf(stderr, "both the config and .env have a backup %s — add --target config or --target env\n", *stamp)
+		return 2
+	}
+	b := matches[0]
+	saved, err := setup.RestoreBackup(b.File, b.Stamp)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "restored %s from the backup of %s\n", b.File, b.Stamp)
+	if saved != nil {
+		_, _ = fmt.Fprintf(stdout, "the version it replaced is saved as %s\n", saved.Path)
+	}
 	return 0
 }
 

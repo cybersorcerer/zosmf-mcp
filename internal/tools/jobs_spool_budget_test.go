@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// The success criterion from docs/2026-08-17-mcp-resources-design.md:
-// small JES files inline, the large SYSPRINT as a link.
+// The success criterion of the MCP resources feature: small JES files
+// inline, the large SYSPRINT as a link.
 func TestGetAllSpoolsBudget(t *testing.T) {
 	jesysmsg := strings.Repeat("J", 2*1024)
 	jesjcl := strings.Repeat("C", 4*1024)

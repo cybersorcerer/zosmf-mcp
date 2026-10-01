@@ -56,7 +56,7 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 		return 1
 	}
 	if *envFile == "" {
-		*envFile = envPathFor(path)
+		*envFile = config.EnvFilePath(path)
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
@@ -168,8 +168,11 @@ func runInitEnv(args []string, stdout, stderr io.Writer, isTTY bool) int {
 	}
 	_, _ = fmt.Fprintf(stdout, "wrote %s with %d variable(s), mode 600\n", *envFile, len(vars))
 	_, _ = fmt.Fprintln(stdout, "values are not printed here — read them from the file if you need them")
-	_, _ = fmt.Fprintf(stdout, "make it reach the server: shell — `set -a; . %s; set +a` before starting it;\n", *envFile)
-	_, _ = fmt.Fprintln(stdout, "stdio client — pass each variable with its own env flag, e.g. `claude mcp add --env NAME=value ...`")
+	if *envFile == config.EnvFilePath(path) {
+		_, _ = fmt.Fprintln(stdout, "zosmf-mcp reads this file at startup — nothing to source, nothing to pass to a client")
+	} else {
+		_, _ = fmt.Fprintf(stdout, "zosmf-mcp only reads %s by itself; export these variables before starting it\n", config.EnvFilePath(path))
+	}
 	return 0
 }
 
@@ -259,6 +262,12 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 			return 1
 		}
 		_, _ = fmt.Fprintf(stdout, "%s is valid\n", path)
+		for _, w := range cfg.Warnings {
+			_, _ = fmt.Fprintf(stdout, "warning: %s\n", w)
+		}
+		if cfg.EnvFile != "" {
+			_, _ = fmt.Fprintf(stdout, "environment file: %s\n", cfg.EnvFile)
+		}
 		for _, sys := range cfg.Systems {
 			_, _ = fmt.Fprintf(stdout, "system %s: password from %s\n", sys.Name, sys.PasswordSource)
 		}
@@ -281,7 +290,7 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 			_, _ = fmt.Fprintln(stderr, "  zosmf-mcp init config --name MAINT --host https://zos.example.com:443 --user IBMUSER")
 			return 2
 		}
-		if err := setup.RunWizard(path, envPathFor(path), *print, os.Stdin, stdout); err != nil {
+		if err := setup.RunWizard(path, config.EnvFilePath(path), *print, os.Stdin, stdout); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -414,7 +423,7 @@ func runInitRestore(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if *envFile == "" {
-		*envFile = envPathFor(path)
+		*envFile = config.EnvFilePath(path)
 	}
 	var all []targetBackup
 	for _, t := range []struct{ name, path string }{{"config", path}, {"env", *envFile}} {
@@ -524,12 +533,6 @@ func runInitSkill(args []string, stdout, stderr io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(stdout, "installed the zosmf-mcp setup skill for %s (%s):\n  %s\n", *agent, *scope, dir)
 	return 0
-}
-
-// envPathFor keeps the secrets beside the configuration they belong to,
-// wherever the command is run from.
-func envPathFor(configPath string) string {
-	return filepath.Join(filepath.Dir(configPath), ".env")
 }
 
 // resolveConfigPath honours --file, then the server's own search order, and

@@ -32,6 +32,12 @@ func (s SSHProxyJumpConfig) Active() bool {
 }
 
 type Config struct {
+	// EnvFile is the .env read beside the configuration, if any; Warnings
+	// are problems worth logging that do not stop the server.
+	EnvFile  string   `yaml:"-"`
+	Warnings []string `yaml:"-"`
+	fileEnv  map[string]string
+
 	Systems      []SystemConfig     `yaml:"systems"`
 	Servers      []SystemConfig     `yaml:"servers"`
 	SSHSystems   []SSHSystemConfig  `yaml:"ssh_systems"`
@@ -119,14 +125,18 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
-	expanded, missing := expandEnvVars(string(data))
+	var cfg Config
+	if err := cfg.loadEnvFile(path); err != nil {
+		return nil, err
+	}
+
+	expanded, missing := cfg.expandEnvVars(string(data))
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("unresolved environment variables in %s: %s — "+
 			"set them, or remove the ${...} references from the file",
 			path, strings.Join(missing, ", "))
 	}
 
-	var cfg Config
 	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
@@ -148,13 +158,16 @@ func Load(path string) (*Config, error) {
 // that are not set. An unresolved reference used to survive as its own literal
 // text, which turned a missing password into an unexplained 401 much later —
 // so the caller refuses to start instead.
-func expandEnvVars(s string) (string, []string) {
+func (c *Config) expandEnvVars(s string) (string, []string) {
 	var missing []string
 	seen := make(map[string]bool)
 
 	expanded := envVarPattern.ReplaceAllStringFunc(s, func(match string) string {
 		varName := match[2 : len(match)-1]
 		if val, ok := os.LookupEnv(varName); ok {
+			return val
+		}
+		if val, ok := c.fileEnv[varName]; ok {
 			return val
 		}
 		if !seen[varName] {
@@ -176,7 +189,7 @@ func (c *Config) normalize() {
 	// own — a config file that only wants to supply the URL can still set
 	// proxy.url, and a per-system block can opt out again.
 	if c.Proxy.URL == "" {
-		if envProxy := os.Getenv("ZOSMF_PROXY"); envProxy != "" {
+		if envProxy, _ := c.getenv("ZOSMF_PROXY"); envProxy != "" {
 			c.Proxy.URL = envProxy
 			c.Proxy.Enabled = true
 		}
@@ -184,7 +197,7 @@ func (c *Config) normalize() {
 
 	// The API key may come from the environment so a mounted production
 	// config never has to carry it. An explicit api_key in the file wins.
-	if envKey := os.Getenv("MCP_API_KEY"); envKey != "" {
+	if envKey, _ := c.getenv("MCP_API_KEY"); envKey != "" {
 		if c.Transport.HTTP.APIKey == "" {
 			c.Transport.HTTP.APIKey = envKey
 		}
@@ -193,7 +206,7 @@ func (c *Config) normalize() {
 		}
 	}
 
-	envPassword := os.Getenv("ZOSMF_PASSWORD")
+	envPassword, globalFromFile := c.getenv("ZOSMF_PASSWORD")
 
 	for i := range c.Systems {
 		s := &c.Systems[i]
@@ -210,12 +223,18 @@ func (c *Config) normalize() {
 		case s.Auth.Password != "":
 			s.PasswordSource = "file"
 		default:
-			if v := os.Getenv(PasswordEnvVar(s.Name)); v != "" {
+			if v, fromFile := c.getenv(PasswordEnvVar(s.Name)); v != "" {
 				s.Auth.Password = v
 				s.PasswordSource = "system-env"
+				if fromFile {
+					s.PasswordSource = "env-file"
+				}
 			} else if envPassword != "" {
 				s.Auth.Password = envPassword
 				s.PasswordSource = "global-env"
+				if globalFromFile {
+					s.PasswordSource = "env-file"
+				}
 			} else {
 				s.PasswordSource = "none"
 			}

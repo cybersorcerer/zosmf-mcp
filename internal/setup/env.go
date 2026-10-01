@@ -1,7 +1,6 @@
 package setup
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -92,34 +91,7 @@ func ReadEnvFile(path string) (map[string]string, error) {
 }
 
 func readEnv(path string) (map[string]string, []string, error) {
-	existing := map[string]string{}
-	var order []string
-
-	if f, err := os.Open(path); err == nil {
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			line = strings.TrimPrefix(line, "export ")
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			key, value, found := strings.Cut(line, "=")
-			if !found {
-				continue
-			}
-			if _, known := existing[key]; !known {
-				order = append(order, key)
-			}
-			existing[key] = value
-		}
-		_ = f.Close()
-		if err := scanner.Err(); err != nil {
-			return nil, nil, fmt.Errorf("reading %s: %w", path, err)
-		}
-	} else if !os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf("reading %s: %w", path, err)
-	}
-	return existing, order, nil
+	return config.ReadEnvFile(path)
 }
 
 // writeFileAtomically writes data to path without ever exposing the merged

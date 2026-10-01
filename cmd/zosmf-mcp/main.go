@@ -97,6 +97,12 @@ func main() {
 	if err != nil {
 		logger.Fatalf("failed to load config: %v", err)
 	}
+	for _, w := range cfg.Warnings {
+		logger.Printf("WARNING: %s", w)
+	}
+	if cfg.EnvFile != "" {
+		logger.Printf("environment file: %s", cfg.EnvFile)
+	}
 
 	// Create z/OSMF clients for each configured system
 	clients := zosmf.NewClientRegistry()

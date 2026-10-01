@@ -219,3 +219,23 @@ func TestInitEnvWithNothingMissing(t *testing.T) {
 		t.Errorf("exit %d, out %q, stderr %q; want success saying nothing to do", code, out, errOut)
 	}
 }
+
+// After init env, --check proves the password reaches the server without
+// sourcing anything: the server reads the .env beside the configuration.
+func TestInitEnvThenCheckFindsThePassword(t *testing.T) {
+	conf, _ := twoSystems(t)
+	t.Setenv("ZOSMF_MAIN_PASSWORD", "pw")
+	if code, _, errOut := run(t, false, "env", "--file", conf); code != 0 {
+		t.Fatalf("init env: exit %d, stderr %s", code, errOut)
+	}
+	_ = os.Unsetenv("ZOSMF_MAIN_PASSWORD")
+	code, out, errOut := run(t, false, "config", "--file", conf, "--check")
+	if code != 0 {
+		t.Fatalf("--check: exit %d, stderr %s", code, errOut)
+	}
+	for _, want := range []string{"system MAIN: password from env-file", "system TEST: password from env-file"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}

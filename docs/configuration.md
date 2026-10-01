@@ -4,6 +4,19 @@ Everything the server reads from its configuration file and the environment. `zo
 
 [← README](../README.md)
 
+## Setup Commands
+
+`zosmf-mcp init <command>` writes this file and its secrets so nobody has to edit YAML by hand. `zosmf-mcp init <command> --help` lists every flag.
+
+| Command | What it does | Flags |
+| --- | --- | --- |
+| `init config` | Adds or updates a system in the configuration file. Without field flags and on a terminal it runs the wizard (below). | `--file` (default: the file the server would find, else `~/.config/smpe_ls/.smpe-zosmf.yaml`), `--print` (show the result, write nothing), `--check` (validate the file and exit), `--questions` (field list as JSON); one flag per field: `--name`, `--host`, `--user`, `--csi A,B`, `--zones A,B`, … and the ZOAU group `--ssh-host`, `--ssh-user`, `--ssh-key-file`, `--zoau-path`, `--ssh-port` |
+| `init env` | Writes the passwords (and `MCP_API_KEY`) the configuration needs to `.env` next to it, mode 600. A variable already set in the environment is taken from there, otherwise it is asked for. Values are never printed. | `--file`, `--env-file`, `--questions`, `--generate-api-key` |
+| `init restore` | Lists or restores the backups every write leaves behind — see [Backups and Restore](#backups-and-restore). | `--file`, `--env-file`, `--list`, `--backup <timestamp>`, `--target config\|env` |
+| `init skill` | Installs the setup procedure as a skill for an AI agent, from the binary itself. | `--agent claude\|opencode\|pi`, `--scope user\|project` (default `user`; `project` = current directory) |
+
+**The wizard.** `zosmf-mcp init config` on its own backs up the file, lists the systems already in it and offers `[n]` new system, `[1-N]` edit a system, `[r]` restore a backup, `[d]` done. A system is asked in sections — Connection, SMP/E, TSO, then optional settings for other tools and ZOAU. CSIs and zones are entered one per line, an empty line ends the list; the first CSI, and all zones, are the defaults a tool call uses when it names none. When editing, the current value is shown in brackets and Enter keeps it; an existing list can be kept, replaced or added to. Each system ends with a YAML preview and `Write? [Y/n]`.
+
 
 Configuration is done via a YAML file. By default the server searches for configuration in the following order (first match wins):
 

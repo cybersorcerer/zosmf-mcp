@@ -50,6 +50,12 @@ func main() {
 	transport := flag.String("transport", "auto", "Transport type: stdio, http, or auto (uses config)")
 	listen := flag.String("listen", "", "HTTP listen address (overrides config)")
 	showVersion := flag.Bool("version", false, "Print version information and exit")
+	flag.Usage = func() {
+		out := flag.CommandLine.Output()
+		_, _ = fmt.Fprintf(out, "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		_, _ = fmt.Fprintln(out, "\nSetup:\n  zosmf-mcp init <config|env|restore|skill>  — see 'zosmf-mcp init <command> --help'")
+	}
 	flag.Parse()
 
 	if *showVersion {

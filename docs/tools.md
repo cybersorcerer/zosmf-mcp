@@ -1,11 +1,8 @@
 # Tools and resources
 
-Every tool the server registers, grouped by area, each with example prompts. Destructive tools are listed in the README's warning section as well.
-
 [← README](../README.md)
 
-
-The server provides 34 tools across 9 categories (plus 11 optional ZOAU tools when ssh_systems is configured):
+Every tool the server registers, grouped by area, with example prompts: 34 tools in 9 areas, plus 11 ZOAU tools when `ssh_systems` is configured. The tools that can destroy data are also listed in the README under [Before You Start](../README.md#️-before-you-start).
 
 ## Tool annotations
 
@@ -36,7 +33,6 @@ a client sees the systems you actually have instead of guessing a name.
 | `zosmf_release_job`       | Release a held job                           |
 
 **Example prompts**
-
 
 **Show all active jobs**
 ```
@@ -88,7 +84,6 @@ Delete the spool output of job TESTJOB JOB12345 on SYSA
 
 **Example prompts**
 
-
 **Check whether a SYSMOD is installed**
 ```
 Is SYSMOD UA12345 installed on SYSA in target zone TGTZONE?
@@ -135,7 +130,6 @@ Are there any open HOLDDATAs of type ERROR on SYSA in the target zone?
 
 **Example prompts**
 
-
 **Search datasets by pattern**
 ```
 Find all datasets starting with SYS1.PARMLIB on SYSA
@@ -179,7 +173,6 @@ Delete dataset USER.TEMP.DATA on SYSA
 
 **Example prompts**
 
-
 **Show all mounted filesystems**
 ```
 Show me all filesystems mounted on SYSA
@@ -207,6 +200,8 @@ Create a new zFS dataset USER.NEW.ZFS on SYSA with 50 primary cylinders
 |----------------------|------------------------------------------------------------|
 | `zosmf_set_password` | Set the password for a system at runtime (in-memory only)  |
 
+The password lasts until the server restarts. It helps when a call failed with `NO_CREDENTIALS` or `AUTH_FAILED` and the `.env` cannot be fixed right away — but the password then travels through the conversation, and the client may keep it in its transcript. The [`.env`](configuration.md#passwords) is the better place.
+
 ## Operator Console (2 tools)
 | Tool                     | Description                              |
 |--------------------------|------------------------------------------|
@@ -214,7 +209,6 @@ Create a new zFS dataset USER.NEW.ZFS on SYSA with 50 primary cylinders
 | `zosmf_get_hardcopy_log` | Read OPERLOG or SYSLOG                   |
 
 **Example prompts**
-
 
 **Query system time**
 ```
@@ -262,7 +256,6 @@ Are there any error messages in the SYSLOG on SYSA from the last 10 minutes?
 
 **Example prompts**
 
-
 **List a directory**
 ```
 List the contents of directory /u/ibmuser on SYSA
@@ -301,7 +294,6 @@ Delete the file /u/ibmuser/old.log on SYSA
 
 **Example prompts**
 
-
 **Query the dataset catalog**
 ```
 Run the TSO command LISTCAT LVL(USER) on SYSA
@@ -328,27 +320,22 @@ Use TSO on SYSA to check RACF permissions for dataset USER.SECURE.DATA
 
 **Example prompts**
 
-
-### Validate all active BPXPRM members
-
+**Validate all active BPXPRM members**
 ```
 Validate the syntax of all active BPXPRM parmlib members on SYSA
 ```
 
-### Validate a specific member
-
+**Validate a specific member**
 ```
 Validate the syntax of SYS1.PARMLIB(IEASYS00) on SYSA
 ```
 
-### Validate all parmlib types via LOADxx
-
+**Validate all parmlib types via LOADxx**
 ```
 Validate all parmlib types deeply using LOADxx member LOAD00 from SYS1.PARMLIB on SYSA
 ```
 
-### Validate inline content
-
+**Validate inline content**
 ```
 Validate the following BPXPRM parmlib content on SYSA: [parmlib text...]
 ```
@@ -356,14 +343,7 @@ Validate the following BPXPRM parmlib content on SYSA: [parmlib text...]
 
 ## ZOAU (11 tools) — requires `ssh_systems` configuration
 
-> **Breaking change:** As of this version the ZOAU tools are named `zoau_*`
-> (previously `zosmf_zoau_*`) and take an `ssh_system` parameter (previously
-> `system`). The old names are no longer registered — update any n8n workflow,
-> agent prompt or saved client configuration that calls them.
->
-> `ssh_system` resolves against the `ssh_systems:` config block; the `system`
-> parameter of the `zosmf_*` tools resolves against `systems:`. They are
-> separate namespaces.
+The ZOAU tools take an `ssh_system` parameter. It names an entry of `ssh_systems:` — a separate namespace from the `system` of the `zosmf_*` tools; see [ZOAU over SSH](configuration.md#zoau-over-ssh).
 
 | Tool                      | Description                                          |
 |---------------------------|------------------------------------------------------|
@@ -378,6 +358,28 @@ Validate the following BPXPRM parmlib content on SYSA: [parmlib text...]
 | `zoau_version`      | Display the installed ZOAU version                   |
 | `zoau_vtocls`       | List the VTOC contents of a z/OS volume              |
 | `zoau_exec`         | Execute a USS command or script via SSH; returns stdout, stderr and exit code as JSON         |
+
+**Example prompts**
+
+**Show the installed ZOAU version**
+```
+Which ZOAU version is installed on SYSA?
+```
+
+**Find where a parmlib member comes from**
+```
+Which parmlib dataset does member IEASYS00 come from on SYSA?
+```
+
+**Search the proclib**
+```
+Search the proclib on SYSA for procedures that reference SYS1.LINKLIB
+```
+
+**Show the linklist**
+```
+Show me the linklist concatenation on SYSA
+```
 
 
 ## Resources

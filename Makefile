@@ -105,10 +105,17 @@ docker-logs:
 # started by hand and the tunnel's IP is resolved at runtime.
 CONTAINER_IMAGE ?= zosmf-mcp:latest
 
+# container build starts Apple's BuildKit builder (2 CPUs, 2 GB) and leaves it
+# running. Stop it again afterwards, unless it was running before the build.
 container-build:
+	@BUILDER_WAS_RUNNING=$$(container builder status 2>/dev/null | awk 'NR > 1 && $$3 == "running"' | wc -l); \
+	echo "container build --platform linux/arm64 -t $(CONTAINER_IMAGE) ."; \
 	container build --platform linux/arm64 \
 	  --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) \
-	  -t $(CONTAINER_IMAGE) .
+	  -t $(CONTAINER_IMAGE) .; \
+	RC=$$?; \
+	if [ "$$BUILDER_WAS_RUNNING" -eq 0 ]; then container builder stop >/dev/null 2>&1 && echo "builder stopped again"; fi; \
+	exit $$RC
 
 container-up: container-build
 	@test -f .env || { echo ".env is missing — run: cp .env.example .env and fill it in"; exit 1; }

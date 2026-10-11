@@ -29,6 +29,15 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ### Fixed
 
+- **`zosmf_tso_command` ignored `tso_account`, `tso_proc`, `tso_charset` and
+  `tso_codepage`** — it required the first two and never sent any of them.
+  With `tso_account` set, a command now runs in its own TSO address space with
+  exactly these settings (defaults `IZUFPROC`, `697`, `1047`); without it,
+  z/OSMF chooses the address space as before, and nothing is required. The
+  errors `has no tso_account configured` and `has no tso_proc configured` are
+  gone; a procedure, character set or code page without an account is now an
+  error. **Placeholder values in a configuration now take effect — correct or
+  remove them.**
 - **A z/OSMF host without `https://`** was written and passed `--check`,
   then failed every call. `init config` now rejects it, `--check` fails on
   it, and the server warns at startup.

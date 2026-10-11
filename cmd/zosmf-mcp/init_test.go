@@ -417,3 +417,12 @@ func TestInitConfigPrintShowsOnlyThatSystem(t *testing.T) {
 		t.Errorf("want only MAIN:\n%s", out)
 	}
 }
+
+func TestInitConfigCheckNamesATSOProcedureWithoutAccount(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conf.yaml")
+	_ = os.WriteFile(path, []byte("servers:\n  - name: MAIN\n    host: https://zos:443\n    user: U\n    tso_proc: IZUFPROC\n"), 0o600)
+	code, _, errOut := run(t, false, "config", "--file", path, "--check")
+	if code != 1 || !strings.Contains(errOut, "tso_account") {
+		t.Errorf("exit %d, stderr %q; want 1 naming tso_account", code, errOut)
+	}
+}

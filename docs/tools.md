@@ -292,6 +292,8 @@ Delete the file /u/ibmuser/old.log on SYSA
 |-----------------------|--------------------------------------------------|
 | `zosmf_tso_command`   | Execute a TSO/E command and return the output    |
 
+With `tso_account` configured for the system, each command runs in its own TSO address space, with that account number and logon procedure. Without it, z/OSMF chooses the address space itself — see [Systems](configuration.md#systems).
+
 **Example prompts**
 
 **Query the dataset catalog**

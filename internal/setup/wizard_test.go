@@ -21,7 +21,7 @@ var newSystem = []string{
 	"",                   // ca-file
 	"A.CSI", "B.CSI", "", // CSIs
 	"MVST100", "", // zones
-	"", "", // TSO account, proc
+	"", // TSO account; the procedure is asked only with one
 	"", // other tools: no
 	"", // ZOAU: no
 	"", // write: yes
@@ -89,8 +89,8 @@ func TestWizardEditKeepsAndAdds(t *testing.T) {
 		"", "", // host, user kept
 		"", "", // verify, ca-file
 		"a", "B.CSI", "", // CSIs: add one
-		"", // zones: keep
-		"", "", "", "", "",
+		"",             // zones: keep
+		"", "", "", "", // TSO account, other tools, ZOAU, write
 		"d",
 	))
 
@@ -200,10 +200,28 @@ func TestWizardDoesNotKeepAnExistingHostWithoutScheme(t *testing.T) {
 	out := runWizard(t, path, true, lines(
 		"1",
 		"", "https://192.0.2.10:443", // Enter on the broken host is refused
-		"", "", "", "", "", "", "", "", "", "",
+		"", "", "", "", "", "", "", "", "",
 		"d",
 	))
 	if !strings.Contains(out, "host: https://192.0.2.10:443") {
 		t.Errorf("the broken host was kept:\n%s", out)
+	}
+}
+
+func TestWizardAsksTheProcedureOnlyWithAnAccount(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.yaml")
+	answers := append([]string{}, newSystem...)
+	at := 0
+	for i, a := range answers {
+		if a == "MVST100" {
+			at = i + 2 // after the zone and the empty line that ends the list
+		}
+	}
+	withAccount := append(append(append([]string{}, answers[:at]...), "ACCT1", "MYPROC"), answers[at+1:]...)
+	out := runWizard(t, path, true, lines(append(withAccount, "d")...))
+	for _, want := range []string{"tso_account: ACCT1", "tso_proc: MYPROC"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("result lacks %q:\n%s", want, out)
+		}
 	}
 }

@@ -280,7 +280,7 @@ func TestToolsDeclareTheirConfigPreconditions(t *testing.T) {
 			desc := findTool(t, reg, tc.name).Description
 			for _, key := range tc.keys {
 				if !strings.Contains(desc, key) {
-					t.Errorf("description must name the required config key %q, got: %q", key, desc)
+					t.Errorf("description must name the config key %q, got: %q", key, desc)
 				}
 			}
 		})

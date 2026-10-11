@@ -186,8 +186,12 @@ func (w *wizard) editSystem(name string) error {
 	}
 
 	w.section("TSO")
-	for _, id := range []string{"tso-account", "tso-proc"} {
-		if err := w.askScalar(w.field(id), v); err != nil {
+	if err := w.askScalar(w.field("tso-account"), v); err != nil {
+		return err
+	}
+	// The procedure only takes effect together with an account number.
+	if v.Has("tso-account") {
+		if err := w.askScalar(w.field("tso-proc"), v); err != nil {
 			return err
 		}
 	}

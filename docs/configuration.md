@@ -106,10 +106,11 @@ transport:
 | `ca_file` | no | PEM CA certificate for a self-signed z/OSMF certificate — the alternative to turning the check off. |
 | `csi` | no | CSI data sets. SMP/E queries use the first one when they name none. |
 | `zones` | no | SMP/E zones that a query uses when it names none. |
-| `tso_account`, `tso_proc` | for `zosmf_tso_command` | Without them the tool refuses to run. A typical procedure is `IZUFPROC`. |
+| `tso_account` | no | With it, `zosmf_tso_command` starts its own TSO address space with this account number and the three settings below. Without it, z/OSMF chooses the address space itself. |
+| `tso_proc`, `tso_charset`, `tso_codepage` | with `tso_account` | Logon procedure, character set and code page of that address space. Defaults: `IZUFPROC`, `697`, `1047`. Without `tso_account` they cannot take effect, and the tool refuses to run. |
 | `proxy` | no | Overrides the global `proxy` block for this system — see [Forwarding](#forwarding-through-a-proxy-or-jump-host). |
 | `defaultZones`, `home` | no | Read by vscode-smpe, vscpdf and nvpdf; ignored by zosmf-mcp. |
-| `tso_charset`, `tso_codepage`, `dlib_zones` | no | Accepted, but not used. |
+| `dlib_zones` | no | Accepted, but not used. |
 
 Several keys have a second spelling, and both work: `systems` / `servers`, `auth.username` / `user`, `skip_tls_verify: true` / `rejectUnauthorized: false`, `csi_datasets` / `csi`, `target_zones` / `zones`. `zosmf-mcp init config` writes the second form, the one the other tools use, and keeps `systems:` when the file already has it.
 

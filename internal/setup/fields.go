@@ -84,12 +84,12 @@ func ConfigFields() []Field {
 		},
 		{
 			ID: "tso-account", YAMLKey: "tso_account", Label: "TSO account number",
-			Help: "zosmf_tso_command fails without it.",
+			Help: "Optional. With it, zosmf_tso_command starts its own TSO address space with this account number; without it, z/OSMF chooses the address space itself.",
 			Kind: KindString, Cardinality: One, Example: "ACCT#", Group: "system",
 		},
 		{
 			ID: "tso-proc", YAMLKey: "tso_proc", Label: "TSO logon procedure",
-			Help: "zosmf_tso_command fails without it.",
+			Help: "Logon procedure for that address space — only used together with the account number. Default IZUFPROC.",
 			Kind: KindString, Cardinality: One, Example: "IZUFPROC", Group: "system",
 		},
 		{

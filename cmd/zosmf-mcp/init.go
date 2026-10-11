@@ -257,6 +257,10 @@ func runInitConfig(args []string, stdout, stderr io.Writer, isTTY bool) int {
 				_, _ = fmt.Fprintf(stderr, "system %s: %v\n", sys.Name, err)
 				bad = true
 			}
+			if sys.TSOAccount == "" && (sys.TSOProc != "" || sys.TSOCharset != "" || sys.TSOCodepage != "") {
+				_, _ = fmt.Fprintf(stderr, "system %s: tso_proc, tso_charset and tso_codepage only take effect with tso_account — add it, or remove them\n", sys.Name)
+				bad = true
+			}
 		}
 		if bad {
 			return 1

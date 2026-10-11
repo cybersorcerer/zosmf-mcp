@@ -78,8 +78,8 @@ mention it in the changelog when you do.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat:`, `fix:`, `docs:`, `test:`, `chore:`). A breaking change gets a `!`
   and a note in `CHANGELOG.md` under Unreleased.
-- Write the commit body for someone reading it in a year: what broke, and
-  why this fixes it.
+- Keep commit messages short: the subject line says what changed. Add a body
+  of a line or two only when the reason is not obvious from the diff.
 
 ## Security
 

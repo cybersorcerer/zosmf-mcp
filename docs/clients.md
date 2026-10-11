@@ -1,33 +1,21 @@
-# Registering the server with an MCP client
-
-One section per client. Each needs the path to the binary and to the configuration file. Passwords are not part of any client configuration: the server reads them from the `.env` next to its configuration file, which `zosmf-mcp init env` writes.
+# Connecting an MCP client
 
 [← README](../README.md)
 
+There are two ways to connect:
 
-zosmf-mcp supports three transports that can run simultaneously:
+- **The client starts the server** and talks to it over stdin and stdout. Desktop apps, CLIs and IDEs work this way.
+- **The server runs on its own** and clients connect over HTTP — n8n, containers, or a server on another machine.
 
-- **stdio** — the client starts the server process and communicates via stdin/stdout. Used by Claude Desktop, Claude Code, VS Code, etc.
-- **HTTP** — the server listens on a TCP port and accepts JSON-RPC 2.0 requests. Used by n8n HTTP Request nodes, curl, and custom clients.
-- **Streamable HTTP** — MCP 2025-03-26 compliant transport with SSE support. Used by the n8n MCP Client Tool Node (v1.88+).
+Contents:
 
-All transports are controlled via the config file. The `--transport` flag can override this (`stdio`, `http`, `streamable-http`, or `auto` which reads the config — default is `auto`).
+- [Clients that start the server](#clients-that-start-the-server): [Claude Code](#claude-code), [Claude Desktop](#claude-desktop), [VS Code](#vs-code), [Cursor](#cursor), [Gemini CLI](#gemini-cli), [JetBrains IDEs](#jetbrains-ides), [Continue](#continue)
+- [Clients that connect over HTTP](#clients-that-connect-over-http): [Claude Code](#claude-code-over-http), [n8n](#n8n-mcp-client-tool-node)
+- [Building your own client](#building-your-own-client)
 
-For the stdio clients the configuration is the same everywhere:
+## Clients that start the server
 
-- **Command**: path to the `zosmf-mcp` binary
-- **Arguments**: `--config` and the full path of the configuration file — `~/.config/smpe_ls/.smpe-zosmf.yaml` unless you chose another
-- **Environment variables**: none needed. The server reads the passwords from the `.env` next to the configuration file; a variable a client does pass wins over the file.
-
-
-## Claude Desktop (macOS/Windows)
-
-Claude Desktop supports MCP servers via the `claude_desktop_config.json` file.
-
-**Location:**
-
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+Every such client needs the same two things — the program and its configuration file — and nothing else. Most of them read this format:
 
 ```json
 {
@@ -40,12 +28,12 @@ Claude Desktop supports MCP servers via the `claude_desktop_config.json` file.
 }
 ```
 
-> **Tip:** On macOS, specify the full path to the binary since Claude Desktop does not perform shell PATH expansion. Use `which zosmf-mcp` to find the path.
+- **Use full paths.** Most clients do not search your shell's `PATH`. `which zosmf-mcp` prints the program's path; on Windows, `where zosmf-mcp`.
+- **No passwords.** The server reads them from the `.env` next to the configuration file. A variable a client does pass wins over the file.
 
-Restart Claude Desktop after saving. The tools will appear in the chat as available functions (hammer icon).
+The sections below say where each client keeps this, and how to check that it connected.
 
-
-## Claude Code CLI
+### Claude Code
 
 Register the server for all your projects:
 
@@ -63,134 +51,192 @@ The scope decides where the server is available:
 
 `claude mcp remove zosmf-mcp --scope <scope>` removes it again.
 
-**Check status:**
+**Check:** `claude mcp list` shows `zosmf-mcp` as `✔ Connected`; in a session, `/mcp` lists it with its tools.
+
+### Claude Desktop
+
+In Claude Desktop, open **Settings → Developer → Edit Config**. That opens `claude_desktop_config.json`:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add the `mcpServers` block shown [above](#clients-that-start-the-server), then quit Claude Desktop completely and start it again.
+
+**Check:** the **Add files, connectors, and more** button at the bottom left of the chat input lists `zosmf-mcp` and its tools.
+
+### VS Code
+
+- **With the Claude Code extension:** the extension shares its MCP configuration with the Claude Code CLI. Register the server with `claude mcp add` as [above](#claude-code), for example in VS Code's integrated terminal.
+- **With GitHub Copilot** (VS Code's own MCP support): put the `mcpServers` block shown [above](#clients-that-start-the-server) into `.mcp.json` at the root of your workspace, or into `~/.copilot/mcp-config.json` for all workspaces. A workspace `.mcp.json` is also what Claude Code reads for `--scope project`, so one file serves both.
+
+**Check:** run **MCP: List Servers** from the Command Palette.
+
+### Cursor
+
+Put the `mcpServers` block shown [above](#clients-that-start-the-server) into `~/.cursor/mcp.json` for all projects, or `.cursor/mcp.json` for one. Cursor lists the server on its **Customize** page.
+
+### Gemini CLI
+
+Add the `mcpServers` block shown [above](#clients-that-start-the-server) to `~/.gemini/settings.json`.
+
+**Check:** `/mcp` in a Gemini CLI session lists the server and its tools.
+
+### JetBrains IDEs
+
+The AI Assistant plugin connects to MCP servers. Open **Settings → Tools → AI Assistant → Model Context Protocol (MCP)**, select **Add**, and paste the `mcpServers` block shown [above](#clients-that-start-the-server) as JSON configuration.
+
+### Continue
+
+Create `.continue/mcpServers/zosmf-mcp.yaml` at the top of your workspace:
+
+```yaml
+name: zosmf-mcp
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: zosmf-mcp
+    command: /Users/<user>/.local/bin/zosmf-mcp
+    args:
+      - --config
+      - /Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml
+```
+
+Continue also picks up the JSON block shown [above](#clients-that-start-the-server) as a file in the same directory. MCP tools are available in Continue's agent mode only.
+
+## Clients that connect over HTTP
+
+Here zosmf-mcp runs on its own — on this machine, another one, or [in a container](container-setup.md) — and clients reach it at `http://<host>:8081/mcp`. That needs the Streamable HTTP transport and an API key in the configuration; [Transports and API key](configuration.md#transports-and-api-key) shows both. In short:
+
+```yaml
+transport:
+  streamable_http:
+    enabled: true
+    listen: ":8081"
+```
+
 ```bash
-claude mcp list
-# or in the interactive chat:
-/mcp
+zosmf-mcp init env --generate-api-key    # writes MCP_API_KEY to the .env next to the configuration
 ```
 
+The command never prints the key — read it from that `.env` file. Every client sends it as `Authorization: Bearer <key>`.
 
-## VS Code (Claude Code Extension)
+The HTTP transports carry no TLS: anyone who can read the traffic sees the key and every z/OS command. Keep the port on a trusted network, or put a TLS-terminating reverse proxy in front.
 
-MCP servers are registered in VS Code via an `mcp.json` file in the workspace directory.
+### Claude Code over HTTP
 
-**`.vscode/mcp.json`** (automatically detected by the extension):
+```bash
+claude mcp add --transport http --scope user zosmf-mcp http://<host>:8081/mcp \
+  --header "Authorization: Bearer <key>"
+```
+
+### n8n: MCP Client Tool node
+
+1. Add an **AI Agent** node to your workflow.
+2. Add an **MCP Client Tool** node and connect it to the agent's tools input.
+3. Configure the MCP Client Tool node:
+   - **Transport**: `Streamable HTTP` (n8n v1.104+) or `SSE` (older versions)
+   - **URL**: `http://<host>:8081/mcp`
+   - **Authentication**: `Bearer Auth`, with the key from `MCP_API_KEY`
+4. The agent can now use all zosmf-mcp tools.
+
+The node handles session setup, tool discovery and tool calls itself.
+
+### n8n: HTTP Request nodes
+
+Without the MCP Client Tool node, a workflow can speak the protocol with plain **HTTP Request** nodes. This uses the older `http` transport — `transport.http.enabled: true`, default port `8080` — with the same API key. Each run takes three requests:
+
+**1 — Initialize** (creates a session):
 
 ```json
+POST http://<host>:8080/mcp
+Content-Type: application/json
+Authorization: Bearer <key>
+
 {
-  "servers": {
-    "zosmf-mcp": {
-      "type": "stdio",
-      "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "${workspaceFolder}/.smpe-zosmf.yaml"]
-    }
+  "jsonrpc": "2.0", "id": 1, "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {},
+    "clientInfo": { "name": "n8n", "version": "1.0" }
   }
 }
 ```
 
-> `${workspaceFolder}` is resolved by VS Code to the current workspace directory. The server then reads the passwords from the `.env` next to that file.
+The response carries the header `Mcp-Session-Id: <uuid>` — keep it for the next requests.
 
-**Check status:** Type `/mcp` in the chat window — all registered servers and their tools will be listed.
-
-
-## JetBrains IDEs
-
-JetBrains IDEs (IntelliJ, GoLand, etc.) support MCP via the **AI Assistant plugin**.
-
-**Configuration:** `Settings → Tools → AI Assistant → Model Context Protocol (MCP)`
-
-Add a new server entry:
-
-| Field       | Value                                             |
-|-------------|---------------------------------------------------|
-| Name        | `zosmf-mcp`                                       |
-| Command     | `/Users/<user>/.local/bin/zosmf-mcp`              |
-| Arguments   | `--config /Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml` |
-
-Alternatively, as a JSON configuration in `~/.config/JetBrains/mcp.json` (since 2024.3):
+**2 — Initialized notification:**
 
 ```json
+POST http://<host>:8080/mcp
+Authorization: Bearer <key>
+Mcp-Session-Id: <uuid>
+
+{"jsonrpc": "2.0", "method": "notifications/initialized"}
+```
+
+**3 — Call a tool:**
+
+```json
+POST http://<host>:8080/mcp
+Authorization: Bearer <key>
+Mcp-Session-Id: <uuid>
+
 {
-  "servers": {
-    "zosmf-mcp": {
-      "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
-    }
+  "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+  "params": {
+    "name": "zosmf_list_jobs",
+    "arguments": { "system": "MAINT", "owner": "*", "status": "ACTIVE" }
   }
 }
 ```
 
+A workflow therefore looks like this:
 
-## Gemini CLI
-
-Google Gemini CLI supports MCP servers via a `settings.json` configuration file.
-
-**Location:** `~/.gemini/settings.json`
-
-```json
-{
-  "mcpServers": {
-    "zosmf-mcp": {
-      "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
-    }
-  }
-}
+```
+[Trigger]
+  → [HTTP POST /mcp  initialize]
+  → [Set: sessionId from response header]
+  → [HTTP POST /mcp  notifications/initialized]
+  → [HTTP POST /mcp  tools/call]
+  → [Process result ...]
+  → [HTTP DELETE /mcp]   ← optional, ends the session
 ```
 
-**Check status:** In the Gemini CLI session:
-```
-/mcp
-```
+The z/OSMF passwords stay on the zosmf-mcp host; n8n never reaches the mainframe directly.
 
-All registered tools become available in the session — the model can use them as native capabilities.
+## Building your own client
 
+### Over stdio, from a shell
 
-## Continue.dev
+A session has to start with `initialize` and the `notifications/initialized` notification — before that, the server answers every request with `server not initialized`.
 
-[Continue](https://continue.dev) is an open-source AI coding extension for VS Code and JetBrains. MCP servers are configured in `~/.continue/config.json`:
+**List the tools:**
 
-```json
-{
-  "experimental": {
-    "modelContextProtocolServers": [
-      {
-        "transport": {
-          "type": "stdio",
-          "command": "/Users/<user>/.local/bin/zosmf-mcp",
-          "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
-        }
-      }
-    ]
-  }
-}
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  | zosmf-mcp --config ~/.config/smpe_ls/.smpe-zosmf.yaml --transport stdio
 ```
 
+**Call a tool:**
 
-## Cursor
-
-[Cursor](https://cursor.sh) supports MCP servers since version 0.43 via `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in the project directory:
-
-```json
-{
-  "mcpServers": {
-    "zosmf-mcp": {
-      "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
-    }
-  }
-}
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"zosmf_issue_command","arguments":{"system":"SYSA","command":"D T"}}}' \
+  | zosmf-mcp --config ~/.config/smpe_ls/.smpe-zosmf.yaml --transport stdio
 ```
 
-After saving, go to `Cursor Settings → MCP` — the server should appear with a green status indicator.
+Every request gets one JSON line in reply, the notification none.
 
+### With the Anthropic API
 
-## Anthropic API (custom applications)
+Both examples start zosmf-mcp over stdio, hand its tools to Claude, and run the tool calls Claude asks for until it has an answer.
 
-Using the Anthropic API with the **MCP Client SDK**, you can build custom applications that leverage Claude together with zosmf-mcp.
-
-### Python — with `anthropic` SDK and `mcp` client
+**Python**
 
 ```bash
 pip install anthropic mcp
@@ -233,7 +279,7 @@ async def main():
             # Agentic loop: Claude calls tools until the answer is complete
             while True:
                 response = client.messages.create(
-                    model="claude-opus-4-6",
+                    model="claude-opus-5-5",
                     max_tokens=4096,
                     tools=tools,
                     messages=messages,
@@ -262,7 +308,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### TypeScript/Node.js
+**TypeScript**
 
 ```bash
 npm install @anthropic-ai/sdk @modelcontextprotocol/sdk
@@ -297,7 +343,7 @@ const messages: Anthropic.MessageParam[] = [
 // Agentic loop
 while (true) {
   const response = await client.messages.create({
-    model: "claude-opus-4-6",
+    model: "claude-opus-5-5",
     max_tokens: 4096,
     tools: anthropicTools,
     messages,
@@ -328,172 +374,8 @@ while (true) {
 await mcp.close();
 ```
 
-> Both examples implement an **agentic loop**: Claude decides which tools to call and continues until it can formulate a complete answer.
-
-
-## Direct invocation / custom clients
-
-For custom applications or shell scripts, the server can be started directly and addressed via JSON-RPC 2.0 over stdio. A session has to start with `initialize` and the `notifications/initialized` notification — before that, the server answers every request with `server not initialized`.
-
-**Example: list available tools**
-
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-  | zosmf-mcp --config ~/.config/smpe_ls/.smpe-zosmf.yaml --transport stdio
-```
-
-**Example: call a tool**
-
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"zosmf_issue_command","arguments":{"system":"SYSA","command":"D T"}}}' \
-  | zosmf-mcp --config ~/.config/smpe_ls/.smpe-zosmf.yaml --transport stdio
-```
-
-Every request gets one JSON line in reply, the notification none.
-
-MCP client SDKs are available for several languages:
+### MCP SDKs
 
 - **Python**: `pip install mcp`
-- **TypeScript/Node.js**: `npm install @modelcontextprotocol/sdk`
-- **Go**: `github.com/mark3labs/mcp-go`
-
-
-## n8n (HTTP transport)
-
-[n8n](https://n8n.io) is an open-source workflow automation platform. It can call the zosmf-mcp server via the **HTTP transport** using standard HTTP Request nodes.
-
-### Enable HTTP transport
-
-In `.smpe-zosmf.yaml`:
-
-```yaml
-transport:
-  stdio: true       # keep for Claude Code / VS Code
-  http:
-    enabled: true
-    listen: ":8080"
-```
-
-Both transports start simultaneously. The server is reachable at `http://<host>:8080/mcp`.
-
-An HTTP transport refuses to start without an API key. Generate one:
-
-```bash
-zosmf-mcp init env --generate-api-key
-```
-
-It writes `MCP_API_KEY` to the `.env` next to the configuration, which the server reads at startup. The command never prints the key — take it from that file for n8n. Every request has to send it as `Authorization: Bearer <key>`.
-
-### MCP protocol over HTTP
-
-The HTTP transport uses JSON-RPC 2.0 over POST. Each workflow run performs three steps:
-
-#### Step 1 — Initialize (creates a session)
-
-```json
-POST http://server:8080/mcp
-Content-Type: application/json
-Authorization: Bearer <key>
-
-{
-  "jsonrpc": "2.0", "id": 1, "method": "initialize",
-  "params": {
-    "protocolVersion": "2025-03-26",
-    "capabilities": {},
-    "clientInfo": { "name": "n8n", "version": "1.0" }
-  }
-}
-```
-
-The response contains the header `Mcp-Session-Id: <uuid>` — save this for subsequent requests.
-
-#### Step 2 — Initialized notification
-
-```json
-POST http://server:8080/mcp
-Authorization: Bearer <key>
-Mcp-Session-Id: <uuid>
-
-{"jsonrpc": "2.0", "method": "notifications/initialized"}
-```
-
-#### Step 3 — Call a tool
-
-```json
-POST http://server:8080/mcp
-Authorization: Bearer <key>
-Mcp-Session-Id: <uuid>
-
-{
-  "jsonrpc": "2.0", "id": 2, "method": "tools/call",
-  "params": {
-    "name": "zosmf_list_jobs",
-    "arguments": { "system": "MAINT", "owner": "*", "status": "ACTIVE" }
-  }
-}
-```
-
-### n8n workflow structure
-
-```
-[Trigger]
-  → [HTTP POST /mcp  initialize]
-  → [Set: sessionId from response header]
-  → [HTTP POST /mcp  notifications/initialized]
-  → [HTTP POST /mcp  tools/call]
-  → [Process result ...]
-  → [HTTP DELETE /mcp]   ← optional, cleans up session
-```
-
-### Notes
-
-- No TLS is built into the HTTP transport — use nginx or Traefik as a reverse proxy for production.
-- The n8n host must be able to reach the MCP server on the configured port.
-- Credentials (z/OSMF passwords) stay on the MCP server — n8n never has direct mainframe access.
-
-
-## n8n (MCP Client Node)
-
-Since n8n **v1.88**, the native **MCP Client Tool Node** allows AI Agent workflows to use zosmf-mcp tools directly — without manually building HTTP Request nodes or managing session IDs.
-
-### Enable Streamable HTTP transport
-
-In `.smpe-zosmf.yaml`:
-
-```yaml
-transport:
-  stdio: true                   # keep for Claude Code / VS Code
-  streamable_http:
-    enabled: true
-    listen: ":8081"
-```
-
-Restart the server after changing the config. The MCP endpoint is then available at `http://<host>:8081/mcp`.
-
-Like the HTTP transport, it needs an API key: run `zosmf-mcp init env --generate-api-key` once, as described [above](#enable-http-transport).
-
-### n8n workflow setup
-
-1. Add an **AI Agent** node to your workflow
-2. Add a **MCP Client Tool** node and connect it to the Agent's tools input
-3. Configure the MCP Client Tool node:
-   - **Transport**: `Streamable HTTP` (n8n v1.104+) or `SSE` (older versions)
-   - **URL**: `http://<host>:8081/mcp`
-   - **Authentication**: `Bearer Auth`, with the key from `MCP_API_KEY` in the `.env`
-4. The Agent can now use all zosmf-mcp tools natively
-
-The MCP Client Node automatically handles session initialization, tool discovery, and tool calls. No manual JSON-RPC plumbing required.
-
-### Requirements and Notes
-
-- Use **Streamable HTTP** transport (n8n v1.104+) — it supersedes the older SSE transport.
-- The standalone **MCP Client node** (n8n v1.122+) allows configuring the transport directly in node parameters.
-- For production, use a reverse proxy (nginx, Traefik) for TLS termination in front of the Streamable HTTP port.
-
-
+- **TypeScript**: `npm install @modelcontextprotocol/sdk`
+- **Go**: `github.com/modelcontextprotocol/go-sdk`

@@ -74,8 +74,8 @@ type SystemConfig struct {
 	Proxy         *ProxyConfig `yaml:"proxy"`
 
 	// PasswordSource records where the password came from: "file",
-	// "system-env", "global-env" or "none". Set by normalize, logged at
-	// startup, never serialised.
+	// "system-env", "global-env", "env-file" or "none". Set by normalize,
+	// logged at startup, never serialised.
 	PasswordSource string `yaml:"-"`
 
 	// smpe_ls-compatible aliases

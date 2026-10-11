@@ -8,6 +8,8 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-11
+
 ### Added
 
 - **The server reads the `.env` beside its configuration** at startup, so

@@ -9,12 +9,17 @@ GOFLAGS   := -trimpath
 # Keep in step with the version in .github/workflows/build.yml
 GOLANGCI_VERSION ?= v2.12.0
 
-# Remote deployment target (macOS Apple Silicon); REMOTE_HOST/REMOTE_USER come from .env
+# make deploy updates the container on another machine; REMOTE_HOST,
+# REMOTE_USER and REMOTE_REPO (the repository checkout there) come from .env
 -include .env
 REMOTE_HOST ?=
 REMOTE_USER ?=
-REMOTE_DIR  ?= ~/.local/bin
+REMOTE_REPO ?=
 REMOTE      := $(REMOTE_USER)@$(REMOTE_HOST)
+
+# A binary here replaces the one built into the container image. make deploy
+# puts it on the target machine; delete it to go back to the image's build.
+CONTAINER_BINARY := $(BINARY_DIR)/$(BINARY)-container
 
 .PHONY: all build build-all build-local clean test vet fmt lint check-identifiers run install deploy apikey docker-build docker-up docker-up-direct docker-down docker-logs container-build container-up container-up-direct container-down container-logs launch-agent launch-agent-remove install-skill
 
@@ -63,14 +68,14 @@ install: build
 	install -m 755 $(BINARY_DIR)/$(BINARY) $(HOME)/.local/bin/$(BINARY)
 
 deploy:
-	@test -n "$(REMOTE_HOST)" -a -n "$(REMOTE_USER)" || { echo "REMOTE_HOST/REMOTE_USER not set — put them in .env or pass on the command line"; exit 1; }
+	@test -n "$(REMOTE_HOST)" -a -n "$(REMOTE_USER)" -a -n "$(REMOTE_REPO)" || { echo "REMOTE_HOST, REMOTE_USER and REMOTE_REPO must be set — put them in .env or pass them on the command line"; exit 1; }
 	@mkdir -p $(BINARY_DIR)
-	GOARCH=arm64 GOOS=darwin go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-darwin-arm64 ./cmd/zosmf-mcp
-	ssh $(REMOTE) 'mkdir -p $(REMOTE_DIR)'
-	scp $(BINARY_DIR)/$(BINARY)-darwin-arm64 $(REMOTE):$(REMOTE_DIR)/$(BINARY)
-	# macOS rejects the linker-signed ad-hoc signature after transfer — re-sign on the target
-	ssh $(REMOTE) 'chmod 755 $(REMOTE_DIR)/$(BINARY) && xattr -c $(REMOTE_DIR)/$(BINARY) && codesign -f -s - $(REMOTE_DIR)/$(BINARY) && $(REMOTE_DIR)/$(BINARY) --version'
-	@echo "deployed to $(REMOTE):$(REMOTE_DIR)/$(BINARY) — restart the server there manually"
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $(BINARY_DIR)/$(BINARY)-linux-arm64 ./cmd/zosmf-mcp
+	ssh $(REMOTE) 'mkdir -p $(REMOTE_REPO)/$(BINARY_DIR)'
+	scp $(BINARY_DIR)/$(BINARY)-linux-arm64 $(REMOTE):$(REMOTE_REPO)/$(CONTAINER_BINARY)
+	# container is in /usr/local/bin, which a non-interactive SSH session lacks on its PATH
+	ssh $(REMOTE) 'cd $(REMOTE_REPO) && PATH=/usr/local/bin:$$PATH make container-down container-up-direct'
+	ssh $(REMOTE) 'PATH=/usr/local/bin:$$PATH container exec zosmf-mcp /usr/local/bin/zosmf-mcp --version'
 
 tidy:
 	go mod tidy
@@ -124,9 +129,12 @@ container-up: container-build
 	ENVFILE=$$(mktemp -t zosmf-mcp-env); chmod 600 "$$ENVFILE"; \
 	trap 'rm -f "$$ENVFILE"' EXIT INT TERM; \
 	sed -E 's/^[[:space:]]*export[[:space:]]+//' .env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' > "$$ENVFILE"; \
+	BINMOUNT=""; \
+	[ -f $(CONTAINER_BINARY) ] && { BINMOUNT="-v $$PWD/$(CONTAINER_BINARY):/usr/local/bin/zosmf-mcp"; echo "using $(CONTAINER_BINARY) instead of the image's build"; }; \
 	container run -d --name zosmf-mcp \
 	  -v "$${ZOSMF_CONFIG:-./.smpe-zosmf.yaml}:/config/.smpe-zosmf.yaml" \
 	  -v "$${SSH_KEY_DIR:-./secrets}:/keys" \
+	  $$BINMOUNT \
 	  --env-file "$$ENVFILE" \
 	  -e MCP_API_KEY="$$MCP_API_KEY" \
 	  -e ZOSMF_PROXY=socks5://$$TUNNEL_IP:1080 \
@@ -147,9 +155,12 @@ container-up-direct: container-build
 	  | grep -v '^ZOSMF_PROXY=' > "$$ENVFILE"; \
 	KEYS="$${SSH_KEY_DIR:-./secrets}"; KEYMOUNT=""; \
 	[ -d "$$KEYS" ] && KEYMOUNT="-v $$KEYS:/keys"; \
+	BINMOUNT=""; \
+	[ -f $(CONTAINER_BINARY) ] && { BINMOUNT="-v $$PWD/$(CONTAINER_BINARY):/usr/local/bin/zosmf-mcp"; echo "using $(CONTAINER_BINARY) instead of the image's build"; }; \
 	container run -d --name zosmf-mcp \
 	  -v "$${ZOSMF_CONFIG:-./.smpe-zosmf.yaml}:/config/.smpe-zosmf.yaml" \
 	  $$KEYMOUNT \
+	  $$BINMOUNT \
 	  --env-file "$$ENVFILE" \
 	  -e MCP_API_KEY="$$MCP_API_KEY" \
 	  -p 8081:8081 \
@@ -197,8 +208,8 @@ help:
 	@echo "  check-identifiers - Fail on private IPs, internal hostnames or keys in tracked files"
 	@echo "  run       - Build and run with default config"
 	@echo "  install   - Install binary to ~/.local/bin"
-	@echo "  deploy    - Cross-compile for macOS arm64 and copy to REMOTE_USER@REMOTE_HOST:~/.local/bin"
-	@echo "              REMOTE_HOST/REMOTE_USER are read from .env; override on the command line if needed"
+	@echo "  deploy    - Build a linux/arm64 binary, copy it to REMOTE_REPO on REMOTE_USER@REMOTE_HOST"
+	@echo "              and restart the container there with it (REMOTE_* are read from .env)"
 	@echo "  tidy      - Run go mod tidy"
 	@echo "  apikey    - Generate a bearer token for the HTTP transports"
 	@echo "  install-skill - Install the guided-setup instructions for an agent"

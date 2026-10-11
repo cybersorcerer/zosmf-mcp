@@ -519,6 +519,29 @@ make container-down && make container-up-direct
 
 — restarting the agent only starts the container that already exists.
 
+### Updating another machine with `make deploy`
+
+When the container runs on a different machine than the one you build on,
+`make deploy` updates it without copying any source. Set three variables in
+the `.env` of the machine you build on:
+
+```bash
+REMOTE_HOST=zos-gateway.example.com
+REMOTE_USER=youruser
+REMOTE_REPO=/Users/youruser/zosmf-mcp    # the repository checkout over there
+```
+
+`make deploy` then builds a linux/arm64 binary, copies it to
+`bin/zosmf-mcp-container` in that checkout, runs `make container-down
+container-up-direct` there over SSH, and prints the version the container now
+runs.
+
+While `bin/zosmf-mcp-container` exists, `make container-up` and
+`make container-up-direct` use it instead of the binary built into the image,
+and say so. Delete the file to go back to the image's build. The checkout
+over there needs a Makefile from this version once — an older one does not
+know about the file yet.
+
 ## 10. Connecting a client
 
 Endpoint: `http://<container-host>:8081/mcp`

@@ -20,6 +20,11 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ### Changed
 
+- **`make deploy` updates the container on another machine.** It builds a
+  linux/arm64 binary, copies it into the repository checkout there
+  (`REMOTE_REPO`), and restarts the container with it; `container-up` and
+  `container-up-direct` use such a binary instead of the image's build. It
+  used to copy a macOS binary that the container never used.
 - **`init config --print` shows only the system being written**, not the
   whole shared file. `init config` says whether it added or updated it.
 - **`agents/setup.md` rewritten** so it works with small local models: the

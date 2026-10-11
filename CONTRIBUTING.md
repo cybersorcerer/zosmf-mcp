@@ -61,8 +61,8 @@ request and describe what you ran.
 3. Add the z/OSMF call to `internal/zosmf/` if one is missing.
 4. Annotate it. `readOnlyHint` and `destructiveHint` decide whether a client
    asks the user before running it — a wrong annotation is a safety problem.
-5. Document it in the README's tool reference, and list it in the warning
-   section up front if it can destroy data.
+5. Document it in `docs/tools.md`, and list it in the README's warning
+   section if it can destroy data.
 
 ## Error messages are an interface
 

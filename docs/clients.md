@@ -1,6 +1,6 @@
 # Registering the server with an MCP client
 
-One section per client. Each needs the path to the binary and, for basic auth, the password variables reaching the server's environment.
+One section per client. Each needs the path to the binary and to the configuration file. Passwords are not part of any client configuration: the server reads them from the `.env` next to its configuration file, which `zosmf-mcp init env` writes.
 
 [← README](../README.md)
 
@@ -16,8 +16,8 @@ All transports are controlled via the config file. The `--transport` flag can ov
 For the stdio clients the configuration is the same everywhere:
 
 - **Command**: path to the `zosmf-mcp` binary
-- **Arguments**: `--config /path/to/.smpe-zosmf.yaml`
-- **Environment variables**: pass passwords as `ENV` variables
+- **Arguments**: `--config` and the full path of the configuration file — `~/.config/smpe_ls/.smpe-zosmf.yaml` unless you chose another
+- **Environment variables**: none needed. The server reads the passwords from the `.env` next to the configuration file; a variable a client does pass wins over the file.
 
 
 ## Claude Desktop (macOS/Windows)
@@ -34,10 +34,7 @@ Claude Desktop supports MCP servers via the `claude_desktop_config.json` file.
   "mcpServers": {
     "zosmf-mcp": {
       "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "secret"
-      }
+      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
     }
   }
 }
@@ -50,45 +47,21 @@ Restart Claude Desktop after saving. The tools will appear in the chat as availa
 
 ## Claude Code CLI
 
-Claude Code (the `claude` CLI tool) reads MCP server configurations from `~/.claude/mcp.json` (global) or `.claude/mcp.json` in the project directory (local).
-
-**Register globally** (applies to all projects):
+Register the server for all your projects:
 
 ```bash
-claude mcp add zosmf-mcp -- /Users/<user>/.local/bin/zosmf-mcp --config /Users/<user>/.smpe-zosmf.yaml
+claude mcp add --scope user zosmf-mcp -- /Users/<user>/.local/bin/zosmf-mcp --config /Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml
 ```
 
-Or manually in `~/.claude/mcp.json`:
+The scope decides where the server is available:
 
-```json
-{
-  "mcpServers": {
-    "zosmf-mcp": {
-      "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "secret"
-      }
-    }
-  }
-}
-```
+| `--scope` | Available in | Stored in |
+| --- | --- | --- |
+| `local` (the default) | the current project only | `~/.claude.json` |
+| `project` | the current project, shared through version control | `.mcp.json` in the project root |
+| `user` | all your projects | `~/.claude.json` |
 
-**Local to a project** (`.claude/mcp.json` in the repo):
-
-```json
-{
-  "mcpServers": {
-    "zosmf-mcp": {
-      "command": "zosmf-mcp",
-      "args": ["--config", ".smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "${ZOSMF_SYSA_PASSWORD}"
-      }
-    }
-  }
-}
-```
+`claude mcp remove zosmf-mcp --scope <scope>` removes it again.
 
 **Check status:**
 ```bash
@@ -110,16 +83,13 @@ MCP servers are registered in VS Code via an `mcp.json` file in the workspace di
     "zosmf-mcp": {
       "type": "stdio",
       "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "${workspaceFolder}/.smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "${env:ZOSMF_SYSA_PASSWORD}"
-      }
+      "args": ["--config", "${workspaceFolder}/.smpe-zosmf.yaml"]
     }
   }
 }
 ```
 
-> `${workspaceFolder}` is resolved by VS Code to the current workspace directory. `${env:VAR}` reads environment variables from the terminal session in which VS Code was launched.
+> `${workspaceFolder}` is resolved by VS Code to the current workspace directory. The server then reads the passwords from the `.env` next to that file.
 
 **Check status:** Type `/mcp` in the chat window — all registered servers and their tools will be listed.
 
@@ -136,8 +106,7 @@ Add a new server entry:
 |-------------|---------------------------------------------------|
 | Name        | `zosmf-mcp`                                       |
 | Command     | `/Users/<user>/.local/bin/zosmf-mcp`              |
-| Arguments   | `--config /Users/<user>/.smpe-zosmf.yaml`         |
-| Environment | `ZOSMF_SYSA_PASSWORD=secret`                      |
+| Arguments   | `--config /Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml` |
 
 Alternatively, as a JSON configuration in `~/.config/JetBrains/mcp.json` (since 2024.3):
 
@@ -146,10 +115,7 @@ Alternatively, as a JSON configuration in `~/.config/JetBrains/mcp.json` (since 
   "servers": {
     "zosmf-mcp": {
       "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "secret"
-      }
+      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
     }
   }
 }
@@ -167,10 +133,7 @@ Google Gemini CLI supports MCP servers via a `settings.json` configuration file.
   "mcpServers": {
     "zosmf-mcp": {
       "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "secret"
-      }
+      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
     }
   }
 }
@@ -196,10 +159,7 @@ All registered tools become available in the session — the model can use them 
         "transport": {
           "type": "stdio",
           "command": "/Users/<user>/.local/bin/zosmf-mcp",
-          "args": ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-          "env": {
-            "ZOSMF_SYSA_PASSWORD": "secret"
-          }
+          "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
         }
       }
     ]
@@ -217,10 +177,7 @@ All registered tools become available in the session — the model can use them 
   "mcpServers": {
     "zosmf-mcp": {
       "command": "/Users/<user>/.local/bin/zosmf-mcp",
-      "args": ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-      "env": {
-        "ZOSMF_SYSA_PASSWORD": "secret"
-      }
+      "args": ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"]
     }
   }
 }
@@ -246,13 +203,12 @@ from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 SYSTEM = "SYSA"
-CONFIG = "/Users/<user>/.smpe-zosmf.yaml"
+CONFIG = "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"
 
 async def main():
     server_params = StdioServerParameters(
         command="/Users/<user>/.local/bin/zosmf-mcp",
         args=["--config", CONFIG],
-        env={"ZOSMF_SYSA_PASSWORD": "secret"},
     )
 
     async with stdio_client(server_params) as (read, write):
@@ -319,8 +275,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const transport = new StdioClientTransport({
   command: "/Users/<user>/.local/bin/zosmf-mcp",
-  args: ["--config", "/Users/<user>/.smpe-zosmf.yaml"],
-  env: { ...process.env, ZOSMF_SYSA_PASSWORD: "secret" },
+  args: ["--config", "/Users/<user>/.config/smpe_ls/.smpe-zosmf.yaml"],
 });
 
 const mcp = new Client({ name: "my-app", version: "1.0.0" }, { capabilities: {} });
@@ -378,26 +333,29 @@ await mcp.close();
 
 ## Direct invocation / custom clients
 
-For custom applications or shell scripts, the server can be started directly and addressed via JSON-RPC 2.0 over stdio:
-
-```bash
-# Start the server manually (waits for JSON-RPC on stdin)
-ZOSMF_SYSA_PASSWORD=secret zosmf-mcp --config .smpe-zosmf.yaml
-```
+For custom applications or shell scripts, the server can be started directly and addressed via JSON-RPC 2.0 over stdio. A session has to start with `initialize` and the `notifications/initialized` notification — before that, the server answers every request with `server not initialized`.
 
 **Example: list available tools**
 
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
-  | ZOSMF_SYSA_PASSWORD=secret zosmf-mcp --config .smpe-zosmf.yaml
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  | zosmf-mcp --config ~/.config/smpe_ls/.smpe-zosmf.yaml --transport stdio
 ```
 
 **Example: call a tool**
 
 ```bash
-echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"zosmf_issue_command","arguments":{"system":"SYSA","command":"D T"}}}' \
-  | ZOSMF_SYSA_PASSWORD=secret zosmf-mcp --config .smpe-zosmf.yaml
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"zosmf_issue_command","arguments":{"system":"SYSA","command":"D T"}}}' \
+  | zosmf-mcp --config ~/.config/smpe_ls/.smpe-zosmf.yaml --transport stdio
 ```
+
+Every request gets one JSON line in reply, the notification none.
 
 MCP client SDKs are available for several languages:
 
@@ -424,6 +382,14 @@ transport:
 
 Both transports start simultaneously. The server is reachable at `http://<host>:8080/mcp`.
 
+An HTTP transport refuses to start without an API key. Generate one:
+
+```bash
+zosmf-mcp init env --generate-api-key
+```
+
+It writes `MCP_API_KEY` to the `.env` next to the configuration, which the server reads at startup. The command never prints the key — take it from that file for n8n. Every request has to send it as `Authorization: Bearer <key>`.
+
 ### MCP protocol over HTTP
 
 The HTTP transport uses JSON-RPC 2.0 over POST. Each workflow run performs three steps:
@@ -433,6 +399,7 @@ The HTTP transport uses JSON-RPC 2.0 over POST. Each workflow run performs three
 ```json
 POST http://server:8080/mcp
 Content-Type: application/json
+Authorization: Bearer <key>
 
 {
   "jsonrpc": "2.0", "id": 1, "method": "initialize",
@@ -450,6 +417,7 @@ The response contains the header `Mcp-Session-Id: <uuid>` — save this for subs
 
 ```json
 POST http://server:8080/mcp
+Authorization: Bearer <key>
 Mcp-Session-Id: <uuid>
 
 {"jsonrpc": "2.0", "method": "notifications/initialized"}
@@ -459,6 +427,7 @@ Mcp-Session-Id: <uuid>
 
 ```json
 POST http://server:8080/mcp
+Authorization: Bearer <key>
 Mcp-Session-Id: <uuid>
 
 {
@@ -507,6 +476,8 @@ transport:
 
 Restart the server after changing the config. The MCP endpoint is then available at `http://<host>:8081/mcp`.
 
+Like the HTTP transport, it needs an API key: run `zosmf-mcp init env --generate-api-key` once, as described [above](#enable-http-transport).
+
 ### n8n workflow setup
 
 1. Add an **AI Agent** node to your workflow
@@ -514,6 +485,7 @@ Restart the server after changing the config. The MCP endpoint is then available
 3. Configure the MCP Client Tool node:
    - **Transport**: `Streamable HTTP` (n8n v1.104+) or `SSE` (older versions)
    - **URL**: `http://<host>:8081/mcp`
+   - **Authentication**: `Bearer Auth`, with the key from `MCP_API_KEY` in the `.env`
 4. The Agent can now use all zosmf-mcp tools natively
 
 The MCP Client Node automatically handles session initialization, tool discovery, and tool calls. No manual JSON-RPC plumbing required.

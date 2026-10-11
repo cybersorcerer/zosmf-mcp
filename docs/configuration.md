@@ -81,7 +81,7 @@ This means you can use the simpler `servers:` key with `user:` and `rejectUnauth
 | `port`            | No       | Port number — appended to `host` if not already present          |
 | `auth.type`       | No       | `basic` or `certificate` — defaults to `basic` when a username is present; entries without any credentials start but reject tool calls |
 | `auth.username`   | Yes*     | TSO user ID (*required for `basic`)                               |
-| `auth.password`   | Yes*     | Password — reference via `${ENV_VAR}` to avoid hardcoding        |
+| `auth.password`   | No       | Password as a `${ENV_VAR}` reference — omit it to use `ZOSMF_<SYSTEM>_PASSWORD`, see [Passing Passwords Securely](#passing-passwords-securely) |
 | `auth.cert_file`  | Yes**    | PEM certificate file (**required for `certificate`)               |
 | `auth.key_file`   | Yes**    | PEM private key file (**required for `certificate`)               |
 | `ca_file`         | No       | PEM file with the CA certificate for self-signed z/OSMF certs    |
@@ -110,21 +110,20 @@ A restore replaces the whole file and backs up the version it replaces first, so
 
 ## Passing Passwords Securely
 
-Never store passwords in plain text in the configuration file. Use environment variables instead:
+Never put a password in the configuration file. A system's password is looked up in this order:
 
-`zosmf-mcp init env` writes these to `.env` next to the configuration file (for example `~/.config/smpe_ls/.env`), mode 600. **The server reads that file itself at startup** — nothing to source, nothing to pass to an MCP client. A variable already set in the process environment wins over the file. A `.env` that group or others can read is ignored, with a startup warning naming the `chmod 600` that fixes it. `KEY=value` lines, `export ` prefixes and quoted values are understood. By hand:
+1. `auth.password` in the file — normally a reference such as `${ZOSMF_SYSA_PASSWORD}`;
+2. `ZOSMF_<SYSTEM>_PASSWORD`, derived from the system's `name`: uppercased, every character other than A-Z and 0-9 replaced by `_`. Nothing has to be added to the file for this one;
+3. `ZOSMF_PASSWORD`, one password for every system.
+
+Each variable is taken from the process environment first, then from the `.env` file next to the configuration. `zosmf-mcp init env` writes that file (for example `~/.config/smpe_ls/.env`), mode 600. **The server reads it itself at startup** — nothing to source, nothing to pass to an MCP client. A `.env` that group or others can read is ignored, with a startup warning naming the `chmod 600` that fixes it. `KEY=value` lines, `export ` prefixes and quoted values are understood. By hand:
 
 ```bash
 # ~/.config/smpe_ls/.env — chmod 600, never commit it
 ZOSMF_SYSA_PASSWORD=my_password
 ```
 
-In the config:
-```yaml
-password: "${ZOSMF_SYSA_PASSWORD}"
-```
-
-A system's password is resolved in this order: an explicit `${ENV_VAR}` (or literal value) in `auth.password`; otherwise `ZOSMF_<SYSTEM>_PASSWORD`, derived from the system's `name` — nothing to add to the file for this one; otherwise the global `ZOSMF_PASSWORD` fallback. Each variable is looked up in the process environment first, then in the `.env` file. The startup log and `zosmf-mcp init config --check` name the source each system used — `file`, `system-env`, `global-env`, `env-file` or `none` — never the value itself.
+The startup log and `zosmf-mcp init config --check` name the source each system used — `file`, `system-env`, `global-env`, `env-file` or `none` — never the value itself.
 
 ## SSH Systems (for ZOAU tools)
 
@@ -248,19 +247,13 @@ without a `url` / `host`.
 
 ### API-key authentication
 
-The HTTP and Streamable HTTP transports require an API key before they will start:
+The HTTP and Streamable HTTP transports require an API key before they will start. Generate one:
 
 ```bash
-make apikey        # openssl rand -base64 32
+zosmf-mcp init env --generate-api-key
 ```
 
-Put the generated value in `.env` next to `docker-compose.yml` (already covered by
-`.gitignore`):
-
-```bash
-MCP_API_KEY=...
-ZOSMF_PASSWORD=...
-```
+It writes `MCP_API_KEY` to the `.env` next to the configuration, which the server reads at startup; the key is never printed. A container takes the key from its own `.env` instead — see [`container-setup.md`](container-setup.md#4-create-env).
 
 The server reads it as `transport.http.api_key` / `transport.streamable_http.api_key`
 (each transport has its own key) and expects clients to send it as
@@ -330,5 +323,5 @@ are worth knowing before the first start:
 - **Permissions**: The configured z/OSMF user requires appropriate SAF/RACF permissions for the z/OSMF REST APIs being used.
 - **TSO**: `tso_account` and `tso_proc` must be set in the configuration to use `zosmf_tso_command`. The logon procedure must be valid on the target system (e.g. `IZUFPROC`).
 - **SMP/E**: If `csi_dataset` and `zone` are not specified explicitly, the default values from the system configuration are used.
-- **Passwords**: Never hardcode passwords in the configuration file. Always use environment variables (`${VAR}`).
+- **Passwords**: never in the configuration file — see [Passing Passwords Securely](#passing-passwords-securely).
 

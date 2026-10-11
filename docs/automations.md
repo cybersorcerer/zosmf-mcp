@@ -60,18 +60,18 @@ Are both systems at the same maintenance level?
 
 ## Claude Code Hooks
 
-With Claude Code hooks, actions can be triggered automatically. Example `.claude/settings.json`:
+With Claude Code hooks, actions can be triggered automatically. Claude Code names MCP tools `mcp__<server>__<tool>`, so the matcher has to use that full name — here for a server registered as `zosmf-mcp`. Example `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "zosmf_submit_job",
+        "matcher": "mcp__zosmf-mcp__zosmf_submit_job",
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Job submitted at $(date)' >> job.log"
+            "command": "echo \"Job submitted at $(date)\" >> job.log"
           }
         ]
       }

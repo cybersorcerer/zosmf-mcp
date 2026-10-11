@@ -94,9 +94,10 @@ this:
 the proxy. A `proxy:` block in the file takes precedence, and a
 `proxy: {enabled: false}` on an individual system remains an effective opt-out.
 
-**Passwords** referenced as `${ZOSMF_SYSA_PASSWORD}` are resolved from the
-container's environment. If a referenced variable is not set, the server
-**refuses to start** and names the missing variables. That is deliberate —
+**Passwords** come from the container's environment: `ZOSMF_<SYSTEM>_PASSWORD`
+for each system — derived from its name, nothing to add to the file — and any
+`${...}` reference the file contains. If a referenced variable is not set, the
+server **refuses to start** and names the missing variables. That is deliberate —
 previously the placeholder survived as literal text and surfaced much later as
 an unexplained 401.
 
@@ -120,8 +121,9 @@ ZOSMF_SYSA_PASSWORD=…
 ZOSMF_SYSB_PASSWORD=…
 ```
 
-The password variable names must match the `${...}` references in your
-configuration file **exactly**.
+Name each password variable `ZOSMF_<SYSTEM>_PASSWORD` after a system in your
+configuration (uppercase; any character other than A-Z and 0-9 becomes `_`), or
+exactly like a `${...}` reference the file contains.
 
 > **Plain `KEY=value` only — no leading `export`.** Both `docker compose`
 > (`env_file`) and `container run --env-file` reject the export form. Apple
@@ -434,8 +436,6 @@ tunnel, jump host, z/OSMF.
 ---
 
 ## 9. Direct access (no jump host)
-
-[`agents/setup.md`](../agents/setup.md) covers this same ground as one step of the guided setup procedure — its step 6 is this section.
 
 When the container host can reach z/OSMF itself, there is nothing to tunnel.
 One container, no SOCKS proxy, and the same image as above.

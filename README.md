@@ -44,7 +44,7 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 
 ### Network and credential exposure
 
-- **Never hardcode passwords.** Use `${ENV_VAR}` substitution or the `ZOSMF_PASSWORD` environment variable.
+- **Never put passwords in the configuration file.** `zosmf-mcp init env` keeps them in a `.env` next to it that only you can read, and the server reads that file itself — see [Passing Passwords Securely](docs/configuration.md#passing-passwords-securely).
 - **`skip_tls_verify: true` disables certificate validation.** It exists for self-signed test systems. Setting it against a production system exposes credentials to interception.
 - **The HTTP and Streamable HTTP transports listen on all interfaces by default.** Anyone who can reach the port can drive the server with your z/OSMF credentials. Bind to localhost, put it behind a reverse proxy, or enable API-key authentication — see [API-key authentication](docs/configuration.md#api-key-authentication).
 - **ZOAU tools authenticate by SSH key only.** The key grants shell access to the target system; protect it accordingly.
@@ -52,7 +52,7 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 
 ## Prerequisites
 
-- **Go 1.22+** — to build from source
+- **Go 1.26.1+** — only to build from source
 - **z/OSMF** — enabled on the target system (z/OS V2.3+)
 - **Network access** — to the z/OSMF port (default: 443)
 - An **MCP-compatible AI client** — Claude Desktop, Claude Code CLI, VS Code, Cursor, etc.
@@ -72,7 +72,7 @@ zosmf-mcp init env      # that system's password — writes .env next to the con
 Register with an MCP client, for example Claude Code — `claude mcp list` should then show `zosmf-mcp` as `✔ Connected`:
 
 ```bash
-claude mcp add zosmf-mcp -- zosmf-mcp --config <path init config printed>
+claude mcp add --scope user zosmf-mcp -- zosmf-mcp --config <path init config printed>
 ```
 
 The server reads the `.env` next to its configuration at startup, so no client needs the password. `zosmf-mcp init config --check` shows where each system's password comes from.

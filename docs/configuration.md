@@ -1,114 +1,121 @@
 # Configuration
 
-Everything the server reads from its configuration file and the environment. `zosmf-mcp init config` and `zosmf-mcp init env` write the same file and variables this page describes.
-
 [← README](../README.md)
 
-## Setup Commands
+zosmf-mcp reads one YAML file. You rarely edit it by hand: `zosmf-mcp init config` writes it, and `zosmf-mcp init env` stores the passwords next to it. This page explains those commands first, then every key the file can hold.
 
-`zosmf-mcp init <command>` writes this file and its secrets so nobody has to edit YAML by hand. `zosmf-mcp init <command> --help` lists every flag.
+- [Setup commands](#setup-commands)
+- [Where the file lives](#where-the-file-lives)
+- [Example](#example)
+- [Systems](#systems)
+- [Passwords](#passwords)
+- [ZOAU over SSH](#zoau-over-ssh)
+- [Transports and API key](#transports-and-api-key)
+- [Forwarding through a proxy or jump host](#forwarding-through-a-proxy-or-jump-host)
+- [Resources](#resources)
+- [Backups and restore](#backups-and-restore)
 
-| Command | What it does | Flags |
-| --- | --- | --- |
-| `init config` | Adds or updates a system in the configuration file. Without field flags and on a terminal it runs the wizard (below). | `--file` (default: the file the server would find, else `~/.config/smpe_ls/.smpe-zosmf.yaml`), `--show` (systems already in the file, as JSON, no secrets), `--print` (show the system as it would be written, write nothing), `--check` (validate the file, report each system's password source), `--questions` (field list as JSON); one flag per field: `--name`, `--host`, `--user`, `--csi A,B`, `--zones A,B`, … and the ZOAU group `--ssh-host`, `--ssh-user`, `--ssh-key-file`, `--zoau-path`, `--ssh-port` |
-| `init env` | Writes the passwords (and `MCP_API_KEY`) the configuration needs to `.env` next to it, mode 600. Variables the file already has are kept; one set in the environment is taken from there, otherwise it is asked for. `--questions` lists only what is missing. Values are never printed. | `--file`, `--env-file`, `--questions`, `--generate-api-key` |
-| `init restore` | Lists or restores the backups every write leaves behind — see [Backups and Restore](#backups-and-restore). | `--file`, `--env-file`, `--list`, `--backup <timestamp>`, `--target config\|env` |
-| `init skill` | Installs the setup procedure as a skill for an AI agent, from the binary itself. | `--agent claude\|opencode\|pi`, `--scope user\|project` (default `user`; `project` = current directory) |
+## Setup commands
 
-**The wizard.** `zosmf-mcp init config` on its own backs up the file, lists the systems already in it and offers `[n]` new system, `[1-N]` edit a system, `[r]` restore a backup, `[d]` done. A system is asked in sections — Connection, SMP/E, TSO, then optional settings for other tools and ZOAU. CSIs and zones are entered one per line, an empty line ends the list; the first CSI, and all zones, are the defaults a tool call uses when it names none. When editing, the current value is shown in brackets and Enter keeps it; an existing list can be kept, replaced or added to. Each system ends with a YAML preview and `Write? [Y/n]`.
+| Command | What it does |
+| --- | --- |
+| `zosmf-mcp init config` | Adds or changes a system. Without field flags, on a terminal, it runs the wizard. |
+| `zosmf-mcp init env` | Writes the passwords the configuration needs — and `MCP_API_KEY` for an HTTP transport — to `.env` next to it, mode 600. |
+| `zosmf-mcp init restore` | Lists or restores the backups every write leaves behind. |
+| `zosmf-mcp init skill` | Installs the setup procedure as a skill for an AI agent: Claude Code, opencode or pi. |
 
+`zosmf-mcp init <command> --help` lists every flag.
 
-Configuration is done via a YAML file. By default the server searches for configuration in the following order (first match wins):
+### The wizard
 
-1. Path specified via `--config` flag
-2. `.smpe-zosmf.yaml` in the current working directory
-3. `.smpe-zosmf.yaml` in `~/.config/smpe_ls/`
-4. `.zosmf-mcp-config.yaml` in the current working directory **(deprecated)**
+`zosmf-mcp init config` on its own backs up the file, lists the systems already in it and offers `[n]` new system, `[1-N]` change a system, `[r]` restore a backup and `[d]` done. It asks for one system in sections — connection, SMP/E, TSO, then optional settings for other tools and for ZOAU — and shows the result as YAML before `Write? [Y/n]`.
 
-> **Note:** The `.zosmf-mcp-config.yaml` file is deprecated. For new installations, use `.smpe-zosmf.yaml`. This shared configuration file is used by zosmf-mcp, vscode-smpe, vscpdf, and nvpdf.nvim — all four tools ignore unknown fields in the config.
+- CSIs and zones are entered one per line; an empty line ends the list. The first CSI, and all zones, are what a tool call uses when it names none.
+- When changing a system, the current value is shown in brackets and Enter keeps it. A list can be kept, replaced or added to.
 
-## Canonical Configuration Example
+### Flags for scripts
 
-The following is the recommended shared configuration file `.smpe-zosmf.yaml`, which is read by zosmf-mcp, vscode-smpe, vscpdf, and nvpdf.nvim:
+`init config` also takes every field as a flag. `--questions` prints the field list as JSON.
+
+| Flag | Purpose |
+| --- | --- |
+| `--name`, `--host`, `--user` | The required fields. `--host` needs `https://`. |
+| `--csi A,B`, `--zones A,B`, `--tso-account`, `--tso-proc`, … | The optional fields, one flag each. |
+| `--ssh-host`, `--ssh-user`, `--ssh-key-file`, `--zoau-path`, `--ssh-port` | The ZOAU group: once one of them is given, all but `--ssh-port` are required. |
+| `--file` | The configuration file. Default: the file the server would find, else `~/.config/smpe_ls/.smpe-zosmf.yaml`. |
+| `--show` | Prints the systems already in the file as JSON, without secrets. |
+| `--print` | Shows the system as it would be written; writes nothing. |
+| `--check` | Validates the file and reports where each system's password comes from. |
+
+`init env` takes `--file`, `--env-file`, `--questions` (the variables still missing) and `--generate-api-key`. It never prints a value it writes.
+
+## Where the file lives
+
+The server uses the first of these that exists:
+
+1. the path given with `--config`
+2. `.smpe-zosmf.yaml` in the current directory
+3. `~/.config/smpe_ls/.smpe-zosmf.yaml`
+4. `.zosmf-mcp-config.yaml` in the current directory — deprecated
+
+The same file is read by vscode-smpe, vscpdf and nvpdf.nvim. Each tool ignores the keys it does not know.
+
+## Example
 
 ```yaml
-# .smpe-zosmf.yaml — shared by zosmf-mcp, vscode-smpe, vscpdf and nvpdf.nvim
+# ~/.config/smpe_ls/.smpe-zosmf.yaml
 servers:
   - name: PROD
-    host: https://zosmf.example.com
-    port: 443
-    user: USER1                  # z/OSMF userid (basic auth)
+    host: https://zosmf.example.com:443
+    user: USER1
     rejectUnauthorized: true
-    # auth:                      # alternative to user:, with env expansion
-    #   username: USER1
-    #   password: ${PROD_PASSWORD}
-    # tso_account: ACCT1         # required for zosmf_tso_command
-    # tso_proc: IKJACCNT
-    # csi:                       # SMP/E (used by vscode-smpe and zosmf_smpe_query_csi)
-    #   - SMPE.GLOBAL.CSI
-    # zones: [GLOBAL, TGT1]
-    # defaultZones: [GLOBAL]
-    # home: /u/user1             # USS home (used by vscpdf/nvpdf)
+    csi:
+      - SMPE.GLOBAL.CSI
+    zones: [TGT1]
+    tso_account: ACCT1
+    tso_proc: IZUFPROC
 
-# ssh_systems:                   # optional, for ZOAU tools via SSH
+# ssh_systems:                  # only for the ZOAU tools
 #   - name: PROD
 #     host: prod.example.com
-#     port: 22
 #     username: user1
-#     key_file: ~/.ssh/id_rsa
+#     key_file: ~/.ssh/id_ed25519
+#     environment:
+#       ZOAU_HOME: /usr/lpp/IBM/zoautil
+#       PATH: /usr/lpp/IBM/zoautil/bin:/bin:/usr/bin
+#       LIBPATH: /usr/lpp/IBM/zoautil/lib:/lib:/usr/lib
 
-# defaultServer: PROD            # used by vscode-smpe; ignored by zosmf-mcp
+transport:
+  stdio: true
 ```
 
-## Compatibility Aliases
+## Systems
 
-The following fields are accepted as aliases for compatibility with other z/OSMF tools:
+`servers:` — or `systems:` — is a list. Each entry is one z/OSMF endpoint.
 
-| Alias                | Equivalent to                 |
-|----------------------|-------------------------------|
-| `servers`            | `systems`                     |
-| `user`               | `auth.username`               |
-| `rejectUnauthorized` | `skip_tls_verify` (inverted)  |
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `name` | yes | The name tool calls use as `system`. Upper and lower case do not matter. |
+| `host` | yes | The z/OSMF base URL, with `https://` (or `http://`), optionally with a port. |
+| `port` | no | Appended to `host` when the URL carries no port. |
+| `user` | for password login | The z/OSMF user ID. |
+| `auth.password` | no | The password, normally as a `${VAR}` reference. Leave it out to use `ZOSMF_<SYSTEM>_PASSWORD` — see [Passwords](#passwords). |
+| `auth.type` | no | `basic` — the default once a user is set — or `certificate`. |
+| `auth.cert_file`, `auth.key_file` | for `certificate` | PEM client certificate and its key. |
+| `rejectUnauthorized` | no | `false` turns off the TLS certificate check. Only for test systems. |
+| `ca_file` | no | PEM CA certificate for a self-signed z/OSMF certificate — the alternative to turning the check off. |
+| `csi` | no | CSI data sets. SMP/E queries use the first one when they name none. |
+| `zones` | no | SMP/E zones that a query uses when it names none. |
+| `tso_account`, `tso_proc` | for `zosmf_tso_command` | Without them the tool refuses to run. A typical procedure is `IZUFPROC`. |
+| `proxy` | no | Overrides the global `proxy` block for this system — see [Forwarding](#forwarding-through-a-proxy-or-jump-host). |
+| `defaultZones`, `home` | no | Read by vscode-smpe, vscpdf and nvpdf; ignored by zosmf-mcp. |
+| `tso_charset`, `tso_codepage`, `dlib_zones` | no | Accepted, but not used. |
 
-This means you can use the simpler `servers:` key with `user:` and `rejectUnauthorized:` fields (as shown in the canonical example above) instead of the older nested `systems` list with `auth` blocks.
+Several keys have a second spelling, and both work: `systems` / `servers`, `auth.username` / `user`, `skip_tls_verify: true` / `rejectUnauthorized: false`, `csi_datasets` / `csi`, `target_zones` / `zones`. `zosmf-mcp init config` writes the second form, the one the other tools use, and keeps `systems:` when the file already has it.
 
-## Configuration Reference
+A system without any credentials still loads; only its tool calls fail. The configured user needs SAF/RACF access to the z/OSMF REST services the tools use — and no more, see [Before You Start](../README.md#️-before-you-start).
 
-| Field             | Required | Description                                                       |
-|-------------------|----------|-------------------------------------------------------------------|
-| `name`            | Yes      | System name used in prompts (e.g. "PROD", "MAINT")               |
-| `host`            | Yes      | z/OSMF base URL including port                                    |
-| `port`            | No       | Port number — appended to `host` if not already present          |
-| `auth.type`       | No       | `basic` or `certificate` — defaults to `basic` when a username is present; entries without any credentials start but reject tool calls |
-| `auth.username`   | Yes*     | TSO user ID (*required for `basic`)                               |
-| `auth.password`   | No       | Password as a `${ENV_VAR}` reference — omit it to use `ZOSMF_<SYSTEM>_PASSWORD`, see [Passing Passwords Securely](#passing-passwords-securely) |
-| `auth.cert_file`  | Yes**    | PEM certificate file (**required for `certificate`)               |
-| `auth.key_file`   | Yes**    | PEM private key file (**required for `certificate`)               |
-| `ca_file`         | No       | PEM file with the CA certificate for self-signed z/OSMF certs    |
-| `skip_tls_verify` | No       | Skip TLS validation — not recommended for production             |
-| `csi`             | No       | Default CSI datasets for SMP/E queries (list of dataset names)   |
-| `zones`           | No       | Default SMP/E zones (used when no zone is specified in tool call) |
-| `defaultZones`    | No       | Default SMP/E zones used by vscode-smpe; ignored by zosmf-mcp     |
-| `tso_account`     | No       | TSO account number (required for `zosmf_tso_command`)            |
-| `tso_proc`        | No       | TSO logon procedure (required for `zosmf_tso_command`)           |
-| `tso_charset`     | No       | TSO character set, default: `697`                                 |
-| `tso_codepage`    | No       | TSO code page, default: `1047`                                    |
-| `home`            | No       | USS home directory, used by vscpdf/nvpdf                          |
-
-## Backups and Restore
-
-`zosmf-mcp init config` and `zosmf-mcp init env` copy the file they are about to replace into `.zosmf-mcp-backups/` next to it — for example `~/.config/smpe_ls/.zosmf-mcp-backups/.smpe-zosmf.yaml.20261001-140530`. The newest 10 copies per file are kept, all mode 600. The interactive wizard also backs up the file when it starts.
-
-To put one back, use `[r]` in the wizard, or:
-
-```bash
-zosmf-mcp init restore --list                       # JSON, newest first
-zosmf-mcp init restore --backup 20261001-140530     # add --target config|env if both match
-```
-
-A restore replaces the whole file and backs up the version it replaces first, so it can itself be undone. `--file` and `--env-file` select the files as in `init config` and `init env`; without `--env-file` it is `.env` next to the configuration.
-
-## Passing Passwords Securely
+## Passwords
 
 Never put a password in the configuration file. A system's password is looked up in this order:
 
@@ -123,205 +130,129 @@ Each variable is taken from the process environment first, then from the `.env` 
 ZOSMF_SYSA_PASSWORD=my_password
 ```
 
+A `${VAR}` reference that resolves nowhere stops the server at startup and is named in the error, instead of reaching z/OSMF as literal text.
+
 The startup log and `zosmf-mcp init config --check` name the source each system used — `file`, `system-env`, `global-env`, `env-file` or `none` — never the value itself.
 
-## SSH Systems (for ZOAU tools)
+## ZOAU over SSH
 
-ZOAU tools require SSH access to individual LPARs. SSH systems are configured independently of z/OSMF systems — one z/OSMF endpoint can serve an entire sysplex, while SSH requires a separate entry per LPAR.
+The `zoau_*` tools run ZOAU commands over SSH, not through z/OSMF. They are registered only when `ssh_systems` has an entry. One z/OSMF endpoint can serve a whole sysplex; SSH needs one entry per LPAR. Tool calls name the entry as `ssh_system` — a separate namespace from the `system` of the `zosmf_*` tools.
 
 ```yaml
 ssh_systems:
-  - name: "MVSA"
-    host: "mvsa.example.com"
-    port: 22                    # optional, default: 22
-    username: "ibmuser"
-    key_file: "~/.ssh/id_rsa"  # optional — omit to use SSH default key
-  - name: "MVSB"
-    host: "mvsb.example.com"
-    username: "ibmuser"
+  - name: MVSA
+    host: mvsa.example.com
+    username: ibmuser
+    key_file: ~/.ssh/id_ed25519
+    environment:
+      ZOAU_HOME: /usr/lpp/IBM/zoautil
+      PATH: /usr/lpp/IBM/zoautil/bin:/bin:/usr/bin
+      LIBPATH: /usr/lpp/IBM/zoautil/lib:/lib:/usr/lib
 ```
 
-ZOAU tools are only registered when at least one `ssh_systems` entry is present. Password-based SSH is not supported — only key authentication.
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `name` | yes | The name tool calls use as `ssh_system`. |
+| `host` | yes | SSH host name or IP address. |
+| `port` | no | Default `22`. |
+| `username` | yes | The z/OS user the commands run as. |
+| `key_file` | no | The private key. Without it, `ssh` uses its default key. Only key authentication is supported; `init config` always asks for a key. |
+| `environment` | no | Variables exported before every command. ZOAU needs `ZOAU_HOME` and its `bin` and `lib` directories in `PATH` and `LIBPATH`, unless the user's login already sets them. `init config --zoau-path` writes all three. |
+| `proxy_jump` | no | Overrides the global `ssh_proxy_jump` block for this entry — see [Forwarding](#forwarding-through-a-proxy-or-jump-host). |
 
-### SSH Systems Configuration Reference
+The key grants shell access to z/OS; protect it like one.
 
-| Field      | Required | Default | Description                                   |
-|------------|----------|---------|-----------------------------------------------|
-| `name`     | Yes      | —       | LPAR name — used as `system` in tool calls    |
-| `host`     | Yes      | —       | SSH hostname or IP address                    |
-| `port`     | No       | 22      | SSH port                                      |
-| `username` | Yes      | —       | USS username for SSH login                    |
-| `key_file` | No       | —       | Path to SSH private key; omit for SSH default |
-
-
-## Request Forwarding, API-Key Authentication and Docker
-
-By default zosmf-mcp needs direct network access to the z/OSMF REST API (and, for ZOAU
-tools, direct SSH access to the target LPARs). This section is for the case where the
-server itself runs somewhere without that access — for example in a container on a
-homelab Docker host that can only reach the z/OS systems indirectly, through another
-machine that does have a route to them.
-
-### Topology
-
-```text
-MacBook (privat)          Homelab-Dockerhost           Maschine 2                z/OS
-──────────────────        ────────────────────         ──────────────            ──────
-Claude Code / Agent  ──▶  zosmf-mcp ──▶ tunnel   ──▶   sshd (Jump)   ──▶  z/OSMF REST
-                 (MCP über HTTP)   (SOCKS5)      (SSH)              (HTTPS)
-```
-
-A tunnel sidecar runs next to the `zosmf-mcp` container and opens an outbound SSH
-connection to the jump host, exposing a local SOCKS5 endpoint (`ssh -D`) that the
-zosmf-mcp container routes its z/OSMF traffic through. Nothing needs to be installed on
-the jump host beyond `sshd` — `ssh -D` is entirely handled by the client side.
-
-The TLS connection to z/OSMF stays end-to-end: it terminates inside the zosmf-mcp
-container, not on the jump host. The jump host only ever sees encrypted bytes, so there
-are no certificate changes to make and `skip_tls_verify` remains unnecessary.
-
-ZOAU tools do **not** use the SOCKS tunnel above — they open their own, independent
-outbound SSH connection straight to the target LPAR, using `ssh -J` (`ProxyJump`) to
-reach it via the jump host:
-
-```text
-MacBook (privat)          Homelab-Dockerhost           Maschine 2                z/OS
-──────────────────        ────────────────────         ──────────────            ──────
-Claude Code / Agent  ──▶  zosmf-mcp        ──────────▶ sshd (Jump)   ──▶  sshd (LPAR, ZOAU)
-                 (MCP über HTTP)    (SSH, -J via jump host)
-```
-
-Because the two paths are independent, the jump host has to be configured in two
-places: `JUMP_HOST` in `.env` for the tunnel sidecar (z/OSMF REST), and
-`ssh_proxy_jump.host` in the config file for ZOAU. They are typically the same host but
-nothing enforces that.
-
-### Config schema
-
-Two independent, optional top-level blocks control forwarding. Neither block, or
-`enabled: false`, means today's behavior — requests go out directly.
+## Transports and API key
 
 ```yaml
-# Route all z/OSMF REST calls through a proxy (e.g. a SOCKS5 tunnel to a jump host).
-# Without this block, all requests go out directly.
-# proxy:
-#   enabled: true
-#   url: ${ZOSMF_PROXY}          # socks5://tunnel:1080
-
-# Route ZOAU SSH connections through a jump host (ssh -J).
-# ssh_proxy_jump:
-#   enabled: true
-#   host: jump@jumphost.example.com
-
-# Exempt an individual system from the proxy:
-# servers:
-#   - name: SYS2
-#     host: https://zosmf-internal.example.com:443
-#     proxy:
-#       enabled: false
+transport:
+  stdio: true               # the client starts the server: Claude Code, Claude Desktop, IDEs
+  streamable_http:          # the server runs on its own: n8n, containers
+    enabled: true
+    listen: ":8081"
+  http:                     # older plain JSON-RPC over HTTP
+    enabled: false
+    listen: ":8080"
 ```
 
-| Field                  | Scope                | Description                                                              |
-|------------------------|-----------------------|----------------------------------------------------------------------------|
-| `proxy.enabled`        | global                | Turns the global z/OSMF REST proxy on                                     |
-| `proxy.url`            | global                | Proxy URL — scheme must be `http`, `https` or `socks5`                    |
-| `servers[].proxy`      | per system            | Overrides the global `proxy` block for one system                         |
-| `ssh_proxy_jump.enabled` | global              | Turns the global ZOAU SSH jump host on                                    |
-| `ssh_proxy_jump.host`  | global                | Jump host as `user@host`, passed to `ssh -J`                              |
-| `ssh_systems[].proxy_jump` | per SSH system   | Overrides the global `ssh_proxy_jump` block for one SSH system            |
+| Key | Meaning |
+| --- | --- |
+| `stdio` | Serves one client over stdin and stdout. |
+| `streamable_http.enabled`, `http.enabled` | Starts that HTTP transport. |
+| `listen` | Address to listen on. Defaults: `:8081` and `:8080` — all interfaces. `127.0.0.1:8081` keeps it on this machine. |
+| `api_key` | The bearer token clients must send. Defaults to `MCP_API_KEY`. |
+| `allow_insecure` | `true` starts the transport without an API key. Only when nobody else can reach the port. |
 
-Precedence: a per-system (or per-SSH-system) `proxy` / `proxy_jump` block always wins
-over the global block, whether it turns forwarding on or off for that one entry. If a
-per-system block omits `url` (or a per-SSH-system block omits `host`), it inherits the
-value from the global block — so `proxy: {enabled: true}` on one system means "on for
-this system, using the global proxy URL." If `proxy.url` is empty at the global level,
-it is filled from the `ZOSMF_PROXY` environment variable. An invalid proxy URL scheme is
-rejected at config load time, not on the first tool call, and so is `enabled: true`
-without a `url` / `host`.
+All enabled transports run at the same time. `--transport stdio|http|streamable-http` overrides the file for one run; the default, `auto`, follows it. `zosmf-mcp init config` adds `transport: {stdio: true}` to a file that has no transport block.
 
-> **Constraint:** `ssh -J` (ProxyJump) propagates the `-i` key given to the target
-> connection to the jump-host connection as well, so the jump host and the target z/OS
-> LPAR must accept the *same* private key. Inside the container there is no
-> `~/.ssh/config`, no agent, and `BatchMode=yes` is set, so there is no way to configure
-> a different key per hop — plan the jump host's `authorized_keys` accordingly.
-
-### API-key authentication
-
-The HTTP and Streamable HTTP transports require an API key before they will start. Generate one:
+An HTTP transport refuses to start without an API key. Generate one:
 
 ```bash
 zosmf-mcp init env --generate-api-key
 ```
 
-It writes `MCP_API_KEY` to the `.env` next to the configuration, which the server reads at startup; the key is never printed. A container takes the key from its own `.env` instead — see [`container-setup.md`](container-setup.md#4-create-env).
-
-The server reads it as `transport.http.api_key` / `transport.streamable_http.api_key`
-(each transport has its own key) and expects clients to send it as
-`Authorization: Bearer <key>`. Starting an HTTP transport without an `api_key` set
-aborts the server at startup; pass `allow_insecure: true` on that transport to opt into
-running without a key.
-
-Client-side, add the header to the MCP client configuration, e.g. `.mcp.json`:
+It writes `MCP_API_KEY` to the `.env` next to the configuration; the server reads it at startup and uses it for both HTTP transports, unless the file sets its own `api_key`. The key is never printed. Clients send it as `Authorization: Bearer <key>`, for example in a `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "zosmf": {
+    "zosmf-mcp": {
       "type": "http",
-      "url": "http://dockerhost:8081/mcp",
+      "url": "http://zosmf-mcp.example.com:8081/mcp",
       "headers": { "Authorization": "Bearer ..." }
     }
   }
 }
 ```
 
-> **Warning:** Over plain HTTP, the API key only protects against a device that
-> stumbles onto or scans the port. It does **not** protect against anyone able to read
-> the traffic — the key and every z/OS command travel in the clear. TLS, via a reverse
-> proxy in front of the transport, is the next step if that matters for your network.
+> **Warning:** The HTTP transports carry no TLS. Over plain HTTP the API key only keeps out someone who stumbles onto the port — anyone who can read the traffic sees the key and every z/OS command. Put a TLS-terminating reverse proxy in front if that matters on your network.
 
-### Container operation
+## Forwarding through a proxy or jump host
 
-**Full step-by-step guide: [`container-setup.md`](container-setup.md)** — covers
-both Docker/Compose and Apple container, with every command, the required `.env`
-entries, key permissions, verification and troubleshooting.
+For a server that cannot reach z/OS directly, two optional blocks route its traffic through a machine that can. [Running zosmf-mcp in a container](container-setup.md) shows the complete setup with a tunnel container.
 
-The short version:
-
-```bash
-cp .env.example .env     # fill in JUMP_HOST, MCP_API_KEY, per-system passwords, mount paths
-make apikey              # generate the bearer token
-make docker-up           # Docker:          builds and starts tunnel + zosmf-mcp
-make container-up        # Apple container: same, resolving the tunnel IP at runtime
+```yaml
+proxy:                          # z/OSMF REST calls, e.g. through a SOCKS5 tunnel
+  enabled: true
+  url: socks5://tunnel:1080
+ssh_proxy_jump:                 # ZOAU SSH connections, via ssh -J
+  enabled: true
+  host: jump@jumphost.example.com
 ```
 
-The container mounts your existing configuration — it does not ship one. Three things
-are worth knowing before the first start:
+| Key | Scope | Meaning |
+| --- | --- | --- |
+| `proxy.enabled` | global | Turns the z/OSMF proxy on. |
+| `proxy.url` | global | Proxy URL; the scheme must be `http`, `https` or `socks5`. Empty: taken from `ZOSMF_PROXY`. |
+| `servers[].proxy` | per system | Overrides the global block for one system. |
+| `ssh_proxy_jump.enabled` | global | Turns the ZOAU jump host on. |
+| `ssh_proxy_jump.host` | global | Jump host as `user@host`, passed to `ssh -J`. |
+| `ssh_systems[].proxy_jump` | per SSH system | Overrides the global block for one SSH system. |
 
-- **The transport is overridden on the command line** (`--transport streamable-http`).
-  A production config usually selects stdio, and nothing is attached to stdin inside a
-  container, so the server would exit immediately and restart in a loop.
-- **The proxy is switched on by `ZOSMF_PROXY`** — no `proxy:` block needed in the
-  mounted file. A block in the file still wins.
-- **Unresolved `${VAR}` references abort the start** and are reported by name, instead
-  of surfacing later as an unexplained 401.
+Without either block — or with `enabled: false` — requests go out directly. Setting `ZOSMF_PROXY` on its own also turns the proxy on.
 
-> **Required on Linux — key ownership:** a bind-mounted SSH key keeps the host's file
-> ownership. The tunnel container runs as root, and OpenSSH refuses a key owned by
-> anyone else; under `BatchMode=yes` that failure is silent. Before the first start:
->
-> ```bash
-> sudo chown 0:0 secrets/jump_key && sudo chmod 600 secrets/jump_key
-> ```
->
-> Not needed on macOS, where the filesystem layer remaps ownership.
+A per-system block always wins over the global one, whether it turns forwarding on or off. A per-system block without `url` (or `host`) inherits it from the global block, so `proxy: {enabled: true}` on one system means "on, with the global URL". An invalid scheme, or `enabled: true` without a URL or host, is rejected when the file is loaded, not on the first tool call.
 
+> **The jump host and the LPAR must accept the same key.** zosmf-mcp passes the entry's `key_file` to both hops. In a container there is also no `~/.ssh/config` or agent that could offer a different one.
 
-## Additional Notes
+## Resources
 
-- **TLS**: For production systems, set `skip_tls_verify: false` and configure CA certificates correctly.
-- **Permissions**: The configured z/OSMF user requires appropriate SAF/RACF permissions for the z/OSMF REST APIs being used.
-- **TSO**: `tso_account` and `tso_proc` must be set in the configuration to use `zosmf_tso_command`. The logon procedure must be valid on the target system (e.g. `IZUFPROC`).
-- **SMP/E**: If `csi_dataset` and `zone` are not specified explicitly, the default values from the system configuration are used.
-- **Passwords**: never in the configuration file — see [Passing Passwords Securely](#passing-passwords-securely).
+```yaml
+resources:
+  inline_max_bytes: 32768
+```
 
+A read result larger than this — 32 KB by default — comes back as a preview plus a link to the full content. See [Resources](tools.md#resources).
+
+## Backups and restore
+
+`zosmf-mcp init config` and `zosmf-mcp init env` copy the file they are about to replace into `.zosmf-mcp-backups/` next to it — for example `~/.config/smpe_ls/.zosmf-mcp-backups/.smpe-zosmf.yaml.20261001-140530`. The newest 10 copies per file are kept, all mode 600. The wizard also backs up the file when it starts.
+
+To put one back, use `[r]` in the wizard, or:
+
+```bash
+zosmf-mcp init restore --list                       # JSON, newest first
+zosmf-mcp init restore --backup 20261001-140530     # add --target config|env if both match
+```
+
+A restore replaces the whole file and backs up the version it replaces first, so it can itself be undone. `--file` and `--env-file` select the files as in `init config` and `init env`; without `--env-file` it is the `.env` next to the configuration.

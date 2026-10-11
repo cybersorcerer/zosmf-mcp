@@ -51,13 +51,28 @@ TLS stays end to end: SOCKS5 tunnels the TCP connection, and the TLS handshake
 happens between the container and z/OSMF. The jump host only ever sees
 encrypted traffic.
 
+The ZOAU tools take a different path. They do not use the tunnel; each call
+opens its own SSH connection from the `zosmf-mcp` container to the LPAR, via
+the jump host (`ssh -J`):
+
+```text
+zosmf-mcp ──SSH──▶ Jump host ──SSH──▶ LPAR (sshd, ZOAU)
+```
+
+So the jump host is named in two places: `JUMP_HOST` in `.env` for the tunnel,
+and `ssh_proxy_jump.host` in the configuration file for ZOAU — see
+[Forwarding through a proxy or jump host](configuration.md#forwarding-through-a-proxy-or-jump-host).
+They are usually the same host, but nothing enforces that. For ZOAU, the jump
+host must accept the same key as the LPAR — the tunnel uses its own `JUMP_KEY`.
+
 ---
 
 ## 2. Prerequisites
 
 **On the jump host:** a running sshd and an authorized public key. Nothing else.
 
-**On the container host:** Docker with the Compose plugin, or Apple container
+**On the container host:** a clone of this repository — the image is built
+from it, there is no published image — and Docker with the Compose plugin, or Apple container
 1.2+ on macOS 26 (Apple Silicon). Exercised with Apple container 1.2 on
 macOS 26 and 1.4.1 on macOS 27; the latter needs the kernel step in
 [section 7](#7-path-b-apple-container).
@@ -378,9 +393,9 @@ container run -d --name zosmf-mcp \
 rm -f /tmp/zosmf-env
 ```
 
-Using our own image for the tunnel has a reason: `alpine/openssh` could not be
-pulled anonymously from Docker Hub here (`401 Unauthorized`), and our image
-already contains `openssh-client`. Under Docker, `alpine/openssh` works
+Using our own image for the tunnel has a reason: Apple container can fail to
+pull `alpine/openssh` anonymously from Docker Hub (`401 Unauthorized`), and our
+image already contains `openssh-client`. Under Docker, `alpine/openssh` works
 normally.
 
 ---

@@ -44,9 +44,9 @@ This server enforces no authorization of its own. Every limit comes from SAF/RAC
 
 ### Network and credential exposure
 
-- **Never put passwords in the configuration file.** `zosmf-mcp init env` keeps them in a `.env` next to it that only you can read, and the server reads that file itself — see [Passing Passwords Securely](docs/configuration.md#passing-passwords-securely).
+- **Never put passwords in the configuration file.** `zosmf-mcp init env` keeps them in a `.env` next to it that only you can read, and the server reads that file itself — see [Passing Passwords Securely](docs/configuration.md#passwords).
 - **`skip_tls_verify: true` disables certificate validation.** It exists for self-signed test systems. Setting it against a production system exposes credentials to interception.
-- **The HTTP and Streamable HTTP transports listen on all interfaces by default.** Anyone who can reach the port can drive the server with your z/OSMF credentials. Bind to localhost, put it behind a reverse proxy, or enable API-key authentication — see [API-key authentication](docs/configuration.md#api-key-authentication).
+- **The HTTP and Streamable HTTP transports listen on all interfaces by default.** Anyone who can reach the port can drive the server with your z/OSMF credentials. Bind to localhost, put it behind a reverse proxy, or enable API-key authentication — see [API-key authentication](docs/configuration.md#transports-and-api-key).
 - **ZOAU tools authenticate by SSH key only.** The key grants shell access to the target system; protect it accordingly.
 
 

@@ -8,6 +8,20 @@ Entries for releases up to 0.5.2 were reconstructed from the commit history.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every tool and resource result is guarded.** Text is sanitized (invalid
+  UTF-8, control characters, NEL from EBCDIC, U+2028/2029, BOM) and capped:
+  64 KiB per tool result, 256 KiB per resource read; binary blobs above
+  16 KiB are replaced by a note. Unbounded results could grow a client
+  conversation until the client failed with "request body is not valid JSON".
+
+### Added
+
+- **`zosmf_get_spool_content` filters on the server**: `search`, `research`,
+  `case_sensitive`, `max_records` and `record_range` (X-IBM-Record-Range).
+
+
 ## [1.1.0] — 2026-10-11
 
 ### Added

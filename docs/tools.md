@@ -24,7 +24,7 @@ a client sees the systems you actually have instead of guessing a name.
 | `zosmf_list_jobs`         | List jobs with optional filters              |
 | `zosmf_get_job`           | Get details of a specific job                |
 | `zosmf_get_job_output`    | List spool files (DD names) of a job         |
-| `zosmf_get_spool_content` | Read the content of a spool file             |
+| `zosmf_get_spool_content` | Read the content of a spool file; optional server-side `search`/`research`, `max_records`, `record_range` |
 | `zosmf_get_all_spools`    | Read all spool file contents of a job in a single call |
 | `zosmf_submit_job`        | Submit a job from inline JCL or a dataset    |
 | `zosmf_cancel_job`        | Cancel a running job                         |
@@ -33,6 +33,11 @@ a client sees the systems you actually have instead of guessing a name.
 | `zosmf_release_job`       | Release a held job                           |
 
 **Example prompts**
+
+**Find the first error in a large SYSPRINT**
+```
+Search spool file 104 of MYJOB JOB01234 on SYSA for "ABEND|IEW2456E", at most 20 records
+```
 
 **Show all active jobs**
 ```

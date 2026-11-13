@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -149,6 +150,100 @@ func (c *Client) GetJobFileContent(jobName, jobID string, fileID int) (string, e
 	}
 
 	return string(body), nil
+}
+
+// SpoolReadOptions narrows a spool file read on the server side, so that only
+// the interesting part of a large SYSPRINT crosses the wire. All fields are
+// optional; the zero value is a plain read. See "Retrieve the contents of a
+// job spool file" in the z/OSMF Programming Guide (z/OS jobs REST interface).
+type SpoolReadOptions struct {
+	// Search is a substring; z/OSMF returns records starting at the first
+	// matching record. Mutually exclusive with Research.
+	Search string
+	// Research is an extended regular expression, e.g. "IEF142I|ABEND".
+	Research string
+	// CaseSensitive turns off the default case-insensitive matching.
+	CaseSensitive bool
+	// MaxReturnSize limits the records returned for Search/Research
+	// (z/OSMF default 100).
+	MaxReturnSize int
+	// RecordRange is sent as X-IBM-Record-Range: "SSS-EEE" (0-based,
+	// inclusive) or "SSS,NNN" (start, count).
+	RecordRange string
+}
+
+// SpoolReadResult is the content plus, for searches, the X-IBM-Record-Range
+// response header (first matching record, number of records returned).
+type SpoolReadResult struct {
+	Content    string `json:"content"`
+	Found      bool   `json:"found"`
+	FirstMatch int    `json:"first_match,omitempty"`
+	NumRecords int    `json:"num_records,omitempty"`
+}
+
+func (o SpoolReadOptions) IsZero() bool {
+	return o.Search == "" && o.Research == "" && o.RecordRange == ""
+}
+
+// GetJobFileContentEx reads a spool file with optional server-side search
+// and record range.
+func (c *Client) GetJobFileContentEx(jobName, jobID string, fileID int, opts SpoolReadOptions) (*SpoolReadResult, error) {
+	if opts.Search != "" && opts.Research != "" {
+		return nil, fmt.Errorf("search and research cannot be combined")
+	}
+	path := fmt.Sprintf("/zosmf/restjobs/jobs/%s/%s/files/%d/records",
+		url.PathEscape(jobName), url.PathEscape(jobID), fileID)
+
+	q := url.Values{}
+	switch {
+	case opts.Search != "":
+		q.Set("search", opts.Search)
+	case opts.Research != "":
+		q.Set("research", opts.Research)
+	}
+	searching := len(q) > 0
+	if searching {
+		if opts.CaseSensitive {
+			q.Set("insensitive", "false")
+		}
+		if opts.MaxReturnSize > 0 {
+			q.Set("maxreturnsize", strconv.Itoa(opts.MaxReturnSize))
+		}
+		path += "?" + q.Encode()
+	}
+
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if opts.RecordRange != "" {
+		req.Header.Set("X-IBM-Record-Range", opts.RecordRange)
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to %s failed: %w", path, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := readLimited(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, c.httpError(path, resp.StatusCode, body)
+	}
+
+	res := &SpoolReadResult{Content: string(body), Found: true}
+	if rr := resp.Header.Get("X-IBM-Record-Range"); searching && rr != "" {
+		var p, n int
+		if _, err := fmt.Sscanf(rr, "%d,%d", &p, &n); err == nil {
+			res.FirstMatch = p
+			res.NumRecords = n
+			res.Found = n > 0
+		}
+	}
+	return res, nil
 }
 
 // SubmitJobJCL submits a job from inline JCL.

@@ -206,6 +206,12 @@ type getSpoolContentArgs struct {
 	JobName string          `json:"job_name"`
 	JobID   string          `json:"job_id"`
 	FileID  json.RawMessage `json:"file_id"`
+
+	Search        string          `json:"search,omitempty"`
+	Research      string          `json:"research,omitempty"`
+	CaseSensitive bool            `json:"case_sensitive,omitempty"`
+	MaxRecords    json.RawMessage `json:"max_records,omitempty"`
+	RecordRange   string          `json:"record_range,omitempty"`
 }
 
 func NewGetSpoolContentTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.ToolHandler {
@@ -214,8 +220,10 @@ func NewGetSpoolContentTool(clients *zosmf.ClientRegistry, inlineMax int) mcp.To
 
 func (t *getSpoolContentTool) Definition() mcp.Tool {
 	return mcp.Tool{
-		Name:        "zosmf_get_spool_content",
-		Description: "Read the content of a specific spool file (DD) from a z/OS job. Use zosmf_get_job_output first to get available file IDs.",
+		Name: "zosmf_get_spool_content",
+		Description: "Read the content of a specific spool file (DD) from a z/OS job. Use zosmf_get_job_output first to get available file IDs. " +
+			"For large files (SYSPRINT, compile/link listings) prefer a server-side filter: 'search' or 'research' " +
+			"returns records starting at the first match (up to 'max_records', default 100); 'record_range' reads only a slice.",
 		Annotations: readOnlyTool("Read Spool File"),
 		InputSchema: mustJSON(map[string]any{
 			"type": "object",
@@ -224,6 +232,17 @@ func (t *getSpoolContentTool) Definition() mcp.Tool {
 				"job_name": map[string]any{"type": "string", "description": "Job name"},
 				"job_id":   map[string]any{"type": "string", "description": "Job ID"},
 				"file_id":  map[string]any{"type": "string", "description": "Spool file ID (from zosmf_get_job_output)"},
+				"search": map[string]any{"type": "string",
+					"description": "Substring; return records starting at the first matching record. Cannot be combined with 'research'."},
+				"research": map[string]any{"type": "string",
+					"description": "Extended regular expression, e.g. 'ABEND|IEF142I'; return records starting at the first match."},
+				"case_sensitive": map[string]any{"type": "boolean",
+					"description": "Match search/research case-sensitively (default: case-insensitive)."},
+				"max_records": map[string]any{"type": "integer",
+					"description": "Maximum records returned with search/research (z/OSMF default 100)."},
+				"record_range": map[string]any{"type": "string",
+					"description": "Records to read: 'SSS-EEE' (0-based, inclusive; EEE=0 means to the end) or 'SSS,NNN' (start, count). " +
+						"With search/research it limits the range searched."},
 			},
 			"required": []string{"system", "job_name", "job_id", "file_id"},
 		}),
@@ -248,6 +267,34 @@ func (t *getSpoolContentTool) Execute(ctx context.Context, arguments json.RawMes
 	if _, err := fmt.Sscanf(raw, "%d", &fileID); err != nil {
 		return mcp.ErrorResult("invalid file_id: " + err.Error()), nil
 	}
+
+	opts := zosmf.SpoolReadOptions{
+		Search:        args.Search,
+		Research:      args.Research,
+		CaseSensitive: args.CaseSensitive,
+		RecordRange:   strings.TrimSpace(args.RecordRange),
+	}
+	if len(args.MaxRecords) > 0 {
+		// max_records may arrive as integer or quoted string — handle both
+		if _, err := fmt.Sscanf(strings.Trim(string(args.MaxRecords), `"`), "%d", &opts.MaxReturnSize); err != nil {
+			return mcp.ErrorResult("invalid max_records: " + err.Error()), nil
+		}
+	}
+	if opts.RecordRange != "" && !validRecordRange(opts.RecordRange) {
+		return mcp.ErrorResult("invalid record_range: use 'SSS-EEE' or 'SSS,NNN' with non-negative integers"), nil
+	}
+	if !opts.IsZero() {
+		res, err := client.GetJobFileContentEx(args.JobName, args.JobID, fileID, opts)
+		if err != nil {
+			return mcp.ErrorResult("failed to get spool content: " + err.Error()), nil
+		}
+		if opts.Search != "" || opts.Research != "" {
+			data, _ := json.Marshal(res)
+			return mcp.TextResult(string(data)), nil
+		}
+		return mcp.TextResult(res.Content), nil
+	}
+
 	content, err := client.GetJobFileContent(args.JobName, args.JobID, fileID)
 	if err != nil {
 		return mcp.ErrorResult("failed to get spool content: " + err.Error()), nil
@@ -617,4 +664,21 @@ func mustJSON(v any) json.RawMessage {
 		panic(err)
 	}
 	return data
+}
+
+// validRecordRange accepts the two X-IBM-Record-Range forms documented by
+// z/OSMF: "SSS-EEE" and "SSS,NNN", both with non-negative integers.
+func validRecordRange(s string) bool {
+	sep := strings.IndexAny(s, "-,")
+	if sep <= 0 || sep == len(s)-1 {
+		return false
+	}
+	for _, part := range []string{s[:sep], s[sep+1:]} {
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }

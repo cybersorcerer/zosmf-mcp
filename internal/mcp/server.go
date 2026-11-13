@@ -266,6 +266,10 @@ func (s *Server) handleToolsCall(ctx context.Context, msg *JSONRPCMessage) *JSON
 	if result.IsError {
 		status = "error"
 	}
+	rawSize := resultSize(result)
+	if GuardToolResult(result, MaxResultTextBytes) {
+		s.logger.Printf("<-- tool %s result truncated: %d -> %d bytes", p.Name, rawSize, resultSize(result))
+	}
 	s.logger.Printf("<-- tool %s %s in %s (%d bytes)", p.Name, status, elapsed, resultSize(result))
 
 	resp, err := NewResponse(msg.ID, result)
@@ -315,6 +319,10 @@ func (s *Server) handleResourcesRead(ctx context.Context, msg *JSONRPCMessage) *
 	contents, err := s.resources.Read(ctx, params.URI)
 	if err != nil {
 		return NewErrorResponse(msg.ID, resourceErrorCode(err), err.Error())
+	}
+	rawSize := len(contents.Text) + len(contents.Blob)
+	if GuardResourceContents(&contents) {
+		s.logger.Printf("<-- resource %s truncated: %d -> %d bytes", params.URI, rawSize, len(contents.Text)+len(contents.Blob))
 	}
 
 	resp, err := NewResponse(msg.ID, ResourcesReadResult{Contents: []ResourceContents{contents}})
